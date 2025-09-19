@@ -4,6 +4,7 @@ const sendEmail = require('../utils/sendEmail');
 const { welcomeEmail, otpEmail, resetPasswordEmail } = require('../utils/sentEmail');
 const { generateOtp, generateResetToken, generateJwtToken } = require('../utils/tokenGenerator');
 const crypto = require('crypto');
+const VendorProfile = require('../models/vendor/vendorProfile');
 
 // ------------------ REGISTER ------------------
 exports.register = async (req, res) => {
@@ -43,6 +44,33 @@ exports.register = async (req, res) => {
 };
 
 // ------------------ LOGIN ------------------
+// exports.login = async (req, res) => {
+//   try {
+//     const { email, password } = req.body;
+//     if (!email || !password)
+//       return res.status(400).json({ message: 'Provide email and password' });
+
+//     const user = await User.findOne({ email });
+//     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+
+//     // ⛔ don't deleted this section
+//     // if (!user.isVerified) return res.status(403).json({ message: 'Account not verified' });
+//     // if (!user.isActive) return res.status(403).json({ message: 'Account is deactivated' });
+
+//     const isMatch = await user.comparePassword(password);
+//     if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
+
+//     user.lastLogin = new Date();
+//     await user.save();
+
+//     const token = generateJwtToken({ id: user._id });
+//     res.json({ message: 'Logged in', user: user.toJSON(), token });
+//   } catch (err) {
+//     res.status(500).json({ message: 'Login failed', error: err.message });
+//   }
+// };
+
+
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -52,19 +80,40 @@ exports.login = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
-    // ⛔ don't deleted this section
-    // if (!user.isVerified) return res.status(403).json({ message: 'Account not verified' });
-    // if (!user.isActive) return res.status(403).json({ message: 'Account is deactivated' });
-
     const isMatch = await user.comparePassword(password);
     if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
 
     user.lastLogin = new Date();
     await user.save();
 
+    // ✅ Fetch vendor profile if this user is a vendor
+    let vendorProfile = null;
+    if (user.role === 'vendor') {
+      vendorProfile = await VendorProfile.findOne({ user: user._id }).populate([
+        {
+          path: "module",
+          select: "moduleId title icon categories isActive createdAt updatedAt",
+          populate: {
+            path: "categories",
+            select: "title description isActive createdAt updatedAt",
+          },
+        },
+        {
+          path: "zone",
+          select: "name description coordinates city country isActive",
+        },
+      ]);
+    }
+
     const token = generateJwtToken({ id: user._id });
-    res.json({ message: 'Logged in', user: user.toJSON(), token });
+    res.json({
+      message: 'Logged in',
+      user: user.toJSON(),
+      profile: vendorProfile, // ✅ attach vendor profile if available
+      token
+    });
   } catch (err) {
+    console.error("Login Error:", err);
     res.status(500).json({ message: 'Login failed', error: err.message });
   }
 };
