@@ -26,6 +26,9 @@ app.use('/api/zones', require('./routes/admin/zoneRoutes'));
 
 // Admin Routes
 app.use('/api/vendorprofiles', require('./routes/vendor/vendorProfileRoutes'));
+app.use('/api/reviews', require('./routes/vendor/reviewRouters'));
+app.use('/api/venues', require('./routes/vendor/venueRoutes'));
+app.use('/api/renters', require('./routes/vendor/renterRoutes'));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
