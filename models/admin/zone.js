@@ -17,7 +17,7 @@ const zoneSchema = new mongoose.Schema(
       required: true,
       validate: {
         validator: function (v) {
-          return v.length >= 3;
+          return v.length >= 2;
         },
         message: "A zone must have at least 3 coordinates.",
       },

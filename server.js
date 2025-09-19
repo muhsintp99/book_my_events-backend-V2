@@ -8,6 +8,8 @@ connectDB();
 const app = express();
 app.use(express.json());
 
+app.get("/", (req, res) => res.send("BookMyEvent API Running 🚀"));
+
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Public Routes
@@ -22,7 +24,8 @@ app.use('/api/coupons', require('./routes/admin/couponsRouters'));
 app.use('/api/banners', require('./routes/admin/bannerRoutes'));
 app.use('/api/zones', require('./routes/admin/zoneRoutes'));
 
-// app.use('/api/stores', require('./routes/admin/storeRoutes'));
+// Admin Routes
+app.use('/api/vendorprofiles', require('./routes/vendor/vendorProfileRoutes'));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
