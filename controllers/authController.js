@@ -71,25 +71,35 @@ exports.register = async (req, res) => {
       phone,
       role,
       storeName,
-      storeAddress,
       businessTIN,
       tinExpireDate,
       module,
       zone
     } = req.body;
 
+    // ✅ Parse nested storeAddress from FormData
+    const storeAddress = {
+      street: req.body['storeAddress[street]'] || '',
+      city: req.body['storeAddress[city]'] || '',
+      state: req.body['storeAddress[state]'] || '',
+      zipCode: req.body['storeAddress[zipCode]'] || '',
+      fullAddress: req.body['storeAddress[fullAddress]'] || ''
+    };
+
     if (!firstName || !lastName || !email) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
     const existing = await User.findOne({ email });
-    if (existing) return res.status(400).json({ message: 'Email already registered' });
+    if (existing) {
+      return res.status(400).json({ message: 'Email already registered' });
+    }
 
     const userId = await generateUserId(role || 'user');
 
     let password = req.body.password;
     if (role === 'vendor') {
-      password = Math.random().toString(36).slice(-8); // auto password
+      password = Math.random().toString(36).slice(-8); // auto-generate if vendor
     }
 
     // 1️⃣ Create User
@@ -108,13 +118,7 @@ exports.register = async (req, res) => {
     if (role === 'vendor') {
       vendorProfile = await VendorProfile.create({
         storeName,
-        storeAddress: {
-          street: storeAddress?.street,
-          city: storeAddress?.city,
-          state: storeAddress?.state,
-          zipCode: storeAddress?.zipCode,
-          fullAddress: storeAddress?.fullAddress,
-        },
+        storeAddress,
         logo: req.files?.logo ? `/uploads/vendors/${req.files.logo[0].filename}` : null,
         coverImage: req.files?.coverImage ? `/uploads/vendors/${req.files.coverImage[0].filename}` : null,
         tinCertificate: req.files?.tinCertificate ? `/uploads/vendors/${req.files.tinCertificate[0].filename}` : null,
@@ -152,18 +156,17 @@ exports.register = async (req, res) => {
     const token = generateJwtToken({ id: user._id });
 
     res.status(201).json({
+      success: true,
       message: 'User registered',
       user: user.toJSON(),
       profile: vendorProfile,
       token
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Registration failed', error: err.message });
+    console.error("Register Error:", err);
+    res.status(500).json({ success: false, message: 'Registration failed', error: err.message });
   }
 };
-
-
 
 // ------------------ LOGIN ------------------
 // exports.login = async (req, res) => {
