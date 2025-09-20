@@ -7,10 +7,78 @@ const crypto = require('crypto');
 const VendorProfile = require('../models/vendor/vendorProfile');
 
 // ------------------ REGISTER ------------------
+// exports.register = async (req, res) => {
+//   try {
+//     const { firstName, lastName, email, phone, role } = req.body;
+//     if (!firstName || !lastName || !email ) {
+//       return res.status(400).json({ message: 'Missing required fields' });
+//     }
+
+//     const existing = await User.findOne({ email });
+//     if (existing) return res.status(400).json({ message: 'Email already registered' });
+
+//     const userId = await generateUserId(role || 'user');
+
+//     let password = req.body.password;
+//     if (role === 'vendor' || role?.startsWith("vendor")) {
+//       password = Math.random().toString(36).slice(-8);
+//     }
+
+//     const user = await User.create({
+//       userId,
+//       firstName,
+//       lastName,
+//       email,
+//       password,
+//       phone,
+//       role: role || 'user'
+//     });
+
+//     try {
+//       if (role === 'vendor' || role?.startsWith("vendor")) {
+//         await sendEmail(
+//           user.email,
+//           'Your Vendor Account Credentials',
+//           vendorEmail(user, password)
+//         );
+//       } else {
+//         await sendEmail(
+//           user.email,
+//           'Welcome to BookMyEvent',
+//           welcomeEmail(user)
+//         );
+//       }
+//     } catch (e) {
+//       console.error('Email sending failed:', e.message);
+//     }
+
+//     const token = generateJwtToken({ id: user._id });
+
+//     res.status(201).json({ message: 'User registered', user: user.toJSON(), token });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: 'Registration failed', error: err.message });
+//   }
+// };
+
+// ------------------ REGISTER ------------------
 exports.register = async (req, res) => {
   try {
-    const { firstName, lastName, email, phone, role } = req.body;
-    if (!firstName || !lastName || !email ) {
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      role,
+      storeName,
+      storeAddress,
+      businessTIN,
+      tinExpireDate,
+      module,
+      zone
+    } = req.body;
+
+    if (!firstName || !lastName || !email) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
@@ -20,22 +88,51 @@ exports.register = async (req, res) => {
     const userId = await generateUserId(role || 'user');
 
     let password = req.body.password;
-    if (role === 'vendor' || role?.startsWith("vendor")) {
-      password = Math.random().toString(36).slice(-8); // 8 char random password
+    if (role === 'vendor') {
+      password = Math.random().toString(36).slice(-8); // auto password
     }
 
+    // 1️⃣ Create User
     const user = await User.create({
       userId,
       firstName,
       lastName,
       email,
-      password,       // ❗️no manual hash — handled by pre('save')
+      password,
       phone,
       role: role || 'user'
     });
 
+    // 2️⃣ If vendor → create VendorProfile
+    let vendorProfile = null;
+    if (role === 'vendor') {
+      vendorProfile = await VendorProfile.create({
+        storeName,
+        storeAddress: {
+          street: storeAddress?.street,
+          city: storeAddress?.city,
+          state: storeAddress?.state,
+          zipCode: storeAddress?.zipCode,
+          fullAddress: storeAddress?.fullAddress,
+        },
+        logo: req.files?.logo ? `/uploads/vendors/${req.files.logo[0].filename}` : null,
+        coverImage: req.files?.coverImage ? `/uploads/vendors/${req.files.coverImage[0].filename}` : null,
+        tinCertificate: req.files?.tinCertificate ? `/uploads/vendors/${req.files.tinCertificate[0].filename}` : null,
+        ownerFirstName: firstName,
+        ownerLastName: lastName,
+        ownerPhone: phone,
+        ownerEmail: email,
+        businessTIN,
+        tinExpireDate,
+        module,
+        zone,
+        user: user._id
+      });
+    }
+
+    // 3️⃣ Send email
     try {
-      if (role === 'vendor' || role?.startsWith("vendor")) {
+      if (role === 'vendor') {
         await sendEmail(
           user.email,
           'Your Vendor Account Credentials',
@@ -53,13 +150,20 @@ exports.register = async (req, res) => {
     }
 
     const token = generateJwtToken({ id: user._id });
-    
-    res.status(201).json({ message: 'User registered', user: user.toJSON(), token });
+
+    res.status(201).json({
+      message: 'User registered',
+      user: user.toJSON(),
+      profile: vendorProfile,
+      token
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Registration failed', error: err.message });
   }
 };
+
+
 
 // ------------------ LOGIN ------------------
 // exports.login = async (req, res) => {

@@ -21,8 +21,6 @@ const vendorProfileSchema = new mongoose.Schema(
     },
     logo: String,
     coverImage: String,
-
-    // Owner Info
     ownerFirstName: {
       type: String,
       required: [true, "Owner first name is required"],
@@ -49,8 +47,6 @@ const vendorProfileSchema = new mongoose.Schema(
         "Please enter a valid email",
       ],
     },
-
-    // Business Info
     businessTIN: {
       type: String,
       required: [true, "Business TIN is required"],
@@ -62,10 +58,8 @@ const vendorProfileSchema = new mongoose.Schema(
     },
     tinCertificate: {
       type: String,
-      required: [true, "TIN certificate is required"],
+      required: false, // Must be false
     },
-
-    // Module & Zone
     module: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Module",
@@ -76,15 +70,11 @@ const vendorProfileSchema = new mongoose.Schema(
       ref: "Zone",
       required: [true, "Zone is required"],
     },
-
-    // Request Status
     status: {
       type: String,
       enum: ["pending", "under_review", "approved", "rejected"],
       default: "pending",
     },
-
-    // Admin Actions
     reviewedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -92,17 +82,14 @@ const vendorProfileSchema = new mongoose.Schema(
     reviewedAt: Date,
     rejectionReason: String,
     adminNotes: String,
-
     isActive: {
       type: Boolean,
       default: true,
     },
-
     approvedProvider: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
-
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
