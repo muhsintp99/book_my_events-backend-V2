@@ -3,18 +3,18 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const multer = require('multer');
 const path = require('path');
+const createUpload = require('../middlewares/upload');
 
-// Storage for vendor uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'public/uploads/vendors/');
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + '-' + file.originalname.replace(/\s+/g, '_'));
-  }
+const upload = createUpload('vendors', {
+  fileSizeMB: 2, // Match client-side 2MB limit
+  allowedTypes: [
+    'image/jpeg',
+    'image/png',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ]
 });
-
-const upload = multer({ storage });
 
 router.post(
   '/register',
