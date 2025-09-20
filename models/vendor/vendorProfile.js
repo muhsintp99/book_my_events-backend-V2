@@ -100,7 +100,7 @@ const vendorProfileSchema = new mongoose.Schema(
 
     approvedProvider: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Provider",
+      ref: "User",
     },
 
     user: {

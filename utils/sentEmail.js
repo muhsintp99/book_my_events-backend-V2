@@ -10,6 +10,20 @@ exports.welcomeEmail = (user) => `
   </div>
 `;
 
+exports.vendorEmail = (user, password) => `
+  <div style="font-family:Arial,sans-serif;line-height:1.6">
+    <h2>Welcome Vendor 🎉</h2>
+    <p>Hi <strong>${user.firstName}</strong>,</p>
+    <p>Your vendor account has been successfully created.</p>
+    <p><strong>Vendor ID:</strong> ${user.userId}</p>
+    <p><strong>Email:</strong> ${user.email}</p>
+    <p><strong>Password:</strong> ${password}</p>
+    <p style="color:red;">⚠️ Please change your password after your first login.</p>
+    <br/>
+    <p>Regards,<br/>BookMyEvent Team</p>
+  </div>
+`;
+
 exports.otpEmail = (otp) => `
   <div style="font-family:Arial,sans-serif;line-height:1.6">
     <h2>Your OTP Code</h2>

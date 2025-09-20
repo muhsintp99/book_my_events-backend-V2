@@ -1,7 +1,7 @@
 const User = require('../models/User');
 const { generateUserId } = require('../utils/generateId');
 const sendEmail = require('../utils/sendEmail');
-const { welcomeEmail, otpEmail, resetPasswordEmail } = require('../utils/sentEmail');
+const { welcomeEmail, vendorEmail, otpEmail, resetPasswordEmail } = require('../utils/sentEmail');
 const { generateOtp, generateResetToken, generateJwtToken } = require('../utils/tokenGenerator');
 const crypto = require('crypto');
 const VendorProfile = require('../models/vendor/vendorProfile');
@@ -9,8 +9,8 @@ const VendorProfile = require('../models/vendor/vendorProfile');
 // ------------------ REGISTER ------------------
 exports.register = async (req, res) => {
   try {
-    const { firstName, lastName, email, password, phone, role } = req.body;
-    if (!firstName || !lastName || !email || !password) {
+    const { firstName, lastName, email, phone, role } = req.body;
+    if (!firstName || !lastName || !email ) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
@@ -18,6 +18,11 @@ exports.register = async (req, res) => {
     if (existing) return res.status(400).json({ message: 'Email already registered' });
 
     const userId = await generateUserId(role || 'user');
+
+    let password = req.body.password;
+    if (role === 'vendor' || role?.startsWith("vendor")) {
+      password = Math.random().toString(36).slice(-8); // 8 char random password
+    }
 
     const user = await User.create({
       userId,
@@ -30,12 +35,25 @@ exports.register = async (req, res) => {
     });
 
     try {
-      await sendEmail(user.email, 'Welcome to BookMyEvent', welcomeEmail(user));
+      if (role === 'vendor' || role?.startsWith("vendor")) {
+        await sendEmail(
+          user.email,
+          'Your Vendor Account Credentials',
+          vendorEmail(user, password)
+        );
+      } else {
+        await sendEmail(
+          user.email,
+          'Welcome to BookMyEvent',
+          welcomeEmail(user)
+        );
+      }
     } catch (e) {
-      console.error('Welcome email failed:', e.message);
+      console.error('Email sending failed:', e.message);
     }
 
     const token = generateJwtToken({ id: user._id });
+    
     res.status(201).json({ message: 'User registered', user: user.toJSON(), token });
   } catch (err) {
     console.error(err);
