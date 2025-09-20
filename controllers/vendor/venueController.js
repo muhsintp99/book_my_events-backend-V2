@@ -16,8 +16,15 @@ exports.createVenue = async (req, res) => {
 
 exports.getVenues = async (req, res) => {
   try {
-    const venues = await Venue.find().populate("provider");
-    res.status(200).json({ success: true, data: venues });
+    const venues = await Venue.find()
+      .populate("provider") // ✅ Populates full User details
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      count: venues.length,
+      data: venues,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -25,9 +32,21 @@ exports.getVenues = async (req, res) => {
 
 exports.getVenue = async (req, res) => {
   try {
-    const venue = await Venue.findById(req.params.id).populate("provider");
-    if (!venue) return res.status(404).json({ success: false, message: "Venue not found" });
-    res.status(200).json({ success: true, data: venue });
+    const venue = await Venue.findById(req.params.id)
+      .populate("provider")
+      .lean();
+
+    if (!venue) {
+      return res.status(404).json({
+        success: false,
+        message: "Venue not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: venue,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

@@ -59,7 +59,8 @@ const venueSchema = new mongoose.Schema(
     searchTags: String,
     rentalType: { type: String, enum: ["hourly", "daily"], default: "hourly" },
 
-    provider: { type: mongoose.Schema.Types.ObjectId, ref: "Provider" },
+    // ✅ Now points to User model
+    provider: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
     // Media
     thumbnail: String,
