@@ -10,14 +10,32 @@ exports.getMe = async (req, res) => {
 };
 
 // ✅ Get all users (admin/superadmin)
+// exports.getAllUsers = async (req, res) => {
+//   try {
+//     const users = await User.find().select('-password');
+//     res.json({ users });
+//   } catch (err) {
+//     res.status(500).json({ message: err.message });
+//   }
+// };
+
+
 exports.getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().select('-password');
+    const filter = {};
+
+    // Dynamic filtering based on query parameters
+    if (req.query.role) filter.role = req.query.role;
+    if (req.query.isVerified) filter.isVerified = req.query.isVerified === 'true';
+    if (req.query.isActive) filter.isActive = req.query.isActive === 'true';
+
+    const users = await User.find(filter).select('-password');
     res.json({ users });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
+
 
 // ✅ Get one user by ID
 exports.getUserById = async (req, res) => {
