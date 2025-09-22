@@ -43,6 +43,7 @@ app.use('/api/vendorprofiles', require('./routes/vendor/vendorProfileRoutes'));
 app.use('/api/reviews', require('./routes/vendor/reviewRouters'));
 app.use('/api/venues', require('./routes/vendor/venueRoutes'));
 app.use('/api/renters', require('./routes/vendor/renterRoutes'));
+app.use('/api/vehicles', require('./routes/vendor/vehicleRouter'));
 
 // Server listen
 const PORT = process.env.PORT || 5000;

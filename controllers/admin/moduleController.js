@@ -29,7 +29,7 @@ const populateModule = async (moduleId) => {
 // Create Module
 exports.createModule = async (req, res) => {
   try {
-    const { title, categories, createdBy } = req.body;
+    const { title, categories } = req.body;
 
     if (!MODULE_TITLES.includes(title)) {
       return res.status(400).json({ error: 'Invalid module title' });
@@ -38,7 +38,6 @@ exports.createModule = async (req, res) => {
     const moduleData = {
       title,
       categories: categories ? JSON.parse(categories) : [],
-      createdBy,
       icon: req.file ? `uploads/modules/${req.file.filename}` : null
     };
 

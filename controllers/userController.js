@@ -52,7 +52,7 @@ exports.getUserById = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const updates = { ...req.body };
-    delete updates.password; // prevent password update here
+    delete updates.password;
     const user = await User.findByIdAndUpdate(req.params.id, updates, { new: true }).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
     res.json({ message: 'User updated', user });
