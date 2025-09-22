@@ -7,62 +7,9 @@ const crypto = require('crypto');
 const VendorProfile = require('../models/vendor/vendorProfile');
 
 // ------------------ REGISTER ------------------
-// exports.register = async (req, res) => {
-//   try {
-//     const { firstName, lastName, email, phone, role } = req.body;
-//     if (!firstName || !lastName || !email ) {
-//       return res.status(400).json({ message: 'Missing required fields' });
-//     }
-
-//     const existing = await User.findOne({ email });
-//     if (existing) return res.status(400).json({ message: 'Email already registered' });
-
-//     const userId = await generateUserId(role || 'user');
-
-//     let password = req.body.password;
-//     if (role === 'vendor' || role?.startsWith("vendor")) {
-//       password = Math.random().toString(36).slice(-8);
-//     }
-
-//     const user = await User.create({
-//       userId,
-//       firstName,
-//       lastName,
-//       email,
-//       password,
-//       phone,
-//       role: role || 'user'
-//     });
-
-//     try {
-//       if (role === 'vendor' || role?.startsWith("vendor")) {
-//         await sendEmail(
-//           user.email,
-//           'Your Vendor Account Credentials',
-//           vendorEmail(user, password)
-//         );
-//       } else {
-//         await sendEmail(
-//           user.email,
-//           'Welcome to BookMyEvent',
-//           welcomeEmail(user)
-//         );
-//       }
-//     } catch (e) {
-//       console.error('Email sending failed:', e.message);
-//     }
-
-//     const token = generateJwtToken({ id: user._id });
-
-//     res.status(201).json({ message: 'User registered', user: user.toJSON(), token });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ message: 'Registration failed', error: err.message });
-//   }
-// };
-
-// ------------------ REGISTER ------------------
 exports.register = async (req, res) => {
+  const session = await User.startSession();
+  session.startTransaction();
   try {
     const {
       firstName,
@@ -70,6 +17,7 @@ exports.register = async (req, res) => {
       email,
       phone,
       role,
+      password,
       storeName,
       businessTIN,
       tinExpireDate,
@@ -77,7 +25,7 @@ exports.register = async (req, res) => {
       zone
     } = req.body;
 
-    // ✅ Parse nested storeAddress from FormData
+    // Parse nested storeAddress from FormData
     const storeAddress = {
       street: req.body['storeAddress[street]'] || '',
       city: req.body['storeAddress[city]'] || '',
@@ -86,116 +34,128 @@ exports.register = async (req, res) => {
       fullAddress: req.body['storeAddress[fullAddress]'] || ''
     };
 
+    // Basic validation for all roles
     if (!firstName || !lastName || !email) {
-      return res.status(400).json({ message: 'Missing required fields' });
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: 'Missing required fields: firstName, lastName, email' });
     }
 
-    const existing = await User.findOne({ email });
+    // Role validation
+    const validRoles = ['superadmin', 'admin', 'vendor', 'user'];
+    if (role && !validRoles.includes(role)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: `Invalid role. Allowed roles: ${validRoles.join(', ')}` });
+    }
+
+    const existing = await User.findOne({ email }).session(session);
     if (existing) {
-      return res.status(400).json({ message: 'Email already registered' });
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: 'Email already registered' });
+    }
+
+    // Password handling based on role
+    let userPassword = password;
+    if (role === 'vendor') {
+      userPassword = Math.random().toString(36).slice(-8);
+    } else {
+      if (!userPassword || userPassword.length < 6) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ success: false, message: 'Password is required and must be at least 6 characters for non-vendor roles' });
+      }
+      if (phone && !/^\+?[\d\s-]{10,}$/.test(phone)) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ success: false, message: 'Invalid phone number format' });
+      }
     }
 
     const userId = await generateUserId(role || 'user');
+    const refreshToken = crypto.randomBytes(32).toString('hex');
+    const user = await User.create(
+      [{
+        userId,
+        firstName,
+        lastName,
+        email,
+        password: userPassword,
+        phone,
+        role: role || 'user',
+        refreshToken
+      }],
+      { session }
+    );
 
-    let password = req.body.password;
-    if (role === 'vendor') {
-      password = Math.random().toString(36).slice(-8); // auto-generate if vendor
-    }
-
-    // 1️⃣ Create User
-    const user = await User.create({
-      userId,
-      firstName,
-      lastName,
-      email,
-      password,
-      phone,
-      role: role || 'user'
-    });
-
-    // 2️⃣ If vendor → create VendorProfile
     let vendorProfile = null;
     if (role === 'vendor') {
-      vendorProfile = await VendorProfile.create({
-        storeName,
-        storeAddress,
-        logo: req.files?.logo ? `/uploads/vendors/${req.files.logo[0].filename}` : null,
-        coverImage: req.files?.coverImage ? `/uploads/vendors/${req.files.coverImage[0].filename}` : null,
-        tinCertificate: req.files?.tinCertificate ? `/uploads/vendors/${req.files.tinCertificate[0].filename}` : null,
-        ownerFirstName: firstName,
-        ownerLastName: lastName,
-        ownerPhone: phone,
-        ownerEmail: email,
-        businessTIN,
-        tinExpireDate,
-        module,
-        zone,
-        user: user._id
-      });
+      vendorProfile = await VendorProfile.create(
+        [{
+          storeName: storeName || '',
+          storeAddress,
+          logo: req.files?.logo ? `/uploads/vendors/${req.files.logo[0].filename}` : '',
+          coverImage: req.files?.coverImage ? `/uploads/vendors/${req.files.coverImage[0].filename}` : '',
+          tinCertificate: req.files?.tinCertificate ? `/uploads/vendors/${req.files.tinCertificate[0].filename}` : '',
+          ownerFirstName: firstName,
+          ownerLastName: lastName,
+          ownerPhone: phone || '',
+          ownerEmail: email,
+          businessTIN: businessTIN || '',
+          tinExpireDate: tinExpireDate || null,
+          module: module || null,
+          zone: zone || null,
+          user: user[0]._id,
+          status: 'pending'
+        }],
+        { session }
+      );
     }
 
-    // 3️⃣ Send email
+    await session.commitTransaction();
+    session.endSession();
+
     try {
       if (role === 'vendor') {
         await sendEmail(
-          user.email,
+          user[0].email,
           'Your Vendor Account Credentials',
-          vendorEmail(user, password)
+          vendorEmail(user[0], userPassword)
         );
       } else {
         await sendEmail(
-          user.email,
+          user[0].email,
           'Welcome to BookMyEvent',
-          welcomeEmail(user)
+          welcomeEmail(user[0])
         );
       }
     } catch (e) {
       console.error('Email sending failed:', e.message);
     }
 
-    const token = generateJwtToken({ id: user._id });
+    const token = generateJwtToken({ id: user[0]._id });
 
     res.status(201).json({
       success: true,
-      message: 'User registered',
-      user: user.toJSON(),
-      profile: vendorProfile,
-      token
+      message: `User registered as ${role || 'user'}`,
+      user: user[0].toJSON(),
+      profile: vendorProfile ? vendorProfile[0].toJSON() : null,
+      token,
+      refreshToken
     });
   } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
     console.error("Register Error:", err);
+    if (err.message === 'Failed to generate unique userId after multiple attempts') {
+      return res.status(500).json({ success: false, message: 'Registration failed due to userId generation issue', error: err.message });
+    }
     res.status(500).json({ success: false, message: 'Registration failed', error: err.message });
   }
 };
 
 // ------------------ LOGIN ------------------
-// exports.login = async (req, res) => {
-//   try {
-//     const { email, password } = req.body;
-//     if (!email || !password)
-//       return res.status(400).json({ message: 'Provide email and password' });
-
-//     const user = await User.findOne({ email });
-//     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
-
-//     // ⛔ don't deleted this section
-//     // if (!user.isVerified) return res.status(403).json({ message: 'Account not verified' });
-//     // if (!user.isActive) return res.status(403).json({ message: 'Account is deactivated' });
-
-//     const isMatch = await user.comparePassword(password);
-//     if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
-
-//     user.lastLogin = new Date();
-//     await user.save();
-
-//     const token = generateJwtToken({ id: user._id });
-//     res.json({ message: 'Logged in', user: user.toJSON(), token });
-//   } catch (err) {
-//     res.status(500).json({ message: 'Login failed', error: err.message });
-//   }
-// };
-
-
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -208,10 +168,11 @@ exports.login = async (req, res) => {
     const isMatch = await user.comparePassword(password);
     if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
 
+    const refreshToken = crypto.randomBytes(32).toString('hex');
+    user.refreshToken = refreshToken;
     user.lastLogin = new Date();
     await user.save();
 
-    // ✅ Fetch vendor profile if this user is a vendor
     let vendorProfile = null;
     if (user.role === 'vendor') {
       vendorProfile = await VendorProfile.findOne({ user: user._id }).populate([
@@ -234,8 +195,9 @@ exports.login = async (req, res) => {
     res.json({
       message: 'Logged in',
       user: user.toJSON(),
-      profile: vendorProfile, // ✅ attach vendor profile if available
-      token
+      profile: vendorProfile,
+      token,
+      refreshToken
     });
   } catch (err) {
     console.error("Login Error:", err);
@@ -244,8 +206,49 @@ exports.login = async (req, res) => {
 };
 
 // ------------------ LOGOUT ------------------
-exports.logout = (req, res) => {
-  res.json({ message: 'Logged out (client should discard the token)' });
+exports.logout = async (req, res) => {
+  try {
+    if (req.user) {
+      const user = await User.findById(req.user._id);
+      if (user) {
+        user.refreshToken = undefined;
+        await user.save();
+      }
+    }
+    res.json({ message: 'Logged out successfully' });
+  } catch (err) {
+    console.error("Logout Error:", err);
+    res.status(500).json({ message: 'Logout failed', error: err.message });
+  }
+};
+
+// ------------------ REFRESH TOKEN ------------------
+exports.refreshToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(400).json({ message: 'Refresh token is required' });
+    }
+
+    const user = await User.findOne({ refreshToken });
+    if (!user) {
+      return res.status(403).json({ message: 'Invalid refresh token' });
+    }
+
+    const newAccessToken = generateJwtToken({ id: user._id });
+    const newRefreshToken = crypto.randomBytes(32).toString('hex');
+    user.refreshToken = newRefreshToken;
+    await user.save();
+
+    res.json({
+      message: 'Token refreshed',
+      token: newAccessToken,
+      refreshToken: newRefreshToken
+    });
+  } catch (err) {
+    console.error("Refresh Token Error:", err);
+    res.status(500).json({ message: 'Token refresh failed', error: err.message });
+  }
 };
 
 // ------------------ SEND OTP ------------------
@@ -330,7 +333,7 @@ exports.resetPassword = async (req, res) => {
     const { password } = req.body;
     if (!password) return res.status(400).json({ message: 'Password is required' });
 
-    user.password = password;  // ❗️no manual hash — pre('save') will hash
+    user.password = password;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
     await user.save();

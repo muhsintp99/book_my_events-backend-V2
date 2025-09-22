@@ -1,12 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
-const multer = require('multer');
-const path = require('path');
+const { protect } = require('../middlewares/authMiddleware');
 const createUpload = require('../middlewares/upload');
 
 const upload = createUpload('vendors', {
-  fileSizeMB: 2, // Match client-side 2MB limit
+  fileSizeMB: 2,
   allowedTypes: [
     'image/jpeg',
     'image/png',
@@ -26,9 +25,9 @@ router.post(
   authController.register
 );
 
-// router.post('/register', authController.register);
 router.post('/login', authController.login);
-router.post('/logout', authController.logout);
+router.post('/logout', protect, authController.logout);
+router.post('/refresh-token', authController.refreshToken);
 router.post('/otpSend', authController.sendOtp);
 router.post('/otpVerify', authController.verifyOtp);
 router.post('/forgot-password', authController.forgotPassword);

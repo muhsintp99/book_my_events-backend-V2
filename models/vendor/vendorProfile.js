@@ -4,39 +4,41 @@ const vendorProfileSchema = new mongoose.Schema(
   {
     storeName: {
       type: String,
-      required: [true, "Store name is required"],
       trim: true,
       maxlength: [100, "Store name cannot exceed 100 characters"],
+      default: ""
     },
     storeAddress: {
-      street: { type: String, trim: true },
-      city: { type: String, trim: true },
-      state: { type: String, trim: true },
-      zipCode: { type: String, trim: true },
+      street: { type: String, trim: true, default: "" },
+      city: { type: String, trim: true, default: "" },
+      state: { type: String, trim: true, default: "" },
+      zipCode: { type: String, trim: true, default: "" },
       fullAddress: {
         type: String,
         trim: true,
         maxlength: [500, "Address cannot exceed 500 characters"],
-      },
+        default: ""
+      }
     },
-    logo: String,
-    coverImage: String,
+    logo: { type: String, trim: true, default: "" },
+    coverImage: { type: String, trim: true, default: "" },
+    tinCertificate: { type: String, trim: true, default: "" },
     ownerFirstName: {
       type: String,
       required: [true, "Owner first name is required"],
       trim: true,
-      maxlength: [50, "First name cannot exceed 50 characters"],
+      maxlength: [50, "First name cannot exceed 50 characters"]
     },
     ownerLastName: {
       type: String,
       required: [true, "Owner last name is required"],
       trim: true,
-      maxlength: [50, "Last name cannot exceed 50 characters"],
+      maxlength: [50, "Last name cannot exceed 50 characters"]
     },
     ownerPhone: {
       type: String,
-      required: [true, "Owner phone is required"],
       trim: true,
+      default: ""
     },
     ownerEmail: {
       type: String,
@@ -44,56 +46,53 @@ const vendorProfileSchema = new mongoose.Schema(
       lowercase: true,
       match: [
         /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
-        "Please enter a valid email",
-      ],
+        "Please enter a valid email"
+      ]
     },
     businessTIN: {
       type: String,
-      required: [true, "Business TIN is required"],
       trim: true,
+      default: ""
     },
     tinExpireDate: {
       type: Date,
-      required: [true, "TIN expire date is required"],
-    },
-    tinCertificate: {
-      type: String,
-      required: false, // Must be false
+      default: null
     },
     module: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Module",
-      required: [true, "Module is required"],
+      default: null
     },
     zone: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Zone",
-      required: [true, "Zone is required"],
+      default: null
     },
     status: {
       type: String,
       enum: ["pending", "under_review", "approved", "rejected"],
-      default: "pending",
+      default: "pending"
     },
     reviewedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "User"
     },
     reviewedAt: Date,
     rejectionReason: String,
     adminNotes: String,
     isActive: {
       type: Boolean,
-      default: true,
+      default: true
     },
     approvedProvider: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "User"
     },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-    },
+      required: [true, "User reference is required"]
+    }
   },
   { timestamps: true }
 );

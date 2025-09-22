@@ -12,10 +12,24 @@ async function generateUserId(role) {
   if (!prefix) throw new Error(`Invalid role: ${role}`);
 
   const year = new Date().getFullYear();
-  const regex = new RegExp('^' + prefix + year);
-  const count = await User.countDocuments({ userId: { $regex: regex } });
-  const serial = String(count + 1).padStart(4, '0');
-  return `${prefix}${year}${serial}`;
+  const maxAttempts = 10; // Increased retry limit
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    // Generate a 6-digit random number for broader range
+    const randomNum = Math.floor(100000 + Math.random() * 900000);
+    const userId = `${prefix}${year}${randomNum}`;
+
+    // Check if userId exists
+    const existingUser = await User.findOne({ userId });
+    if (!existingUser) {
+      return userId;
+    }
+
+    // Exponential backoff to avoid rapid retries
+    await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 50));
+  }
+
+  throw new Error('Failed to generate unique userId after multiple attempts');
 }
 
 module.exports = { generateUserId };
