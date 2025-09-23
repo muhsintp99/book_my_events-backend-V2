@@ -4,9 +4,9 @@ const { Schema } = mongoose;
 const BrandSchema = new Schema({
   brandId: { type: String, unique: true, required: true },
   title: { type: String, required: true, trim: true },
-  icon: { type: String }, // File path of icon image
+  icon: { type: String }, // we keep this instead of "image" if you prefer
   isActive: { type: Boolean, default: true },
-
+  module: { type: mongoose.Schema.Types.ObjectId, ref: 'Module', required: true }, // ✅ single reference
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

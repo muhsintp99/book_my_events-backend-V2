@@ -9,6 +9,7 @@ const upload = createUpload('categories', {
 });
 
 router.post('/', upload.single('image'), categoryController.createCategory);
+router.get('/module/:moduleId', categoryController.getCategoriesByModule);
 router.put('/:id', upload.single('image'), categoryController.updateCategory);
 router.delete('/:id', categoryController.deleteCategory);
 router.get('/', categoryController.getCategories);

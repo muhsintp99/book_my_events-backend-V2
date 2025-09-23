@@ -10,11 +10,11 @@ const deleteFile = async (filePath) => {
     await fs.access(fullPath);
     await fs.unlink(fullPath);
   } catch {
-    // Ignore if not exists
+    // Ignore if file doesn't exist
   }
 };
 
-// ✅ Create
+// ✅ Create Brand
 exports.createBrand = async (req, res) => {
   try {
     const iconPath = req.file ? `uploads/brands/${req.file.filename}` : null;
@@ -22,16 +22,19 @@ exports.createBrand = async (req, res) => {
     const brand = await Brand.create({
       title: req.body.title,
       icon: iconPath,
+      module: req.body.module, // ✅ lowercase module
       createdBy: req.body.createdBy
     });
 
-    res.status(201).json(brand);
+    const populatedBrand = await Brand.findById(brand._id).populate('module', '-__v');
+
+    res.status(201).json({ message: 'Brand created', brand: populatedBrand });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
 
-// ✅ Update
+// ✅ Update Brand
 exports.updateBrand = async (req, res) => {
   try {
     const brand = await Brand.findById(req.params.id);
@@ -43,17 +46,21 @@ exports.updateBrand = async (req, res) => {
     }
 
     if (req.body.title) brand.title = req.body.title;
+    if (req.body.module) brand.module = req.body.module; // ✅ lowercase
     brand.updatedBy = req.body.updatedBy;
     brand.updatedAt = new Date();
 
     await brand.save();
-    res.json(brand);
+
+    const populatedBrand = await Brand.findById(brand._id).populate('module', '-__v');
+
+    res.json({ message: 'Brand updated', brand: populatedBrand });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
 
-// ✅ Delete (hard delete)
+// ✅ Delete Brand
 exports.deleteBrand = async (req, res) => {
   try {
     const brand = await Brand.findById(req.params.id);
@@ -68,20 +75,20 @@ exports.deleteBrand = async (req, res) => {
   }
 };
 
-// ✅ Get all
+// ✅ Get all Brands
 exports.getBrands = async (req, res) => {
   try {
-    const brands = await Brand.find();
+    const brands = await Brand.find().populate('module', '-__v');
     res.json(brands);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
-// ✅ Get single
+// ✅ Get single Brand
 exports.getBrand = async (req, res) => {
   try {
-    const brand = await Brand.findById(req.params.id);
+    const brand = await Brand.findById(req.params.id).populate('module', '-__v');
     if (!brand) return res.status(404).json({ error: 'Brand not found' });
     res.json(brand);
   } catch (err) {
@@ -89,7 +96,18 @@ exports.getBrand = async (req, res) => {
   }
 };
 
-// ✅ Block (deactivate)
+// ✅ Get Brands by Module
+exports.getBrandsByModule = async (req, res) => {
+  try {
+    const { moduleId } = req.params;
+    const brands = await Brand.find({ module: moduleId }).populate('module', '-__v');
+    res.json(brands);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Block Brand
 exports.blockBrand = async (req, res) => {
   try {
     const brand = await Brand.findById(req.params.id);
@@ -100,13 +118,16 @@ exports.blockBrand = async (req, res) => {
     brand.updatedAt = new Date();
 
     await brand.save();
-    res.json({ message: 'Brand blocked', brand });
+
+    const populatedBrand = await Brand.findById(brand._id).populate('module', '-__v');
+
+    res.json({ message: 'Brand blocked', brand: populatedBrand });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
-// ✅ Reactivate
+// ✅ Reactivate Brand
 exports.reactivateBrand = async (req, res) => {
   try {
     const brand = await Brand.findById(req.params.id);
@@ -117,7 +138,10 @@ exports.reactivateBrand = async (req, res) => {
     brand.updatedAt = new Date();
 
     await brand.save();
-    res.json({ message: 'Brand reactivated', brand });
+
+    const populatedBrand = await Brand.findById(brand._id).populate('module', '-__v');
+
+    res.json({ message: 'Brand reactivated', brand: populatedBrand });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

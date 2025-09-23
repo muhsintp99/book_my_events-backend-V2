@@ -6,6 +6,7 @@ const CategorySchema = new Schema({
   title: { type: String, required: true, trim: true },
   image: { type: String },
   brands: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Brand' }],
+  module: { type: mongoose.Schema.Types.ObjectId, ref: 'Module', required: true }, // ✅ single module
   isActive: { type: Boolean, default: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
