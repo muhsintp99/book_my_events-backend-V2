@@ -107,6 +107,8 @@ exports.getBrandsByModule = async (req, res) => {
   }
 };
 
+
+
 // ✅ Block Brand
 exports.blockBrand = async (req, res) => {
   try {

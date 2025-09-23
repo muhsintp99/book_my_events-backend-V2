@@ -240,6 +240,8 @@ exports.deleteCategory = async (req, res) => {
   }
 };
 
+
+
 // ✅ Get all Categories (populate brands + module)
 exports.getCategories = async (req, res) => {
   try {
