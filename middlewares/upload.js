@@ -78,7 +78,7 @@ function createUpload(folder, options = {}) {
   }
 
   // ✅ Always use lowercase "uploads" to match app.js
-  const uploadDir = path.join(__dirname, `../uploads/${folder}`);
+  const uploadDir = path.join(__dirname, `uploads/${folder}`);
 
   // Ensure directory exists (synchronous, safer for Multer)
   if (!fs.existsSync(uploadDir)) {
