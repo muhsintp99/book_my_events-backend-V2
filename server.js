@@ -32,6 +32,8 @@ app.use('/api/users', require('./routes/userRoutes'));
 
 // ================= ADMIN ROUTES =================
 app.use('/api/modules', require('./routes/admin/moduleRoutes'));
+app.use('/api/secondary-modules', require('./routes/admin/secondaryModuleRoutes'));
+
 app.use('/api/categories', require('./routes/admin/categoryRoutes'));
 app.use('/api/brands', require('./routes/admin/brandRoutes'));
 app.use('/api/coupons', require('./routes/admin/couponsRouters'));
@@ -44,6 +46,8 @@ app.use('/api/reviews', require('./routes/vendor/reviewRouters'));
 app.use('/api/venues', require('./routes/vendor/venueRoutes'));
 app.use('/api/renters', require('./routes/vendor/renterRoutes'));
 app.use('/api/vehicles', require('./routes/vendor/vehicleRouter'));
+app.use('/api/venuecoupons', require('./routes/vendor/venueCouponRoutes'));
+
 
 // Server listen
 const PORT = process.env.PORT || 5000;
