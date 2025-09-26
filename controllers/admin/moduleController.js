@@ -1,12 +1,178 @@
+// const fs = require('fs');
+// const path = require('path');
+// const Module = require('../../models/admin/module');
+
+// const MODULE_TITLES = [
+//   'venue', 'rental', 'event', 'mehandi',
+//   'photography', 'catering', 'makeup', 'dj', 'music'
+// ];
+
+// const deleteFileIfExists = (filePath) => {
+//   if (filePath && fs.existsSync(filePath)) {
+//     fs.unlinkSync(filePath);
+//   }
+// };
+
+// // Helper: populate module -> categories -> brands
+// const populateModule = async (moduleId) => {
+//   return await Module.findById(moduleId)
+//     .populate({
+//       path: 'categories',
+//       select: '-__v',
+//       populate: {
+//         path: 'brands',
+//         select: '-__v'
+//       }
+//     });
+// };
+
+// // Create Module
+// exports.createModule = async (req, res) => {
+//   try {
+//     const { title, categories } = req.body;
+
+//     if (!MODULE_TITLES.includes(title)) {
+//       return res.status(400).json({ error: 'Invalid module title' });
+//     }
+
+//     const moduleData = {
+//       title,
+//       categories: categories ? JSON.parse(categories) : [],
+//       icon: req.file ? `uploads/modules/${req.file.filename}` : null
+//     };
+
+//     const module = await Module.create(moduleData);
+//     const populated = await populateModule(module._id);
+//     res.status(201).json({ message: 'Module created', module: populated });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: err.message });
+//   }
+// };
+
+// // Update Module
+// exports.updateModule = async (req, res) => {
+//   try {
+//     const { title, categories, updatedBy } = req.body;
+//     const module = await Module.findById(req.params.id);
+//     if (!module) return res.status(404).json({ error: 'Module not found' });
+
+//     if (title && !MODULE_TITLES.includes(title)) {
+//       return res.status(400).json({ error: 'Invalid module title' });
+//     }
+
+//     if (req.file) {
+//       deleteFileIfExists(path.join(__dirname, `../../${module.icon}`));
+//       module.icon = `uploads/modules/${req.file.filename}`;
+//     }
+
+//     if (title) module.title = title;
+//     if (categories) module.categories = JSON.parse(categories);
+//     if (updatedBy) module.updatedBy = updatedBy;
+
+//     await module.save();
+//     const populated = await populateModule(module._id);
+//     res.json({ message: 'Module updated', module: populated });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: err.message });
+//   }
+// };
+
+// // Delete Module
+// exports.deleteModule = async (req, res) => {
+//   try {
+//     const module = await Module.findById(req.params.id);
+//     if (!module) return res.status(404).json({ error: 'Module not found' });
+
+//     deleteFileIfExists(path.join(__dirname, `../../${module.icon}`));
+//     await module.deleteOne();
+//     res.json({ message: 'Module deleted successfully' });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: err.message });
+//   }
+// };
+
+// // Get all modules (fully populated)
+// exports.getModules = async (req, res) => {
+//   try {
+//     const modules = await Module.find()
+//       .populate({
+//         path: 'categories',
+//         select: '-__v',
+//         populate: { path: 'brands', select: '-__v' }
+//       });
+//     res.json(modules);
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: err.message });
+//   }
+// };
+
+// // Get single module (fully populated)
+// exports.getModule = async (req, res) => {
+//   try {
+//     const module = await Module.findById(req.params.id)
+//       .populate({
+//         path: 'categories',
+//         select: '-__v',
+//         populate: { path: 'brands', select: '-__v' }
+//       });
+//     if (!module) return res.status(404).json({ error: 'Module not found' });
+//     res.json(module);
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: err.message });
+//   }
+// };
+
+// // Block Module
+// exports.blockModule = async (req, res) => {
+//   try {
+//     const module = await Module.findByIdAndUpdate(
+//       req.params.id,
+//       { isActive: false, updatedBy: req.body.updatedBy },
+//       { new: true }
+//     ).populate({
+//       path: 'categories',
+//       select: '-__v',
+//       populate: { path: 'brands', select: '-__v' }
+//     });
+
+//     if (!module) return res.status(404).json({ error: 'Module not found' });
+//     res.json({ message: 'Module blocked', module });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: err.message });
+//   }
+// };
+
+// // Reactivate Module
+// exports.reactivateModule = async (req, res) => {
+//   try {
+//     const module = await Module.findByIdAndUpdate(
+//       req.params.id,
+//       { isActive: true, updatedBy: req.body.updatedBy },
+//       { new: true }
+//     ).populate({
+//       path: 'categories',
+//       select: '-__v',
+//       populate: { path: 'brands', select: '-__v' }
+//     });
+
+//     if (!module) return res.status(404).json({ error: 'Module not found' });
+//     res.json({ message: 'Module reactivated', module });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: err.message });
+//   }
+// };
 const fs = require('fs');
 const path = require('path');
 const Module = require('../../models/admin/module');
 
-const MODULE_TITLES = [
-  'venue', 'rental', 'event', 'mehandi',
-  'photography', 'catering', 'makeup', 'dj', 'music'
-];
-
+// Helper: delete file if exists
 const deleteFileIfExists = (filePath) => {
   if (filePath && fs.existsSync(filePath)) {
     fs.unlinkSync(filePath);
@@ -29,23 +195,24 @@ const populateModule = async (moduleId) => {
 // Create Module
 exports.createModule = async (req, res) => {
   try {
-    const { title, categories } = req.body;
+    const { title, categories, createdBy } = req.body;
 
-    if (!MODULE_TITLES.includes(title)) {
-      return res.status(400).json({ error: 'Invalid module title' });
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: 'Module title is required' });
     }
 
     const moduleData = {
-      title,
+      title: title.trim(),
       categories: categories ? JSON.parse(categories) : [],
-      icon: req.file ? `uploads/modules/${req.file.filename}` : null
+      icon: req.file ? `uploads/modules/${req.file.filename}` : null,
+      createdBy: createdBy || null,
     };
 
     const module = await Module.create(moduleData);
     const populated = await populateModule(module._id);
     res.status(201).json({ message: 'Module created', module: populated });
   } catch (err) {
-    console.error(err);
+    console.error('Create Module Error:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -57,16 +224,12 @@ exports.updateModule = async (req, res) => {
     const module = await Module.findById(req.params.id);
     if (!module) return res.status(404).json({ error: 'Module not found' });
 
-    if (title && !MODULE_TITLES.includes(title)) {
-      return res.status(400).json({ error: 'Invalid module title' });
-    }
-
     if (req.file) {
       deleteFileIfExists(path.join(__dirname, `../../${module.icon}`));
       module.icon = `uploads/modules/${req.file.filename}`;
     }
 
-    if (title) module.title = title;
+    if (title) module.title = title.trim();
     if (categories) module.categories = JSON.parse(categories);
     if (updatedBy) module.updatedBy = updatedBy;
 
@@ -74,7 +237,7 @@ exports.updateModule = async (req, res) => {
     const populated = await populateModule(module._id);
     res.json({ message: 'Module updated', module: populated });
   } catch (err) {
-    console.error(err);
+    console.error('Update Module Error:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -89,7 +252,7 @@ exports.deleteModule = async (req, res) => {
     await module.deleteOne();
     res.json({ message: 'Module deleted successfully' });
   } catch (err) {
-    console.error(err);
+    console.error('Delete Module Error:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -105,7 +268,7 @@ exports.getModules = async (req, res) => {
       });
     res.json(modules);
   } catch (err) {
-    console.error(err);
+    console.error('Get Modules Error:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -122,7 +285,7 @@ exports.getModule = async (req, res) => {
     if (!module) return res.status(404).json({ error: 'Module not found' });
     res.json(module);
   } catch (err) {
-    console.error(err);
+    console.error('Get Module Error:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -132,7 +295,7 @@ exports.blockModule = async (req, res) => {
   try {
     const module = await Module.findByIdAndUpdate(
       req.params.id,
-      { isActive: false, updatedBy: req.body.updatedBy },
+      { isActive: false, updatedBy: req.body.updatedBy || null },
       { new: true }
     ).populate({
       path: 'categories',
@@ -143,7 +306,7 @@ exports.blockModule = async (req, res) => {
     if (!module) return res.status(404).json({ error: 'Module not found' });
     res.json({ message: 'Module blocked', module });
   } catch (err) {
-    console.error(err);
+    console.error('Block Module Error:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -153,7 +316,7 @@ exports.reactivateModule = async (req, res) => {
   try {
     const module = await Module.findByIdAndUpdate(
       req.params.id,
-      { isActive: true, updatedBy: req.body.updatedBy },
+      { isActive: true, updatedBy: req.body.updatedBy || null },
       { new: true }
     ).populate({
       path: 'categories',
@@ -164,7 +327,7 @@ exports.reactivateModule = async (req, res) => {
     if (!module) return res.status(404).json({ error: 'Module not found' });
     res.json({ message: 'Module reactivated', module });
   } catch (err) {
-    console.error(err);
+    console.error('Reactivate Module Error:', err);
     res.status(500).json({ error: err.message });
   }
 };

@@ -249,15 +249,71 @@ exports.createVehicle = async (req, res) => {
 // ================= READ =================
 
 // Get all vehicles (admin sees all, vendor sees only their own)
+// exports.getVehicles = async (req, res) => {
+//   try {
+//     let vehicles;
+//     if (req.user.role === 'vendor') {
+//       vehicles = await Vehicle.find({ provider: req.user._id }).populate('brand category provider').lean();
+//     } else {
+//       vehicles = await Vehicle.find().populate('brand category provider').lean();
+//     }
+//     res.json({ success: true, count: vehicles.length, data: vehicles });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+// Get all vehicles (admin sees all, vendor sees only their own)
 exports.getVehicles = async (req, res) => {
   try {
-    let vehicles;
+    const { page = 1, limit = 10, search } = req.query;
+
+    // Convert page and limit to numbers
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build query
+    let query = {};
     if (req.user.role === 'vendor') {
-      vehicles = await Vehicle.find({ provider: req.user._id }).populate('brand category provider').lean();
-    } else {
-      vehicles = await Vehicle.find().populate('brand category provider').lean();
+      query.provider = req.user._id;
     }
-    res.json({ success: true, count: vehicles.length, data: vehicles });
+
+    // Add search functionality if search term is provided
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { model: { $regex: search, $options: 'i' } },
+        { vinNumber: { $regex: search, $options: 'i' } },
+        { licensePlateNumber: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    // Fetch vehicles with pagination
+    const vehicles = await Vehicle.find(query)
+      .populate('brand category provider')
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+
+    // Get total count for pagination
+    const totalItems = await Vehicle.countDocuments(query);
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalItems / limitNum);
+
+    // Send response with pagination data
+    res.json({
+      success: true,
+      data: {
+        vehicles,
+        pagination: {
+          currentPage: pageNum,
+          totalPages,
+          totalItems,
+          itemsPerPage: limitNum,
+        },
+      },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
