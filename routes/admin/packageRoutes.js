@@ -108,3 +108,11 @@ router.patch('/:id/toggle-status', protect, authorizeRoles('admin'), packageCont
 router.delete('/:id', protect, authorizeRoles('vendor', 'admin'), packageController.deletePackage);
 
 module.exports = router;
+
+// GET MODULE DETAILS WITH PACKAGE
+router.get(
+  '/module/:moduleId/:packageId',
+  protect,
+  authorizeRoles('admin', 'vendor'),
+  packageController.getPackageModuleDetails
+);

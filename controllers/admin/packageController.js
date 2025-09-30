@@ -187,3 +187,40 @@ exports.getPackageByModuleId = async (req, res, next) => {
     next(err);
   }
 };
+
+
+// ================== MODULE + PACKAGE DETAILS ==================
+exports.getPackageModuleDetails = async (req, res, next) => {
+  try {
+    const { moduleId, packageId } = req.params;
+
+    // Validate packageId
+    if (!mongoose.Types.ObjectId.isValid(packageId)) {
+      return res.status(400).json({ success: false, message: 'Invalid package ID' });
+    }
+
+    // Find the package by ID
+    const pkg = await Package.findById(packageId)
+      .populate('provider', 'name email phone')
+      .populate('linkedVenue', 'venueName venueAddress')
+      .select('-__v');
+
+    if (!pkg) {
+      return res.status(404).json({ success: false, message: 'Package not found' });
+    }
+
+    // Find the module inside this package
+    const module = pkg.modules.id(moduleId);
+    if (!module) {
+      return res.status(404).json({ success: false, message: 'Module not found in this package' });
+    }
+
+    res.status(200).json({
+      success: true,
+      package: pkg,
+      module
+    });
+  } catch (err) {
+    next(err);
+  }
+};

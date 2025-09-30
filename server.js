@@ -28,7 +28,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // Static uploads
 // app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 // ================= PUBLIC ROUTES =================
@@ -49,8 +50,7 @@ app.use('/api/zones', require('./routes/admin/zoneRoutes'));
 app.use('/api/vendorprofiles', require('./routes/vendor/vendorProfileRoutes'));
 app.use('/api/reviews', require('./routes/vendor/reviewRouters'));
 app.use('/api/venues', require('./routes/vendor/venueRoutes'));
-app.use('/api/packages', require('./routes/admin/packageRoutes')); // 🆕 PACKAGE ROUTES
-
+app.use('/api/packages', require('./routes/admin/packageRoutes')); 
 app.use('/api/renters', require('./routes/vendor/renterRoutes'));
 app.use('/api/vehicles', require('./routes/vendor/vehicleRouter'));
 app.use('/api/venuecoupons', require('./routes/vendor/venueCouponRoutes'));

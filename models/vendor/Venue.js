@@ -2,22 +2,59 @@ const mongoose = require("mongoose");
 
 const venueSchema = new mongoose.Schema(
   {
-    venueName: { type: String, required: true, trim: true },
-    shortDescription: { type: String, trim: true },
-    venueAddress: { type: String, required: true, trim: true },
+    venueName: {
+      type: String,
+      required: [true, "Venue name is required"],
+      trim: true,
+      minlength: [1, "Venue name cannot be empty"],
+    },
+    shortDescription: {
+      type: String,
+      trim: true,
+    },
+    venueAddress: {
+      type: String,
+      required: [true, "Venue address is required"],
+      trim: true,
+      minlength: [1, "Venue address cannot be empty"],
+    },
     latitude: Number,
     longitude: Number,
-    language: { type: String, default: "EN" },
+    language: {
+      type: String,
+      default: "EN",
+      enum: ["EN", "ES", "FR", "DE"], // Optional: restrict to specific languages
+    },
 
     // Contact
-    contactPhone: String,
-    contactEmail: String,
-    contactWebsite: String,
+    contactPhone: {
+      type: String,
+      trim: true,
+    },
+    contactEmail: {
+      type: String,
+      trim: true,
+      match: [/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/, "Invalid email format"], // Optional: email validation
+    },
+    contactWebsite: {
+      type: String,
+      trim: true,
+    },
 
     // Owner / Manager Info
-    ownerManagerName: String,
-    ownerManagerPhone: String,
-    ownerManagerEmail: String,
+    ownerManagerName: {
+      type: String,
+      trim: true,
+    },
+    ownerManagerPhone: {
+      type: String,
+      trim: true,
+    },
+    ownerManagerEmail: {
+      type: String,
+      trim: true,
+      match: [/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/, "Invalid email format"], // Optional: email validation
+    },
 
     openingHours: String,
     closingHours: String,
@@ -57,10 +94,18 @@ const venueSchema = new mongoose.Schema(
     multipleHalls: { type: Boolean, default: false },
 
     searchTags: String,
-    rentalType: { type: String, enum: ["hourly", "daily"], default: "hourly" },
+    rentalType: {
+      type: String,
+      enum: ["hourly", "daily"],
+      default: "hourly",
+    },
 
-    // ✅ Now points to User model
-    provider: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    // Points to User model, now required
+    provider: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: [true, "Provider is required"],
+    },
 
     // Media
     thumbnail: String,

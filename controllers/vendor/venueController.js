@@ -161,13 +161,20 @@
 const Venue = require("../../models/vendor/Venue");
 
 // ================= CREATE =================
-
-// Vendor creates venue for themselves
 exports.createVenue = async (req, res) => {
   try {
     const data = req.body;
-    data.provider = req.user._id; // auto-link logged-in vendor
 
+    // Require provider from authenticated user
+    if (!req.user?._id) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+    data.provider = req.user._id; // Set provider from authenticated user
+
+    // Handle uploaded files
     if (req.files?.thumbnail) data.thumbnail = req.files.thumbnail[0].path;
     if (req.files?.images) data.images = req.files.images.map(f => f.path);
 
@@ -176,11 +183,12 @@ exports.createVenue = async (req, res) => {
 
     res.status(201).json({ success: true, data: venue });
   } catch (err) {
+    console.error(`Error creating venue: ${err.message}`);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Admin/vendor creates venue for a specific provider by ID
+// Admin creates venue for a specific provider by ID
 exports.createVenueForProvider = async (req, res) => {
   try {
     const data = req.body;
@@ -194,23 +202,22 @@ exports.createVenueForProvider = async (req, res) => {
 
     res.status(201).json({ success: true, data: venue });
   } catch (err) {
+    console.error(`Error creating venue for provider: ${err.message}`);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
 // ================= READ =================
-
-// Get all venues (admin use case)
 exports.getVenues = async (req, res) => {
   try {
     const venues = await Venue.find().populate("provider").lean();
     res.status(200).json({ success: true, count: venues.length, data: venues });
   } catch (err) {
+    console.error(`Error fetching venues: ${err.message}`);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Get all venues for a specific provider
 exports.getVenuesByProvider = async (req, res) => {
   try {
     const venues = await Venue.find({ provider: req.params.providerId })
@@ -218,17 +225,16 @@ exports.getVenuesByProvider = async (req, res) => {
       .lean();
     res.status(200).json({ success: true, count: venues.length, data: venues });
   } catch (err) {
+    console.error(`Error fetching venues by provider: ${err.message}`);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Internal helper to get venues by providerId (used in routes for vendor)
 exports.getVenuesByProviderInternal = async (providerId) => {
   const venues = await Venue.find({ provider: providerId }).populate("provider").lean();
   return venues;
 };
 
-// Get single venue by ID
 exports.getVenue = async (req, res) => {
   try {
     const venue = await Venue.findById(req.params.id)
@@ -240,12 +246,12 @@ exports.getVenue = async (req, res) => {
 
     res.status(200).json({ success: true, data: venue });
   } catch (err) {
+    console.error(`Error fetching venue: ${err.message}`);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
 // ================= UPDATE =================
-
 exports.updateVenue = async (req, res) => {
   try {
     const data = req.body;
@@ -262,12 +268,12 @@ exports.updateVenue = async (req, res) => {
 
     res.status(200).json({ success: true, data: venue });
   } catch (err) {
+    console.error(`Error updating venue: ${err.message}`);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
 // ================= DELETE =================
-
 exports.deleteVenue = async (req, res) => {
   try {
     const venue = await Venue.findByIdAndDelete(req.params.id);
@@ -275,12 +281,12 @@ exports.deleteVenue = async (req, res) => {
 
     res.status(200).json({ success: true, message: "Venue deleted" });
   } catch (err) {
+    console.error(`Error deleting venue: ${err.message}`);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
 // ================= TOGGLE STATUS =================
-
 exports.toggleVenueStatus = async (req, res) => {
   try {
     const venue = await Venue.findById(req.params.id);
@@ -291,12 +297,12 @@ exports.toggleVenueStatus = async (req, res) => {
 
     res.status(200).json({ success: true, data: venue });
   } catch (err) {
+    console.error(`Error toggling venue status: ${err.message}`);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
 // ================= COUNTS =================
-
 exports.getVenueCounts = async (req, res) => {
   try {
     const total = await Venue.countDocuments();
@@ -305,6 +311,7 @@ exports.getVenueCounts = async (req, res) => {
 
     res.status(200).json({ success: true, total, active, inactive });
   } catch (err) {
+    console.error(`Error fetching venue counts: ${err.message}`);
     res.status(500).json({ success: false, message: err.message });
   }
 };
