@@ -101,7 +101,7 @@ router
   );
 
 // ---------------- GET BY PROVIDER ----------------
-// Must come BEFORE /:id route
+// Must come BEFORE /:id routess
 router.get(
   '/provider/:providerId',
   venueController.getVenuesByProvider
