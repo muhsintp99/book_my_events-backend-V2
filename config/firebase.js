@@ -8,18 +8,18 @@
 // module.exports = admin;
 
 const admin = require("firebase-admin");
+
+// Ensure dotenv is loaded (in case not loaded in server.js yet)
 require("dotenv").config();
 
 if (!process.env.FIREBASE_PRIVATE_KEY) {
-  console.error("❌ FIREBASE_PRIVATE_KEY missing. Check your .env formatting.");
-  process.exit(1);
+  throw new Error("❌ FIREBASE_PRIVATE_KEY is missing in .env");
 }
 
 const serviceAccount = {
   projectId: process.env.FIREBASE_PROJECT_ID,
   clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-  // Replace escaped \n with actual newlines
-  privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+  privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
 };
 
 admin.initializeApp({
@@ -27,3 +27,5 @@ admin.initializeApp({
 });
 
 module.exports = admin;
+
+
