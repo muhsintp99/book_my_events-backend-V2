@@ -252,7 +252,7 @@ function createUpload(folder, options = {}) {
   }
 
   // ---------- Set limits and allowed types ----------
-  const maxSize = (options.fileSizeMB || 10) * 1024 * 1024;
+  const maxSize = (options.fileSizeMB || 50) * 1024 * 1024;
   const allowedTypes = options.allowedTypes || ['image/jpeg', 'image/png'];
 
   // ---------- Storage config ----------
