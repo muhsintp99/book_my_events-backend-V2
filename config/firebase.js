@@ -25,10 +25,11 @@ if (missingVars.length > 0) {
 // Test if private key can be parsed correctly
 try {
   const serviceAccount = {
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n")
-  };
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+};
+
   console.log("✅ Firebase environment variables loaded successfully!");
   console.log("Project ID:", serviceAccount.projectId);
   console.log("Client Email:", serviceAccount.clientEmail);
