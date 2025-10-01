@@ -356,6 +356,8 @@ const { welcomeEmail, vendorEmail, otpEmail, resetPasswordEmail } = require('../
 const { generateOtp, generateResetToken, generateJwtToken } = require('../utils/tokenGenerator');
 const crypto = require('crypto');
 const VendorProfile = require('../models/vendor/vendorProfile');
+const mongoose = require('mongoose');
+
 
 // ------------------ REGISTER ------------------
 exports.register = async (req, res) => {
@@ -441,25 +443,29 @@ exports.register = async (req, res) => {
     let vendorProfile = null;
     if (role === 'vendor') {
       vendorProfile = await VendorProfile.create(
-        [{
-          storeName: storeName || '',
-          storeAddress,
-          logo: req.files?.logo ? `/uploads/vendors/${req.files.logo[0].filename}` : '',
-          coverImage: req.files?.coverImage ? `/uploads/vendors/${req.files.coverImage[0].filename}` : '',
-          tinCertificate: req.files?.tinCertificate ? `/uploads/vendors/${req.files.tinCertificate[0].filename}` : '',
-          ownerFirstName: firstName,
-          ownerLastName: lastName,
-          ownerPhone: phone || '',
-          ownerEmail: email,
-          businessTIN: businessTIN || '',
-          tinExpireDate: tinExpireDate || null,
-          module: module || null,
-          zone: zone || null,
-          user: user[0]._id,
-          status: 'pending'
-        }],
-        { session }
-      );
+  [{
+    storeName: storeName || '',
+    storeAddress,
+    logo: req.files?.logo ? `/uploads/vendors/${req.files.logo[0].filename}` : '',
+    coverImage: req.files?.coverImage ? `/uploads/vendors/${req.files.coverImage[0].filename}` : '',
+    tinCertificate: req.files?.tinCertificate ? `/uploads/vendors/${req.files.tinCertificate[0].filename}` : '',
+    ownerFirstName: firstName,
+    ownerLastName: lastName,
+    ownerPhone: phone || '',
+    ownerEmail: email,
+    businessTIN: businessTIN || '',
+    tinExpireDate: tinExpireDate || null,
+    // module: mongoose.Types.ObjectId.isValid(module) ? module : undefined,
+    // zone: mongoose.Types.ObjectId.isValid(zone) ? zone : undefined,
+    module: mongoose.Types.ObjectId.isValid(module) ? new mongoose.Types.ObjectId(module) : null,
+zone: mongoose.Types.ObjectId.isValid(zone) ? new mongoose.Types.ObjectId(zone) : null,
+
+    user: user[0]._id,
+    status: 'pending'
+  }],
+  { session }
+);
+
     }
 
     await session.commitTransaction();

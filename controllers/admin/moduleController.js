@@ -170,6 +170,7 @@
 // };
 const fs = require('fs');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid'); // Added UUID for unique moduleId
 const Module = require('../../models/admin/module');
 
 // Helper: delete file if exists
@@ -195,13 +196,25 @@ const populateModule = async (moduleId) => {
 // Create Module
 exports.createModule = async (req, res) => {
   try {
-    const { title, categories, createdBy } = req.body;
+    const { title, categories, createdBy, moduleId } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'Module title is required' });
     }
 
+    // Validate provided moduleId or generate a new one
+    let finalModuleId = moduleId;
+    if (moduleId) {
+      const existingModule = await Module.findOne({ moduleId });
+      if (existingModule) {
+        return res.status(400).json({ error: `Module with moduleId ${moduleId} already exists` });
+      }
+    } else {
+      finalModuleId = `MOD-${uuidv4()}`; // Generate unique moduleId
+    }
+
     const moduleData = {
+      moduleId: finalModuleId,
       title: title.trim(),
       categories: categories ? JSON.parse(categories) : [],
       icon: req.file ? `uploads/modules/${req.file.filename}` : null,
@@ -213,6 +226,9 @@ exports.createModule = async (req, res) => {
     res.status(201).json({ message: 'Module created', module: populated });
   } catch (err) {
     console.error('Create Module Error:', err);
+    if (err.code === 11000) {
+      return res.status(400).json({ error: `Duplicate moduleId: ${err.keyValue.moduleId}` });
+    }
     res.status(500).json({ error: err.message });
   }
 };
@@ -220,9 +236,18 @@ exports.createModule = async (req, res) => {
 // Update Module
 exports.updateModule = async (req, res) => {
   try {
-    const { title, categories, updatedBy } = req.body;
+    const { title, categories, updatedBy, moduleId } = req.body;
     const module = await Module.findById(req.params.id);
     if (!module) return res.status(404).json({ error: 'Module not found' });
+
+    // Validate moduleId if provided and different
+    if (moduleId && moduleId !== module.moduleId) {
+      const existingModule = await Module.findOne({ moduleId });
+      if (existingModule) {
+        return res.status(400).json({ error: `Module with moduleId ${moduleId} already exists` });
+      }
+      module.moduleId = moduleId;
+    }
 
     if (req.file) {
       deleteFileIfExists(path.join(__dirname, `../../${module.icon}`));
@@ -238,6 +263,9 @@ exports.updateModule = async (req, res) => {
     res.json({ message: 'Module updated', module: populated });
   } catch (err) {
     console.error('Update Module Error:', err);
+    if (err.code === 11000) {
+      return res.status(400).json({ error: `Duplicate moduleId: ${err.keyValue.moduleId}` });
+    }
     res.status(500).json({ error: err.message });
   }
 };

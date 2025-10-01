@@ -218,11 +218,15 @@ exports.getVenues = async (req, res) => {
   }
 };
 
+// --- Get venues by provider ID ---
 exports.getVenuesByProvider = async (req, res) => {
   try {
-    const venues = await Venue.find({ provider: req.params.providerId })
-      .populate("provider")
-      .lean();
+    const providerId = req.params.providerId;
+    if (!providerId) {
+      return res.status(400).json({ success: false, message: "Provider ID is required" });
+    }
+
+    const venues = await Venue.find({ provider: providerId }).populate("provider").lean();
     res.status(200).json({ success: true, count: venues.length, data: venues });
   } catch (err) {
     console.error(`Error fetching venues by provider: ${err.message}`);
@@ -230,16 +234,16 @@ exports.getVenuesByProvider = async (req, res) => {
   }
 };
 
+// Internal function to get venues by provider (used in other services)
 exports.getVenuesByProviderInternal = async (providerId) => {
   const venues = await Venue.find({ provider: providerId }).populate("provider").lean();
   return venues;
 };
 
+// Get single venue by ID
 exports.getVenue = async (req, res) => {
   try {
-    const venue = await Venue.findById(req.params.id)
-      .populate("provider")
-      .lean();
+    const venue = await Venue.findById(req.params.id).populate("provider").lean();
 
     if (!venue)
       return res.status(404).json({ success: false, message: "Venue not found" });
@@ -255,6 +259,7 @@ exports.getVenue = async (req, res) => {
 exports.updateVenue = async (req, res) => {
   try {
     const data = req.body;
+
     if (req.files?.thumbnail) data.thumbnail = req.files.thumbnail[0].path;
     if (req.files?.images) data.images = req.files.images.map(f => f.path);
 
