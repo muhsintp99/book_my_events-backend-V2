@@ -356,7 +356,6 @@ const { welcomeEmail, vendorEmail, otpEmail, resetPasswordEmail } = require('../
 const { generateOtp, generateResetToken, generateJwtToken } = require('../utils/tokenGenerator');
 const crypto = require('crypto');
 const VendorProfile = require('../models/vendor/vendorProfile');
-const admin = require("../config/firebase");
 
 // ------------------ REGISTER ------------------
 exports.register = async (req, res) => {
@@ -651,26 +650,26 @@ exports.forgotPassword = async (req, res) => {
 };
 
 // ------------------ VERIFY FIREBASE TOKEN (testing only, DB check skipped) ------------------
-exports.verifyFirebaseToken = async (req, res) => {
-  try {
-    const { firebasetoken } = req.body; // or get from headers
-    if (!firebasetoken) {
-      return res.status(401).json({ valid: false, message: "Firebase token missing" });
-    }
+// exports.verifyFirebaseToken = async (req, res) => {
+//   try {
+//     const { firebasetoken } = req.body; // or get from headers
+//     if (!firebasetoken) {
+//       return res.status(401).json({ valid: false, message: "Firebase token missing" });
+//     }
 
-    // Verify token with Firebase
-    const decodedToken = await admin.auth().verifyIdToken(firebasetoken);
+//     // Verify token with Firebase
+//     const decodedToken = await admin.auth().verifyIdToken(firebasetoken);
 
-    // ✅ Skip DB lookup for testing
-    res.json({
-      valid: true,
-      firebaseUser: decodedToken,
-      message: "Firebase token is valid"
-    });
-  } catch (err) {
-    res.status(401).json({ valid: false, message: "Invalid or expired Firebase token", error: err.message });
-  }
-};
+//     // ✅ Skip DB lookup for testing
+//     res.json({
+//       valid: true,
+//       firebaseUser: decodedToken,
+//       message: "Firebase token is valid"
+//     });
+//   } catch (err) {
+//     res.status(401).json({ valid: false, message: "Invalid or expired Firebase token", error: err.message });
+//   }
+// };
 
 // ------------------ RESET PASSWORD ------------------
 // exports.resetPassword = async (req, res) => {

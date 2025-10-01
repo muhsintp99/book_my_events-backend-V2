@@ -44,7 +44,6 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
 const createUpload = require('../middlewares/upload');
-const { verifyFirebaseToken } = require("../controllers/authController");
 
 const upload = createUpload('vendors', {
   fileSizeMB: 2,
@@ -78,7 +77,7 @@ router.post('/otpSend', authController.sendOtp);
 router.post('/otpVerify', authController.verifyOtp);
 
 // ---------------- FIREBASE ----------------
-router.post("/verify-firebase-token", verifyFirebaseToken);
+// router.post("/verify-firebase-token", verifyFirebaseToken);
 
 // ---------------- PASSWORD ----------------
 router.post('/forgot-password', authController.forgotPassword);
