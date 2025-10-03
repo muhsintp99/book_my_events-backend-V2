@@ -23,16 +23,21 @@
 
 const express = require('express');
 const router = express.Router();
-const createUpload = require('../../middlewares/upload');
 const categoryController = require('../../controllers/admin/categoryController');
+const { upload } = require('../../middlewares/upload');
 
-const upload = createUpload('categories', {
-  fileSizeMB: 2,
-  allowedTypes: ['image/png', 'image/jpeg', 'image/jpg']
-});
+// const upload = createUpload('categories', {
+//   fileSizeMB: 2,
+//   allowedTypes: ['image/png', 'image/jpeg', 'image/jpg']
+// });
+const setBrandFolder = (req, res, next) => {
+  req.folder = "brands";
+  next();
+};
+
 
 // Create category
-router.post('/', upload.single('image'), categoryController.createCategory);
+router.post('/', setBrandFolder,upload.single('image'), categoryController.createCategory);
 
 // Get categories by module - FIXED ROUTE
 router.get('/modules/:moduleId', categoryController.getCategoriesByModule);
@@ -44,7 +49,7 @@ router.get('/', categoryController.getCategories);
 router.get('/:id', categoryController.getCategory);
 
 // Update category
-router.put('/:id', upload.single('image'), categoryController.updateCategory);
+router.put('/:id',setBrandFolder,upload.single('image'), categoryController.updateCategory);
 
 // Delete category
 router.delete('/:id', categoryController.deleteCategory);

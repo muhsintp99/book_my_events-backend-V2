@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const createUpload = require('../../middlewares/upload');
+const {upload} = require('../../middlewares/upload');
 const secondaryModuleController = require('../../controllers/admin/secondarymoduleController');
 
 // Create upload middleware that can handle multiple fields
-const upload = createUpload('secondaryModules', {
-  fileSizeMB: 2,
-  allowedTypes: ['image/png', 'image/jpeg']
-});
+const setSecondModuleFolder = (req, res, next) => {
+  req.folder = "secondmodule";
+  next();
+};
 
 // Create Secondary Module - handle both icon and thumbnail
 router.post('/', upload.fields([

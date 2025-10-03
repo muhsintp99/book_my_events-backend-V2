@@ -1,7 +1,7 @@
 // const multer = require('multer');
 // const path = require('path');
 // const fs = require('fs').promises;
-// const sanitizePath = require('sanitize-filename'); 
+// const sanitizePath = require('sanitize-filename');
 
 // function createUpload(folder, options = {}) {
 //   if (!folder || typeof folder !== 'string' || folder.includes('..') || folder.includes('/')) {
@@ -64,14 +64,6 @@
 // }
 
 // module.exports = createUpload;
-
-
-
-
-
-
-
-
 
 // const multer = require('multer');
 // const path = require('path');
@@ -226,69 +218,166 @@
 // }
 
 // module.exports = createUpload;
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const sanitizePath = require('sanitize-filename');
+// const multer = require('multer');
+// const path = require('path');
+// const fs = require('fs');
+// const sanitizePath = require('sanitize-filename');
 
-function createUpload(folder, options = {}) {
-  // ---------- Validate folder name ----------
-  if (!folder || typeof folder !== 'string' || folder.includes('..') || folder.includes('/')) {
-    console.error(`Invalid folder name provided: ${folder}`);
-    throw new Error('Invalid folder name');
-  }
+// function createUpload(folder, options = {}) {
+//   // ---------- Validate folder name ----------
+//   if (!folder || typeof folder !== 'string' || folder.includes('..') || folder.includes('/')) {
+//     console.error(`Invalid folder name provided: ${folder}`);
+//     throw new Error('Invalid folder name');
+//   }
 
-  // ---------- Set upload directories ----------
-  const baseUploadDir = path.join(__dirname, '..', 'Uploads'); // Relative to project root
-  const uploadDir = path.join(baseUploadDir, folder);
+//   // ---------- Set upload directories ----------
+//   const baseUploadDir = path.join(__dirname, '..', 'Uploads'); // Relative to project root
+//   const uploadDir = path.join(baseUploadDir, folder);
 
-  // ---------- Create directories if not exist ----------
-  try {
-    fs.mkdirSync(uploadDir, { recursive: true });
-    console.log(`Upload directory ensured: ${uploadDir}`);
-  } catch (error) {
-    console.error(`Failed to create upload directory: ${error.message}`);
-    throw new Error(`Failed to create upload directory: ${error.message}`);
-  }
+//   // ---------- Create directories if not exist ----------
+//   try {
+//     fs.mkdirSync(uploadDir, { recursive: true });
+//     console.log(`Upload directory ensured: ${uploadDir}`);
+//   } catch (error) {
+//     console.error(`Failed to create upload directory: ${error.message}`);
+//     throw new Error(`Failed to create upload directory: ${error.message}`);
+//   }
 
-  // ---------- Set limits and allowed types ----------
-  const maxSize = (options.fileSizeMB || 50) * 1024 * 1024;
-  const allowedTypes = options.allowedTypes || ['image/jpeg', 'image/png'];
+//   // ---------- Set limits and allowed types ----------
+//   const maxSize = (options.fileSizeMB || 50) * 1024 * 1024;
+//   const allowedTypes = options.allowedTypes || ['image/jpeg', 'image/png'];
 
-  // ---------- Storage config ----------
-  const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      console.log(`Saving file to: ${uploadDir}`);
-      cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-      const sanitizedName = sanitizePath(file.originalname);
-      const uniqueFilename = `${Date.now()}-${sanitizedName}`;
-      console.log(`Generated filename: ${uniqueFilename}`);
-      cb(null, uniqueFilename);
-    },
-  });
+//   // ---------- Storage config ----------
+//   const storage = multer.diskStorage({
+//     destination: (req, file, cb) => {
+//       console.log(`Saving file to: ${uploadDir}`);
+//       cb(null, uploadDir);
+//     },
+//     filename: (req, file, cb) => {
+//       const sanitizedName = sanitizePath(file.originalname);
+//       const uniqueFilename = `${Date.now()}-${sanitizedName}`;
+//       console.log(`Generated filename: ${uniqueFilename}`);
+//       cb(null, uniqueFilename);
+//     },
+//   });
 
-  // ---------- File filter ----------
-  const fileFilter = (req, file, cb) => {
-    if (!allowedTypes.includes(file.mimetype)) {
-      const error = new Error(`Invalid file type. Allowed: ${allowedTypes.join(', ')}`);
-      console.error(`File rejected: ${file.originalname} (type: ${file.mimetype})`);
-      return cb(error, false);
-    }
-    cb(null, true);
-  };
+//   // ---------- File filter ----------
+//   const fileFilter = (req, file, cb) => {
+//     if (!allowedTypes.includes(file.mimetype)) {
+//       const error = new Error(`Invalid file type. Allowed: ${allowedTypes.join(', ')}`);
+//       console.error(`File rejected: ${file.originalname} (type: ${file.mimetype})`);
+//       return cb(error, false);
+//     }
+//     cb(null, true);
+//   };
 
-  // ---------- Return multer instance ----------
-  return multer({
-    storage,
-    fileFilter,
-    limits: {
-      fileSize: maxSize,
-      files: options.maxFiles || 11, // Allow thumbnail + 10 images
-      fields: Infinity,
-    },
-  });
-}
+//   // ---------- Return multer instance ----------
+//   return multer({
+//     storage,
+//     fileFilter,
+//     limits: {
+//       fileSize: maxSize,
+//       files: options.maxFiles || 11, // Allow thumbnail + 10 images
+//       fields: Infinity,
+//     },
+//   });
+// }
 
-module.exports = createUpload;
+// module.exports = createUpload;
+
+// ----------------------------------------------------------------------------------------------------------------------
+
+// const multer = require("multer");
+// const path = require("path");
+// const fs = require("fs");
+
+// const STORAGE_PATH = process.env.MULTER_STORAGE_PATH || "uploads";
+// const FILE_SIZE_LIMIT =
+//   parseInt(process.env.MULTER_FILE_SIZE_LIMIT) || 5 * 1024 * 1024;
+// const ALLOWED_TYPES = (
+//   process.env.MULTER_ALLOWED_FILE_TYPES || "image/jpeg,image/png"
+// ).split(",");
+// const BASE_URL = process.env.MULTER_USE_URL || "http://localhost:5000";
+
+// const storage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     const folder = req.folder || "general";
+//     const uploadPath = path.join(STORAGE_PATH, folder);
+
+//     // ✅ Ensure directory exists
+//     fs.mkdirSync(uploadPath, { recursive: true });
+
+//     cb(null, uploadPath);
+//   },
+//   filename: (req, file, cb) => {
+//     const uniqueName =
+//       Date.now() + "-" + file.originalname.replace(/\s+/g, "_");
+//     cb(null, uniqueName);
+//   },
+// });
+
+// const fileFilter = (req, file, cb) => {
+//   if (ALLOWED_TYPES.includes(file.mimetype)) {
+//     cb(null, true);
+//   } else {
+//     // ✅ FIXED: use backticks
+//     cb(new Error(`Invalid file type. Allowed types: ${ALLOWED_TYPES.join(", ")}`));
+//   }
+// };
+
+// const upload = multer({
+//   storage,
+//   fileFilter,
+//   limits: { fileSize: FILE_SIZE_LIMIT },
+// });
+
+// // ✅ FIXED: use backticks
+// const fileUrl = (folder, filename) =>
+//   `${BASE_URL}/${STORAGE_PATH}/${folder}/${filename}`;
+
+// module.exports = { upload, fileUrl };
+
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+
+const STORAGE_PATH = process.env.MULTER_STORAGE_PATH || "uploads";
+const FILE_SIZE_LIMIT =
+  parseInt(process.env.MULTER_FILE_SIZE_LIMIT) || 5 * 1024 * 1024;
+const ALLOWED_TYPES = (
+  process.env.MULTER_ALLOWED_FILE_TYPES || "image/jpeg,image/png"
+).split(",");
+const BASE_URL = process.env.MULTER_USE_URL || "http://localhost:5000";
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const folder = req.folder || "general";
+    const uploadPath = path.join(STORAGE_PATH, folder);
+    fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName =
+      Date.now() + "-" + file.originalname.replace(/\s+/g, "_");
+    cb(null, uniqueName);
+  },
+});
+
+const fileFilter = (req, file, cb) => {
+  if (ALLOWED_TYPES.includes(file.mimetype)) cb(null, true);
+  else
+    cb(
+      new Error(`Invalid file type. Allowed types: ${ALLOWED_TYPES.join(", ")}`)
+    );
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: FILE_SIZE_LIMIT },
+});
+
+const fileUrl = (folder, filename) =>
+  `${BASE_URL}/${STORAGE_PATH}/${folder}/${filename}`;
+
+module.exports = { upload, fileUrl };

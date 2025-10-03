@@ -159,48 +159,65 @@
 //   }
 // };
 const Venue = require("../../models/vendor/Venue");
+const { fileUrl } = require("../../middlewares/upload");
+
+// Normalize stored paths to full URLs
+function normalizeMedia(venue) {
+  if (!venue) return venue;
+
+  // Fix thumbnail
+  if (venue.thumbnail && !venue.thumbnail.startsWith("http")) {
+    const filename = venue.thumbnail.split("/").pop();
+    venue.thumbnail = fileUrl("venue", filename);
+  }
+
+  // Fix images[]
+  if (Array.isArray(venue.images)) {
+    venue.images = venue.images.map(img => {
+      if (img.startsWith("http")) return img;
+      const filename = img.split("/").pop();
+      return fileUrl("venue", filename);
+    });
+  }
+
+  return venue;
+}
 
 // ================= CREATE =================
 exports.createVenue = async (req, res) => {
   try {
     const data = req.body;
+    if (!req.user?._id) return res.status(401).json({ success: false, message: "Auth required" });
+    data.provider = req.user._id;
 
-    // Require provider from authenticated user
-    if (!req.user?._id) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
-    }
-    data.provider = req.user._id; // Set provider from authenticated user
-
-    // Handle uploaded files
-    if (req.files?.thumbnail) data.thumbnail = req.files.thumbnail[0].path;
-    if (req.files?.images) data.images = req.files.images.map(f => f.path);
+    if (req.files?.thumbnail) data.thumbnail = fileUrl("venue", req.files.thumbnail[0].filename);
+    if (req.files?.images) data.images = req.files.images.map(f => fileUrl("venue", f.filename));
 
     const venue = await Venue.create(data);
     await venue.populate("provider");
 
-    res.status(201).json({ success: true, data: venue });
+    res.status(201).json({ success: true, data: normalizeMedia(venue.toObject()) });
   } catch (err) {
-    console.error(`Error creating venue: ${err.message}`);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
+
+
+// Admin creates venue for a specific provider by ID
 // Admin creates venue for a specific provider by ID
 exports.createVenueForProvider = async (req, res) => {
   try {
     const data = req.body;
     data.provider = req.params.providerId;
 
-    if (req.files?.thumbnail) data.thumbnail = req.files.thumbnail[0].path;
-    if (req.files?.images) data.images = req.files.images.map(f => f.path);
+    if (req.files?.thumbnail) data.thumbnail = fileUrl("venue", req.files.thumbnail[0].filename);
+    if (req.files?.images) data.images = req.files.images.map(f => fileUrl("venue", f.filename));
 
     const venue = await Venue.create(data);
     await venue.populate("provider");
 
-    res.status(201).json({ success: true, data: venue });
+    res.status(201).json({ success: true, data: normalizeMedia(venue.toObject()) });
   } catch (err) {
     console.error(`Error creating venue for provider: ${err.message}`);
     res.status(500).json({ success: false, message: err.message });
@@ -210,10 +227,10 @@ exports.createVenueForProvider = async (req, res) => {
 // ================= READ =================
 exports.getVenues = async (req, res) => {
   try {
-    const venues = await Venue.find().populate("provider").lean();
+    let venues = await Venue.find().populate("provider").lean();
+    venues = venues.map(v => normalizeMedia(v));
     res.status(200).json({ success: true, count: venues.length, data: venues });
   } catch (err) {
-    console.error(`Error fetching venues: ${err.message}`);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -243,14 +260,10 @@ exports.getVenuesByProviderInternal = async (providerId) => {
 // Get single venue by ID
 exports.getVenue = async (req, res) => {
   try {
-    const venue = await Venue.findById(req.params.id).populate("provider").lean();
-
-    if (!venue)
-      return res.status(404).json({ success: false, message: "Venue not found" });
-
-    res.status(200).json({ success: true, data: venue });
+    let venue = await Venue.findById(req.params.id).populate("provider").lean();
+    if (!venue) return res.status(404).json({ success: false, message: "Venue not found" });
+    res.status(200).json({ success: true, data: normalizeMedia(venue) });
   } catch (err) {
-    console.error(`Error fetching venue: ${err.message}`);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -260,20 +273,15 @@ exports.updateVenue = async (req, res) => {
   try {
     const data = req.body;
 
-    if (req.files?.thumbnail) data.thumbnail = req.files.thumbnail[0].path;
-    if (req.files?.images) data.images = req.files.images.map(f => f.path);
+    if (req.files?.thumbnail) data.thumbnail = fileUrl("venue", req.files.thumbnail[0].filename);
+    if (req.files?.images) data.images = req.files.images.map(f => fileUrl("venue", f.filename));
 
-    const venue = await Venue.findByIdAndUpdate(req.params.id, data, {
-      new: true,
-      runValidators: true,
-    }).populate("provider");
+    const venue = await Venue.findByIdAndUpdate(req.params.id, data, { new: true, runValidators: true }).populate("provider");
 
-    if (!venue)
-      return res.status(404).json({ success: false, message: "Venue not found" });
+    if (!venue) return res.status(404).json({ success: false, message: "Venue not found" });
 
-    res.status(200).json({ success: true, data: venue });
+    res.status(200).json({ success: true, data: normalizeMedia(venue.toObject()) });
   } catch (err) {
-    console.error(`Error updating venue: ${err.message}`);
     res.status(500).json({ success: false, message: err.message });
   }
 };

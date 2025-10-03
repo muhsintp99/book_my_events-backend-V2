@@ -2,13 +2,13 @@ const express = require('express');
 const router = express.Router();
 const packageController = require('../../controllers/admin/packageController');
 const { protect, authorizeRoles } = require('../../middlewares/authMiddleware');
-const createUpload = require('../../middlewares/upload');
+const {upload} = require("../../middlewares/upload");
 
 // Upload middleware for packages
-const upload = createUpload('packages', {
-  fileSizeMB: 5,
-  allowedTypes: ['image/png', 'image/jpeg', 'image/jpg']
-});
+const setPackageFolder = (req, res, next) => {
+  req.folder = "package";
+  next();
+};
 
 // ================= STATISTICS ROUTES =================
 router.get('/stats/counts', protect, authorizeRoles('admin'), packageController.getPackageCounts);
@@ -19,6 +19,7 @@ router.post(
   '/',
   protect,
   authorizeRoles('vendor', 'admin'),
+  setPackageFolder,
   upload.fields([
     { name: 'thumbnail', maxCount: 1 },
     { name: 'images', maxCount: 10 }
@@ -30,6 +31,7 @@ router.post(
   '/provider/:providerId',
   protect,
   authorizeRoles('admin'),
+  setPackageFolder,
   upload.fields([
     { name: 'thumbnail', maxCount: 1 },
     { name: 'images', maxCount: 10 }
@@ -95,6 +97,7 @@ router.put(
   '/:id',
   protect,
   authorizeRoles('vendor', 'admin'),
+  setPackageFolder,
   upload.fields([
     { name: 'thumbnail', maxCount: 1 },
     { name: 'images', maxCount: 10 }
