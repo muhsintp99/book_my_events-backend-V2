@@ -107,7 +107,7 @@ const venueSchema = new mongoose.Schema(
       required: [true, "Provider is required"],
     },
 
-    // Media
+    // media
     thumbnail: String,
     images: [String],
 
