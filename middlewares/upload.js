@@ -232,60 +232,53 @@ const fs = require('fs');
 const sanitizePath = require('sanitize-filename');
 
 function createUpload(folder, options = {}) {
-  // ---------- Validate folder name ----------
+  // Validate folder
   if (!folder || typeof folder !== 'string' || folder.includes('..') || folder.includes('/')) {
     console.error(`Invalid folder name provided: ${folder}`);
     throw new Error('Invalid folder name');
   }
 
-  // ---------- Set upload directories ----------
-  const baseUploadDir = path.join(__dirname, '..', 'Uploads'); // Relative to project root
+  // Upload directory setup
+  const baseUploadDir = path.join(__dirname, '..', 'Uploads');
   const uploadDir = path.join(baseUploadDir, folder);
+  fs.mkdirSync(uploadDir, { recursive: true });
 
-  // ---------- Create directories if not exist ----------
-  try {
-    fs.mkdirSync(uploadDir, { recursive: true });
-    console.log(`Upload directory ensured: ${uploadDir}`);
-  } catch (error) {
-    console.error(`Failed to create upload directory: ${error.message}`);
-    throw new Error(`Failed to create upload directory: ${error.message}`);
-  }
+  // ✅ Allow images and PDF
+  const allowedTypes = options.allowedTypes || [
+    'image/jpeg',
+    'image/png',
+    'application/pdf'
+  ];
 
-  // ---------- Set limits and allowed types ----------
   const maxSize = (options.fileSizeMB || 50) * 1024 * 1024;
-  const allowedTypes = options.allowedTypes || ['image/jpeg', 'image/png'];
 
-  // ---------- Storage config ----------
+  // Multer storage
   const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-      console.log(`Saving file to: ${uploadDir}`);
       cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
       const sanitizedName = sanitizePath(file.originalname);
       const uniqueFilename = `${Date.now()}-${sanitizedName}`;
-      console.log(`Generated filename: ${uniqueFilename}`);
       cb(null, uniqueFilename);
     },
   });
 
-  // ---------- File filter ----------
+  // File filter
   const fileFilter = (req, file, cb) => {
     if (!allowedTypes.includes(file.mimetype)) {
-      const error = new Error(`Invalid file type. Allowed: ${allowedTypes.join(', ')}`);
       console.error(`File rejected: ${file.originalname} (type: ${file.mimetype})`);
-      return cb(error, false);
+      return cb(new Error(`Invalid file type. Allowed: ${allowedTypes.join(', ')}`), false);
     }
     cb(null, true);
   };
 
-  // ---------- Return multer instance ----------
   return multer({
     storage,
     fileFilter,
     limits: {
       fileSize: maxSize,
-      files: options.maxFiles || 11, // Allow thumbnail + 10 images
+      files: options.maxFiles || 11,
       fields: Infinity,
     },
   });
