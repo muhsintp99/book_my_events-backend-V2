@@ -172,11 +172,19 @@ exports.createVenue = async (req, res) => {
         message: "Authentication required",
       });
     }
-    data.provider = req.user._id; // Set provider from authenticated user
+    data.provider = req.user._id;
 
-    // Handle uploaded files
-    if (req.files?.thumbnail) data.thumbnail = req.files.thumbnail[0].path;
-    if (req.files?.images) data.images = req.files.images.map(f => f.path);
+    // Convert file paths to relative URLs
+    if (req.files?.thumbnail) {
+      const relativePath = req.files.thumbnail[0].path.replace(/\\/g, '/').split('Uploads/')[1];
+      data.thumbnail = `/uploads/${relativePath}`;
+    }
+    if (req.files?.images) {
+      data.images = req.files.images.map(f => {
+        const relativePath = f.path.replace(/\\/g, '/').split('Uploads/')[1];
+        return `/uploads/${relativePath}`;
+      });
+    }
 
     const venue = await Venue.create(data);
     await venue.populate("provider");
@@ -194,8 +202,17 @@ exports.createVenueForProvider = async (req, res) => {
     const data = req.body;
     data.provider = req.params.providerId;
 
-    if (req.files?.thumbnail) data.thumbnail = req.files.thumbnail[0].path;
-    if (req.files?.images) data.images = req.files.images.map(f => f.path);
+    // Convert file paths to relative URLs
+    if (req.files?.thumbnail) {
+      const relativePath = req.files.thumbnail[0].path.replace(/\\/g, '/').split('Uploads/')[1];
+      data.thumbnail = `/uploads/${relativePath}`;
+    }
+    if (req.files?.images) {
+      data.images = req.files.images.map(f => {
+        const relativePath = f.path.replace(/\\/g, '/').split('Uploads/')[1];
+        return `/uploads/${relativePath}`;
+      });
+    }
 
     const venue = await Venue.create(data);
     await venue.populate("provider");

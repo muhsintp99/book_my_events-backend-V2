@@ -20,6 +20,7 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:5001",
   "http://localhost:5002",
+  "http://localhost:5000",
   "https://dashboard.bookmyevent.ae",
   "https://vendor.bookmyevent.ae",
 ];
@@ -51,7 +52,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Static uploads
 // app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "Uploads")));
+// app.use('/api/modules', require('./routes/admin/moduleRoutes'));
+
 // app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ================= PUBLIC ROUTES =================
