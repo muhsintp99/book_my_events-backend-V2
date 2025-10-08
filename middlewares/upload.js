@@ -226,62 +226,131 @@
 // }
 
 // module.exports = createUpload;
+
+
+// const multer = require('multer');
+// const path = require('path');
+// const fs = require('fs');
+// const sanitizePath = require('sanitize-filename');
+
+// function createUpload(folder, options = {}) {
+//   // Validate folder
+//   if (!folder || typeof folder !== 'string' || folder.includes('..') || folder.includes('/')) {
+//     console.error(`Invalid folder name provided: ${folder}`);
+//     throw new Error('Invalid folder name');
+//   }
+
+//   // Upload directory setup
+//   const baseUploadDir = path.join(__dirname, '..', 'Uploads');
+//   const uploadDir = path.join(baseUploadDir, folder);
+//   fs.mkdirSync(uploadDir, { recursive: true });
+
+//   // ✅ Allow images and PDF
+//   const allowedTypes = options.allowedTypes || [
+//     'image/jpeg',
+//     'image/png',
+//     'application/pdf'
+//   ];
+
+//   const maxSize = (options.fileSizeMB || 50) * 1024 * 1024;
+
+//   // Multer storage
+//   const storage = multer.diskStorage({
+//     destination: (req, file, cb) => {
+//       cb(null, uploadDir);
+//     },
+//     filename: (req, file, cb) => {
+//       const sanitizedName = sanitizePath(file.originalname);
+//       const uniqueFilename = `${Date.now()}-${sanitizedName}`;
+//       cb(null, uniqueFilename);
+//     },
+//   });
+
+//   // File filter
+//   const fileFilter = (req, file, cb) => {
+//     if (!allowedTypes.includes(file.mimetype)) {
+//       console.error(`File rejected: ${file.originalname} (type: ${file.mimetype})`);
+//       return cb(new Error(`Invalid file type. Allowed: ${allowedTypes.join(', ')}`), false);
+//     }
+//     cb(null, true);
+//   };
+
+//   return multer({
+//     storage,
+//     fileFilter,
+//     limits: {
+//       fileSize: maxSize,
+//       files: options.maxFiles || 11,
+//       fields: Infinity,
+//     },
+//   });
+// }
+
+// module.exports = createUpload;
+
+
+// ----------------------------------------------------------------------------------------------------------------------
+
+// middlewares/upload.js
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const sanitizePath = require('sanitize-filename');
+const sanitize = require('sanitize-filename');
 
 function createUpload(folder, options = {}) {
-  // Validate folder
   if (!folder || typeof folder !== 'string' || folder.includes('..') || folder.includes('/')) {
-    console.error(`Invalid folder name provided: ${folder}`);
-    throw new Error('Invalid folder name');
+    throw new Error(`Invalid upload folder: ${folder}`);
   }
 
-  // Upload directory setup
-  const baseUploadDir = path.join(__dirname, '..', 'Uploads');
-  const uploadDir = path.join(baseUploadDir, folder);
-  fs.mkdirSync(uploadDir, { recursive: true });
+  const baseDir = path.join(__dirname, '..', 'Uploads');
+  const uploadDir = path.join(baseDir, folder);
 
-  // ✅ Allow images and PDF
+  // Ensure directory exists with proper permissions
+  try {
+    fs.mkdirSync(uploadDir, { recursive: true });
+    fs.chmodSync(uploadDir, 0o755); // Set directory permissions
+  } catch (err) {
+    console.error(`Failed to create/upload directory ${uploadDir}:`, err);
+    throw err;
+  }
+
   const allowedTypes = options.allowedTypes || [
     'image/jpeg',
     'image/png',
+    'image/jpg',
     'application/pdf'
   ];
+  const maxSize = (options.fileSizeMB || 5) * 1024 * 1024; // Default to 2MB
 
-  const maxSize = (options.fileSizeMB || 50) * 1024 * 1024;
-
-  // Multer storage
   const storage = multer.diskStorage({
     destination: (req, file, cb) => {
       cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-      const sanitizedName = sanitizePath(file.originalname);
-      const uniqueFilename = `${Date.now()}-${sanitizedName}`;
-      cb(null, uniqueFilename);
+      const safeName = sanitize(file.originalname.replace(/\s+/g, '-')); // Replace spaces with hyphens
+      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+      cb(null, `${uniqueSuffix}-${safeName}`);
     },
   });
 
-  // File filter
   const fileFilter = (req, file, cb) => {
     if (!allowedTypes.includes(file.mimetype)) {
-      console.error(`File rejected: ${file.originalname} (type: ${file.mimetype})`);
       return cb(new Error(`Invalid file type. Allowed: ${allowedTypes.join(', ')}`), false);
     }
     cb(null, true);
   };
 
-  return multer({
+  const upload = multer({
     storage,
     fileFilter,
     limits: {
       fileSize: maxSize,
-      files: options.maxFiles || 11,
-      fields: Infinity,
+      files: options.maxFiles || 10,
+      fields: 50,
     },
   });
+
+  return upload;
 }
 
 module.exports = createUpload;

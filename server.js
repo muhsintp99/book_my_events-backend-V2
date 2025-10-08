@@ -8,15 +8,7 @@ connectDB();
 
 const app = express();
 
-// ✅ Enable CORS for all origins (during development)
-// app.use(
-//   cors({
-//     origin: '*',
-//     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-//     allowedHeaders: ['Content-Type', 'Authorization'],
-//   })
-// );
-
+// CORS Configuration
 const allowedOrigins = [
   "http://localhost:5001",
   "http://localhost:5002",
@@ -28,8 +20,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-      // allow requests with no origin (like Postman or curl)
-      if (!origin) return callback(null, true);
+      if (!origin) return callback(null, true); // Allow requests with no origin (e.g., Postman)
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
@@ -38,43 +29,34 @@ app.use(
     },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true, // if you need cookies/sessions
+    credentials: true,
   })
 );
 
-// ✅ Parse JSON
+// Middleware
 app.use(express.json());
-
-// Test route
-app.get("/", (req, res) => res.send("BookMyEvent API Running 🚀"));
-
 app.use(express.urlencoded({ extended: true }));
 
 // Static uploads
-// app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use("/uploads", express.static(path.join(__dirname, "Uploads")));
-// app.use('/api/modules', require('./routes/admin/moduleRoutes'));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
+// Routes
+app.get("/", (req, res) => res.send("BookMyEvent API Running 🚀"));
 
-// ================= PUBLIC ROUTES =================
+// Public Routes
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
 
-// ================= ADMIN ROUTES =================
+// Admin Routes
 app.use("/api/modules", require("./routes/admin/moduleRoutes"));
-app.use(
-  "/api/secondary-modules",
-  require("./routes/admin/secondaryModuleRoutes")
-);
-
+app.use("/api/secondary-modules", require("./routes/admin/secondaryModuleRoutes"));
 app.use("/api/categories", require("./routes/admin/categoryRoutes"));
 app.use("/api/brands", require("./routes/admin/brandRoutes"));
 app.use("/api/coupons", require("./routes/admin/couponsRouters"));
 app.use("/api/banners", require("./routes/admin/bannerRoutes"));
 app.use("/api/zones", require("./routes/admin/zoneRoutes"));
 
-// ================= VENDOR ROUTES =================
+// Vendor Routes
 app.use("/api/vendorprofiles", require("./routes/vendor/vendorProfileRoutes"));
 app.use("/api/reviews", require("./routes/vendor/reviewRouters"));
 app.use("/api/venues", require("./routes/vendor/venueRoutes"));
