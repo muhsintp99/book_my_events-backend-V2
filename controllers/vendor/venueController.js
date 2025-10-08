@@ -172,21 +172,6 @@ exports.createVenue = async (req, res) => {
         message: "Authentication required",
       });
     }
-
-    // Validate required fields
-    if (!data.venueName || data.venueName.trim() === "") {
-      return res.status(400).json({
-        success: false,
-        message: "Venue name is required and cannot be empty",
-      });
-    }
-    if (!data.venueAddress || data.venueAddress.trim() === "") {
-      return res.status(400).json({
-        success: false,
-        message: "Venue address is required and cannot be empty",
-      });
-    }
-
     data.provider = req.user._id;
 
     // Convert file paths to relative URLs
@@ -215,29 +200,6 @@ exports.createVenue = async (req, res) => {
 exports.createVenueForProvider = async (req, res) => {
   try {
     const data = req.body;
-    
-    // Validate provider ID
-    if (!req.params.providerId) {
-      return res.status(400).json({
-        success: false,
-        message: "Provider ID is required",
-      });
-    }
-
-    // Validate required fields
-    if (!data.venueName || data.venueName.trim() === "") {
-      return res.status(400).json({
-        success: false,
-        message: "Venue name is required and cannot be empty",
-      });
-    }
-    if (!data.venueAddress || data.venueAddress.trim() === "") {
-      return res.status(400).json({
-        success: false,
-        message: "Venue address is required and cannot be empty",
-      });
-    }
-
     data.provider = req.params.providerId;
 
     // Convert file paths to relative URLs

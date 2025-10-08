@@ -325,11 +325,15 @@ exports.getBannerById = async (req, res) => {
 
 exports.createBanner = async (req, res) => {
   try {
-    const { zone, bannerType, ...otherData } = req.body;
+    const { zone, bannerType, title, ...otherData } = req.body;
 
-    console.log('Received banner data:', { zone, bannerType, ...otherData });
+    console.log('Received banner data:', { zone, bannerType, title, ...otherData });
 
     // Validate required fields
+    if (!title || !title.trim()) {
+      return errorResponse(res, 'Banner title is required', 400);
+    }
+
     if (!bannerType) {
       return errorResponse(res, 'Banner type is required', 400);
     }
@@ -360,9 +364,10 @@ exports.createBanner = async (req, res) => {
       return errorResponse(res, 'Zone is required', 400);
     }
 
-    // Build banner data - REMOVED createdBy since it's commented out in schema
+    // Build banner data
     const bannerData = {
       ...otherData,
+      title: title.trim(),
       zone: zoneId,
       bannerType: normalizedBannerType
     };
@@ -417,6 +422,16 @@ exports.updateBanner = async (req, res) => {
     if (!banner) return errorResponse(res, 'Banner not found', 404);
 
     const updateData = { ...req.body };
+
+    // Validate title if provided
+    if (updateData.title !== undefined && (!updateData.title || !updateData.title.trim())) {
+      return errorResponse(res, 'Banner title cannot be empty', 400);
+    }
+
+    // Trim title if provided
+    if (updateData.title) {
+      updateData.title = updateData.title.trim();
+    }
 
     // Handle zone conversion
     if (updateData.zone && !mongoose.Types.ObjectId.isValid(updateData.zone)) {
