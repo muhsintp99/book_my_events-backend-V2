@@ -1,123 +1,63 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
+
+const pricingScheduleSchema = new mongoose.Schema({
+  day: { type: String, required: true },
+  slotType: { type: String, required: true },
+  startTime: { type: String, required: true },
+  startAmpm: { type: String, required: true },
+  endTime: { type: String, required: true },
+  endAmpm: { type: String, required: true },
+  price: { type: Number, required: true },
+});
 
 const venueSchema = new mongoose.Schema(
   {
-    venueName: {
-      type: String,
-      required: [true, "Venue name is required"],
-      trim: true,
-      minlength: [1, "Venue name cannot be empty"],
-    },
-    shortDescription: {
-      type: String,
-      trim: true,
-    },
-    venueAddress: {
-      type: String,
-      required: [true, "Venue address is required"],
-      trim: true,
-      minlength: [1, "Venue address cannot be empty"],
-    },
-    latitude: Number,
-    longitude: Number,
-    language: {
-      type: String,
-      default: "EN",
-      enum: ["EN", "ES", "FR", "DE"], // Optional: restrict to specific languages
-    },
-
-    // Contact
-    contactPhone: {
-      type: String,
-      trim: true,
-    },
-    contactEmail: {
-      type: String,
-      trim: true,
-      match: [/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/, "Invalid email format"], // Optional: email validation
-    },
-    contactWebsite: {
-      type: String,
-      trim: true,
-    },
-
-    // Owner / Manager Info
-    ownerManagerName: {
-      type: String,
-      trim: true,
-    },
-    ownerManagerPhone: {
-      type: String,
-      trim: true,
-    },
-    ownerManagerEmail: {
-      type: String,
-      trim: true,
-      match: [/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/, "Invalid email format"], // Optional: email validation
-    },
-
-    openingHours: String,
-    closingHours: String,
-    holidaySchedule: String,
-
-    // Features
-    watermarkProtection: { type: Boolean, default: false },
-    parkingAvailablity: { type: Boolean, default: false },
-    wheelchairAccessiblity: { type: Boolean, default: false },
-    securityArrangements: { type: Boolean, default: false },
+    venueName: { type: String, required: true },
+    shortDescription: { type: String },
+    venueAddress: { type: String, required: true },
+    latitude: { type: Number },
+    longitude: { type: Number },
+    openingHours: { type: String },
+    closingHours: { type: String },
+    holidaySchedule: { type: String },
+    parkingAvailability: { type: Boolean, default: false },
+    parkingCapacity: { type: Number },
     foodCateringAvailability: { type: Boolean, default: false },
-    wifiAvailablity: { type: Boolean, default: false },
     stageLightingAudio: { type: Boolean, default: false },
-
-    parkingCapacity: String,
-    washroomsInfo: String,
-    dressingRooms: String,
-
-    // Pricing
-    hourlyPrice: Number,
-    perDayPrice: Number,
-    discount: Number,
-    distanceWisePrice: Number,
-    customPackages: String,
-    dynamicPricing: { type: Boolean, default: false },
-    advanceDeposit: Number,
-    cancellationPolicy: String,
-    extraCharges: String,
-
-    // Guests
-    seatingArrangement: String,
-    maxGuestsSeated: Number,
-    maxGuestsStanding: Number,
-
-    nearbyTransport: String,
-    accessibilityInfo: String,
-    multipleHalls: { type: Boolean, default: false },
-
-    searchTags: String,
-    rentalType: {
+    wheelchairAccessibility: { type: Boolean, default: false },
+    securityArrangements: { type: Boolean, default: false },
+    wifiAvailability: { type: Boolean, default: false },
+    washroomsInfo: { type: String },
+    dressingRooms: { type: String },
+    venueType: {
       type: String,
-      enum: ["hourly", "daily"],
-      default: "hourly",
+      required: true,
+      enum: ['per_person', 'per_hour', 'per_function'],
     },
-
-    // Points to User model, now required
-    provider: {
+    discount: { type: Number },
+    advanceDeposit: { type: Number },
+    cancellationPolicy: { type: String },
+    extraCharges: { type: String },
+    seatingArrangement: { type: String, required: true },
+    maxGuestsSeated: { type: Number, required: true },
+    maxGuestsStanding: { type: Number },
+    multipleHalls: { type: Boolean, default: false },
+    nearbyTransport: { type: String },
+    accessibilityInfo: { type: Boolean, default: false },
+    searchTags: [{ type: String }],
+    pricingSchedule: [pricingScheduleSchema],
+    thumbnail: { type: String },
+    images: [{ type: String }],
+    createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "Provider is required"],
+      ref: 'User',
+      required: true,
     },
-
-    // media
-    thumbnail: String,
-    images: [String],
-
-    // Reviews
-    rating: { type: Number, default: 0 },
-    reviewCount: { type: Number, default: 0 },
-
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model("Venue", venueSchema);
+module.exports = mongoose.model('Venue', venueSchema);
