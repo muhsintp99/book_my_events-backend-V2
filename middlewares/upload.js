@@ -295,62 +295,33 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const sanitize = require('sanitize-filename');
 
 function createUpload(folder, options = {}) {
-  if (!folder || typeof folder !== 'string' || folder.includes('..') || folder.includes('/')) {
-    throw new Error(`Invalid upload folder: ${folder}`);
-  }
-
   const baseDir = path.join(__dirname, '..', 'Uploads');
   const uploadDir = path.join(baseDir, folder);
 
-  // Ensure directory exists with proper permissions
-  try {
-    fs.mkdirSync(uploadDir, { recursive: true });
-    fs.chmodSync(uploadDir, 0o755); // Set directory permissions
-  } catch (err) {
-    console.error(`Failed to create/upload directory ${uploadDir}:`, err);
-    throw err;
-  }
-
-  const allowedTypes = options.allowedTypes || [
-    'image/jpeg',
-    'image/png',
-    'image/jpg',
-    'application/pdf'
-  ];
-  const maxSize = (options.fileSizeMB || 5) * 1024 * 1024; // Default to 2MB
+  // ✅ ensure directory exists
+  fs.mkdirSync(uploadDir, { recursive: true });
 
   const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, uploadDir);
-    },
+    destination: (req, file, cb) => cb(null, uploadDir),
     filename: (req, file, cb) => {
-      const safeName = sanitize(file.originalname.replace(/\s+/g, '-')); // Replace spaces with hyphens
-      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
-      cb(null, `${uniqueSuffix}-${safeName}`);
+      const ext = path.extname(file.originalname);
+      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
     },
   });
 
   const fileFilter = (req, file, cb) => {
-    if (!allowedTypes.includes(file.mimetype)) {
-      return cb(new Error(`Invalid file type. Allowed: ${allowedTypes.join(', ')}`), false);
-    }
+    const allowedTypes = options.allowedTypes || ['image/png', 'image/jpeg', 'image/webp'];
+    if (!allowedTypes.includes(file.mimetype)) return cb(new Error('Invalid file type'), false);
     cb(null, true);
   };
 
-  const upload = multer({
+  return multer({
     storage,
     fileFilter,
-    limits: {
-      fileSize: maxSize,
-      files: options.maxFiles || 10,
-      fields: 50,
-    },
+    limits: { fileSize: (options.fileSizeMB || 5) * 1024 * 1024 },
   });
-
-  return upload;
 }
 
 module.exports = createUpload;
