@@ -319,39 +319,184 @@
 //   }
 // };
 
-
 const mongoose = require('mongoose');
 const Venue = require('../../models/vendor/Venue');
+
+// Helper function to convert old format to new format
+const convertLegacyPricing = (oldPricing) => {
+  const newPricing = {
+    monday: {}, tuesday: {}, wednesday: {}, thursday: {},
+    friday: {}, saturday: {}, sunday: {}
+  };
+
+  if (Array.isArray(oldPricing)) {
+    oldPricing.forEach(slot => {
+      const day = slot.day.toLowerCase();
+      const slotType = slot.slotType.toLowerCase();
+      
+      if (newPricing[day]) {
+        newPricing[day][slotType] = {
+          startTime: slot.startTime,
+          startAmpm: slot.startAmpm,
+          endTime: slot.endTime,
+          endAmpm: slot.endAmpm,
+          perDay: slot.price || 0,
+          perHour: 0,
+          perPerson: 0
+        };
+      }
+    });
+  }
+
+  return newPricing;
+};
+
+// Helper function to normalize form data (handle arrays from duplicate keys)
+const normalizeFormData = (data) => {
+  const normalized = { ...data };
+  
+  // List of boolean fields
+  const booleanFields = [
+    'watermarkProtection', 'parkingAvailability', 'wheelchairAccessibility',
+    'securityArrangements', 'foodCateringAvailability', 'wifiAvailability',
+    'stageLightingAudio', 'multipleHalls', 'dynamicPricing', 'isActive'
+  ];
+  
+  // List of number fields
+  const numberFields = [
+    'latitude', 'longitude', 'discount', 'advanceDeposit',
+    'maxGuestsSeated', 'maxGuestsStanding', 'rating', 'reviewCount'
+  ];
+  
+  // Normalize boolean fields
+  booleanFields.forEach(field => {
+    if (normalized[field] !== undefined) {
+      if (Array.isArray(normalized[field])) {
+        normalized[field] = normalized[field][0];
+      }
+      if (typeof normalized[field] === 'string') {
+        normalized[field] = normalized[field].toLowerCase() === 'true';
+      }
+    }
+  });
+  
+  // Normalize number fields
+  numberFields.forEach(field => {
+    if (normalized[field] !== undefined) {
+      if (Array.isArray(normalized[field])) {
+        normalized[field] = normalized[field][0];
+      }
+      if (typeof normalized[field] === 'string') {
+        const num = parseFloat(normalized[field]);
+        normalized[field] = isNaN(num) ? undefined : num;
+      }
+    }
+  });
+  
+  // Normalize string fields (but NOT faqs, pricingSchedule, or searchTags)
+  const stringFields = [
+    'venueName', 'shortDescription', 'venueAddress', 'language',
+    'contactPhone', 'contactEmail', 'contactWebsite',
+    'ownerManagerName', 'ownerManagerPhone', 'ownerManagerEmail',
+    'openingHours', 'closingHours', 'holidaySchedule',
+    'parkingCapacity', 'washroomsInfo', 'dressingRooms',
+    'customPackages', 'cancellationPolicy', 'extraCharges',
+    'seatingArrangement', 'nearbyTransport', 'accessibilityInfo'
+  ];
+  
+  stringFields.forEach(field => {
+    if (Array.isArray(normalized[field])) {
+      normalized[field] = normalized[field][0];
+    }
+  });
+  
+  return normalized;
+};
 
 // Create Venue
 exports.createVenue = async (req, res) => {
   try {
-    const data = req.body;
-    console.log(data);
+    let data = normalizeFormData(req.body);
+    // console.log('Normalized data:', data);
 
-    if (data.pricingSchedule) data.pricingSchedule = JSON.parse(data.pricingSchedule);
+    // Parse pricing schedule if it exists
+    if (data.pricingSchedule) {
+      const parsed = typeof data.pricingSchedule === 'string' 
+        ? JSON.parse(data.pricingSchedule) 
+        : data.pricingSchedule;
+      
+      data.pricingSchedule = Array.isArray(parsed) 
+        ? convertLegacyPricing(parsed) 
+        : parsed;
+    }
 
+    // Parse search tags
     if (data.searchTags) {
       let tags = data.searchTags;
       if (typeof tags === 'string') {
         try {
-          const parsed = JSON.parse(tags);
-          tags = Array.isArray(parsed) ? parsed.flat() : [tags];
+          let parsed = JSON.parse(tags);
+          if (typeof parsed === 'string') {
+            parsed = JSON.parse(parsed);
+          }
+          tags = Array.isArray(parsed) ? parsed : [parsed];
         } catch {
-          tags = [tags];
+          tags = tags.split(',').map(t => t.trim()).filter(t => t);
         }
       }
       data.searchTags = Array.isArray(tags)
-        ? tags.flat().filter(t => t && typeof t === 'string').map(t => t.trim())
+        ? tags.flat().filter(t => t && typeof t === 'string' && t.trim()).map(t => t.trim())
         : [];
     } else {
       data.searchTags = [];
     }
 
+    // Parse FAQs - handle if it comes as array from form-data
+    if (data.faqs) {
+      let faqs = data.faqs;
+      
+      // If it's an array (from form-data duplicates), take the first one
+      if (Array.isArray(faqs)) {
+        faqs = faqs[0];
+      }
+      
+      // Now parse if it's a string
+      if (typeof faqs === 'string') {
+        try {
+          faqs = JSON.parse(faqs);
+        } catch (err) {
+          console.error('Error parsing FAQs:', err);
+          faqs = [];
+        }
+      }
+      
+      // Validate FAQ structure
+      if (Array.isArray(faqs)) {
+        data.faqs = faqs.filter(faq => 
+          faq && 
+          typeof faq === 'object' && 
+          faq.question && 
+          faq.answer &&
+          typeof faq.question === 'string' &&
+          typeof faq.answer === 'string'
+        ).map(faq => ({
+          question: faq.question.trim(),
+          answer: faq.answer.trim()
+        }));
+      } else {
+        data.faqs = [];
+      }
+    } else {
+      data.faqs = [];
+    }
+
     if (!data.user) data.user = null;
 
+    // Handle file uploads
     if (req.files?.thumbnail) data.thumbnail = req.files.thumbnail[0].path;
     if (req.files?.images) data.images = req.files.images.map(f => f.path);
+    
+    // Check authentication
     if (!req.user || !req.user._id) {
       return res.status(401).json({
         success: false,
@@ -361,7 +506,7 @@ exports.createVenue = async (req, res) => {
 
     const venue = await Venue.create({
       ...data,
-      createdBy: req.user._id, // use the real logged-in user
+      createdBy: req.user._id,
     });
 
     res.status(201).json({
@@ -377,12 +522,13 @@ exports.createVenue = async (req, res) => {
   }
 };
 
+// Get all venues
 exports.getVenues = async (req, res) => {
   try {
     const venues = await Venue.find()
       .populate({
         path: 'createdBy',
-        select: 'name email phone', // optional: include only what you need
+        select: 'name email phone',
       })
       .lean();
 
@@ -415,32 +561,10 @@ exports.getVenue = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(venueId))
       return res.status(400).json({ success: false, message: 'Invalid venue ID' });
 
-    let venue = await Venue.findById(venueId).populate('provider').lean();
+    const venue = await Venue.findById(venueId).populate('createdBy').lean();
     if (!venue)
       return res.status(404).json({ success: false, message: 'Venue not found' });
 
-    // Fallbacks for legacy data
-    if (!venue.venueType && venue.venueType) {
-      venue.venueType =
-        venue.venueType === 'hourly'
-          ? 'per_hour'
-          : venue.venueType === 'daily'
-            ? 'per_function'
-            : 'per_person';
-    }
-    if (!venue.pricingSchedule && venue.hourlyPrice) {
-      venue.pricingSchedule = [
-        {
-          day: 'Monday',
-          slotType: 'morning',
-          startTime: '08:00',
-          startAmpm: 'AM',
-          endTime: '12:00',
-          endAmpm: 'PM',
-          price: venue.hourlyPrice,
-        },
-      ];
-    }
     res.status(200).json({ success: true, data: venue });
   } catch (err) {
     console.error('Error in getVenue:', err.message);
@@ -455,10 +579,17 @@ exports.updateVenue = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(venueId))
       return res.status(400).json({ success: false, message: 'Invalid venue ID' });
 
-    const data = req.body;
+    let data = normalizeFormData(req.body);
+    
+    // Parse pricing schedule if it exists
     if (data.pricingSchedule && typeof data.pricingSchedule === 'string') {
-      data.pricingSchedule = JSON.parse(data.pricingSchedule);
+      const parsed = JSON.parse(data.pricingSchedule);
+      data.pricingSchedule = Array.isArray(parsed) 
+        ? convertLegacyPricing(parsed) 
+        : parsed;
     }
+    
+    // Parse search tags
     if (data.searchTags) {
       let tags = data.searchTags;
       if (typeof tags === 'string') {
@@ -472,10 +603,36 @@ exports.updateVenue = async (req, res) => {
       data.searchTags = Array.isArray(tags)
         ? tags.flat().filter(t => t && typeof t === 'string').map(t => t.trim())
         : [];
-    } else {
-      data.searchTags = [];
     }
 
+    // Parse FAQs
+    if (data.faqs) {
+      let faqs = data.faqs;
+      if (typeof faqs === 'string') {
+        try {
+          faqs = JSON.parse(faqs);
+        } catch (err) {
+          console.error('Error parsing FAQs:', err);
+          faqs = [];
+        }
+      }
+      
+      if (Array.isArray(faqs)) {
+        data.faqs = faqs.filter(faq => 
+          faq && 
+          typeof faq === 'object' && 
+          faq.question && 
+          faq.answer &&
+          typeof faq.question === 'string' &&
+          typeof faq.answer === 'string'
+        ).map(faq => ({
+          question: faq.question.trim(),
+          answer: faq.answer.trim()
+        }));
+      }
+    }
+
+    // Handle file uploads
     if (req.files?.thumbnail) data.thumbnail = req.files.thumbnail[0].path;
     if (req.files?.images) data.images = req.files.images.map(f => f.path);
 
@@ -486,29 +643,6 @@ exports.updateVenue = async (req, res) => {
 
     if (!venue)
       return res.status(404).json({ success: false, message: 'Venue not found' });
-
-    // Fallbacks
-    if (!venue.venueType && venue.venueType) {
-      venue.venueType =
-        venue.venueType === 'hourly'
-          ? 'per_hour'
-          : venue.venueType === 'daily'
-            ? 'per_function'
-            : 'per_person';
-    }
-    if (!venue.pricingSchedule && venue.hourlyPrice) {
-      venue.pricingSchedule = [
-        {
-          day: 'Monday',
-          slotType: 'morning',
-          startTime: '08:00',
-          startAmpm: 'AM',
-          endTime: '12:00',
-          endAmpm: 'PM',
-          price: venue.hourlyPrice,
-        },
-      ];
-    }
 
     res.status(200).json({ success: true, data: venue });
   } catch (err) {
@@ -521,26 +655,31 @@ exports.updateVenue = async (req, res) => {
 exports.updatePricing = async (req, res) => {
   try {
     const venueId = req.params.id;
-    const { venueType } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(venueId)) {
       return res.status(400).json({ success: false, message: 'Invalid venue ID' });
     }
 
     const pricingSchedule = req.body.pricingSchedule
-      ? JSON.parse(req.body.pricingSchedule)
+      ? (typeof req.body.pricingSchedule === 'string' 
+          ? JSON.parse(req.body.pricingSchedule) 
+          : req.body.pricingSchedule)
       : null;
 
-    if (!venueType || !pricingSchedule || !Array.isArray(pricingSchedule)) {
+    if (!pricingSchedule) {
       return res.status(400).json({
         success: false,
-        message: 'venueType and pricingSchedule are required',
+        message: 'pricingSchedule is required',
       });
     }
 
+    const formattedPricing = Array.isArray(pricingSchedule)
+      ? convertLegacyPricing(pricingSchedule)
+      : pricingSchedule;
+
     const venue = await Venue.findByIdAndUpdate(
       venueId,
-      { venueType, pricingSchedule },
+      { pricingSchedule: formattedPricing },
       { new: true, runValidators: true }
     );
 
@@ -552,7 +691,7 @@ exports.updatePricing = async (req, res) => {
       success: true,
       data: {
         venueId: venue._id,
-        venueType: venue.venueType,
+        venueName: venue.venueName,
         pricingSchedule: venue.pricingSchedule,
       },
     });
@@ -561,7 +700,6 @@ exports.updatePricing = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to update venue pricing' });
   }
 };
-
 
 // Get Pricing
 exports.getPricing = async (req, res) => {
@@ -572,7 +710,7 @@ exports.getPricing = async (req, res) => {
     }
 
     const venue = await Venue.findById(venueId)
-      .select('venueName venueType pricingSchedule')
+      .select('venueName pricingSchedule')
       .lean();
 
     if (!venue) {
@@ -584,8 +722,7 @@ exports.getPricing = async (req, res) => {
       data: {
         venueId: venue._id,
         venueName: venue.venueName,
-        venueType: venue.venueType || 'per_hour',
-        pricingSchedule: venue.pricingSchedule || [],
+        pricingSchedule: venue.pricingSchedule || {},
       },
     });
   } catch (err) {
@@ -594,6 +731,159 @@ exports.getPricing = async (req, res) => {
   }
 };
 
+// Get Pricing for specific day and slot
+exports.getPricingByDaySlot = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { day, slot } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid venue ID' });
+    }
+
+    const venue = await Venue.findById(id)
+      .select('venueName pricingSchedule')
+      .lean();
+
+    if (!venue) {
+      return res.status(404).json({ success: false, message: 'Venue not found' });
+    }
+
+    if (day && slot) {
+      const dayLower = day.toLowerCase();
+      const slotLower = slot.toLowerCase();
+      
+      const daySchedule = venue.pricingSchedule?.[dayLower];
+      const slotPricing = daySchedule?.[slotLower];
+
+      if (!slotPricing) {
+        return res.status(404).json({
+          success: false,
+          message: `No pricing found for ${day} ${slot}`,
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          venueId: venue._id,
+          venueName: venue.venueName,
+          day: dayLower,
+          slot: slotLower,
+          pricing: slotPricing,
+        },
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        venueId: venue._id,
+        venueName: venue.venueName,
+        pricingSchedule: venue.pricingSchedule || {},
+      },
+    });
+  } catch (err) {
+    console.error('Error in getPricingByDaySlot:', err.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch venue pricing' });
+  }
+};
+
+// Get FAQs for a venue
+exports.getFAQs = async (req, res) => {
+  try {
+    const venueId = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(venueId)) {
+      return res.status(400).json({ success: false, message: 'Invalid venue ID' });
+    }
+
+    const venue = await Venue.findById(venueId)
+      .select('venueName faqs')
+      .lean();
+
+    if (!venue) {
+      return res.status(404).json({ success: false, message: 'Venue not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        venueId: venue._id,
+        venueName: venue.venueName,
+        faqs: venue.faqs || [],
+      },
+    });
+  } catch (err) {
+    console.error('Error in getFAQs:', err.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch FAQs' });
+  }
+};
+
+// Update FAQs for a venue
+exports.updateFAQs = async (req, res) => {
+  try {
+    const venueId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(venueId)) {
+      return res.status(400).json({ success: false, message: 'Invalid venue ID' });
+    }
+
+    let faqs = req.body.faqs;
+    
+    if (typeof faqs === 'string') {
+      try {
+        faqs = JSON.parse(faqs);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid FAQ format. Must be a valid JSON array.',
+        });
+      }
+    }
+
+    if (!Array.isArray(faqs)) {
+      return res.status(400).json({
+        success: false,
+        message: 'FAQs must be an array',
+      });
+    }
+
+    // Validate and clean FAQs
+    const validFAQs = faqs.filter(faq => 
+      faq && 
+      typeof faq === 'object' && 
+      faq.question && 
+      faq.answer &&
+      typeof faq.question === 'string' &&
+      typeof faq.answer === 'string'
+    ).map(faq => ({
+      question: faq.question.trim(),
+      answer: faq.answer.trim()
+    }));
+
+    const venue = await Venue.findByIdAndUpdate(
+      venueId,
+      { faqs: validFAQs },
+      { new: true, runValidators: true }
+    ).select('venueName faqs');
+
+    if (!venue) {
+      return res.status(404).json({ success: false, message: 'Venue not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        venueId: venue._id,
+        venueName: venue.venueName,
+        faqs: venue.faqs,
+      },
+    });
+  } catch (err) {
+    console.error('Error in updateFAQs:', err.message);
+    res.status(500).json({ success: false, message: 'Failed to update FAQs' });
+  }
+};
 
 // Delete Venue
 exports.deleteVenue = async (req, res) => {
