@@ -70,13 +70,30 @@ exports.getBannerById = async (req, res) => {
 
 // ----------------------- CREATE BANNER -----------------------
 exports.createBanner = [
-  upload.single("image"), // Multer middleware for FormData
+  upload.single("image"),
 
   async (req, res) => {
     try {
-      const { zone, bannerType, title, ...otherData } = req.body;
+      console.log("=== CREATE BANNER DEBUG ===");
+      console.log("Body:", req.body);
+      console.log("File:", req.file);
+      console.log("=========================");
 
-      console.log("File received:", req.file);
+      // Parse body data if needed (sometimes form-data sends strings)
+      let bodyData = { ...req.body };
+      
+      // Parse boolean values if they come as strings
+      if (typeof bodyData.isActive === 'string') {
+        bodyData.isActive = bodyData.isActive === 'true';
+      }
+      if (typeof bodyData.isFeatured === 'string') {
+        bodyData.isFeatured = bodyData.isFeatured === 'true';
+      }
+      if (bodyData.displayOrder) {
+        bodyData.displayOrder = parseInt(bodyData.displayOrder);
+      }
+
+      const { zone, bannerType, title, description, isActive, isFeatured, displayOrder, store } = bodyData;
 
       // Validate required fields
       if (!title || !title.trim()) {
@@ -92,17 +109,19 @@ exports.createBanner = [
       if (!validTypes.includes(normalizedBannerType)) {
         return errorResponse(
           res,
-          `Invalid banner type: ${bannerType}. Valid types are: ${validTypes.join(
-            ", "
-          )}`,
+          `Invalid banner type: ${bannerType}. Valid types are: ${validTypes.join(", ")}`,
           400
         );
       }
 
       // Handle zone conversion
       let zoneId = zone;
-      if (zone) {
-        if (!mongoose.Types.ObjectId.isValid(zone)) {
+      if (!zone) {
+        return errorResponse(res, "Zone is required", 400);
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(zone)) {
+        try {
           const Zone = mongoose.model("Zone");
           const zoneDoc = await Zone.findOne({ name: zone });
           if (!zoneDoc) {
@@ -113,42 +132,60 @@ exports.createBanner = [
             );
           }
           zoneId = zoneDoc._id;
+        } catch (zoneError) {
+          console.error("Zone lookup error:", zoneError);
+          return errorResponse(res, "Error validating zone", 500);
         }
-      } else {
-        return errorResponse(res, "Zone is required", 400);
       }
 
-      // Build banner data
-      const bannerData = {
-        ...otherData,
-        title: title.trim(),
-        zone: zoneId,
-        bannerType: normalizedBannerType,
-      };
-
       // Handle file upload
-      if (req.file) {
-        bannerData.image = req.file.path
-          ? req.file.path.replace(/\\/g, "/")
-          : req.file.location;
-      } else if (!bannerData.image) {
+      if (!req.file) {
         return errorResponse(res, "Banner image is required", 400);
       }
 
+      const imagePath = req.file.path
+        ? req.file.path.replace(/\\/g, "/")
+        : req.file.location;
+
+      // Build banner data
+      const bannerData = {
+        title: title.trim(),
+        zone: zoneId,
+        bannerType: normalizedBannerType,
+        image: imagePath,
+      };
+
+      // Add optional fields
+      if (description) bannerData.description = description.trim();
+      if (store && mongoose.Types.ObjectId.isValid(store)) bannerData.store = store;
+      if (typeof isActive !== 'undefined') bannerData.isActive = isActive;
+      if (typeof isFeatured !== 'undefined') bannerData.isFeatured = isFeatured;
+      if (displayOrder !== undefined) bannerData.displayOrder = displayOrder;
+
+      console.log("Final banner data:", bannerData);
+
+      // Create banner
       const banner = new Banner(bannerData);
       await banner.save();
 
+      // Populate and return
       const populatedBanner = await Banner.findById(banner._id)
         .populate("zone", "name")
         .populate("store", "storeName");
 
       return res.status(201).json({
         success: true,
-        message: "Banner created",
+        message: "Banner created successfully",
         banner: populatedBanner,
       });
     } catch (error) {
-      console.error("Create banner error:", error);
+      console.error("=== CREATE BANNER ERROR ===");
+      console.error("Error name:", error.name);
+      console.error("Error message:", error.message);
+      console.error("Error code:", error.code);
+      console.error("Full error:", error);
+      console.error("Stack trace:", error.stack);
+      console.error("========================");
 
       if (error.name === "ValidationError") {
         const errors = Object.values(error.errors).map((err) => err.message);
@@ -159,14 +196,20 @@ exports.createBanner = [
         return errorResponse(res, "A banner with this data already exists", 400);
       }
 
-      return errorResponse(res, error.message || "Error creating banner", 500);
+      // Return detailed error in development, generic in production
+      const isDev = process.env.NODE_ENV === 'development';
+      return errorResponse(
+        res, 
+        isDev ? `${error.message}\n${error.stack}` : error.message || "Error creating banner", 
+        500
+      );
     }
   },
 ];
 
 // ----------------------- UPDATE BANNER -----------------------
 exports.updateBanner = [
-  upload.single("image"), // Support file updates
+  upload.single("image"),
 
   async (req, res) => {
     try {
@@ -175,11 +218,19 @@ exports.updateBanner = [
 
       const updateData = { ...req.body };
 
+      // Parse boolean values if they come as strings
+      if (typeof updateData.isActive === 'string') {
+        updateData.isActive = updateData.isActive === 'true';
+      }
+      if (typeof updateData.isFeatured === 'string') {
+        updateData.isFeatured = updateData.isFeatured === 'true';
+      }
+      if (updateData.displayOrder) {
+        updateData.displayOrder = parseInt(updateData.displayOrder);
+      }
+
       // Validate title if provided
-      if (
-        updateData.title !== undefined &&
-        (!updateData.title || !updateData.title.trim())
-      ) {
+      if (updateData.title !== undefined && (!updateData.title || !updateData.title.trim())) {
         return errorResponse(res, "Banner title cannot be empty", 400);
       }
 
@@ -208,9 +259,7 @@ exports.updateBanner = [
         if (!validTypes.includes(updateData.bannerType)) {
           return errorResponse(
             res,
-            `Invalid banner type: ${updateData.bannerType}. Valid types are: ${validTypes.join(
-              ", "
-            )}`,
+            `Invalid banner type: ${updateData.bannerType}. Valid types are: ${validTypes.join(", ")}`,
             400
           );
         }
@@ -278,9 +327,11 @@ exports.toggleBannerStatus = async (req, res) => {
       return errorResponse(res, "No valid fields to update", 400);
     }
 
-    const updatedBanner = await Banner.findByIdAndUpdate(req.params.id, updateData, {
-      new: true,
-    }).populate([
+    const updatedBanner = await Banner.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    ).populate([
       { path: "zone", select: "name" },
       { path: "store", select: "storeName" },
     ]);
