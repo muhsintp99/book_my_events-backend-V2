@@ -417,7 +417,6 @@ const normalizeFormData = (data) => {
 exports.createVenue = async (req, res) => {
   try {
     let data = normalizeFormData(req.body);
-    // console.log('Normalized data:', data);
 
     // Parse pricing schedule if it exists
     if (data.pricingSchedule) {
@@ -504,6 +503,13 @@ exports.createVenue = async (req, res) => {
       });
     }
 
+    // Set provider field if provided in request, otherwise use createdBy
+    if (data.provider && mongoose.Types.ObjectId.isValid(data.provider)) {
+      data.provider = data.provider;
+    } else {
+      data.provider = req.user._id;
+    }
+
     const venue = await Venue.create({
       ...data,
       createdBy: req.user._id,
@@ -512,6 +518,7 @@ exports.createVenue = async (req, res) => {
     res.status(201).json({
       success: true,
       data: venue,
+      message: 'Venue created successfully',
     });
   } catch (err) {
     console.error('Error in createVenue:', err);
@@ -528,6 +535,10 @@ exports.getVenues = async (req, res) => {
     const venues = await Venue.find()
       .populate({
         path: 'createdBy',
+        select: 'name email phone',
+      })
+      .populate({
+        path: 'provider',
         select: 'name email phone',
       })
       .lean();
@@ -554,21 +565,77 @@ exports.getVenues = async (req, res) => {
   }
 };
 
+// Get venues by provider ID
+exports.getVenuesByProvider = async (req, res) => {
+  try {
+    const { providerId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(providerId)) {
+      return res.status(400).json({ success: false, message: 'Invalid provider ID' });
+    }
+
+    // Ensure we cast to ObjectId
+    const providerObjectId = new mongoose.Types.ObjectId(providerId);
+
+    const venues = await Venue.find({
+      $or: [{ provider: providerObjectId }, { createdBy: providerObjectId }],
+    })
+      .populate('createdBy', 'name email')
+      .populate('provider', 'name email')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      count: venues.length,
+      data: venues,
+      message: venues.length === 0 ? 'No venues found for this provider' : 'Venues fetched successfully',
+    });
+  } catch (err) {
+    console.error('Error fetching venues by provider:', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch venues by provider', error: err.message });
+  }
+};
 // Get single venue
 exports.getVenue = async (req, res) => {
   try {
     const venueId = req.params.id;
-    if (!mongoose.Types.ObjectId.isValid(venueId))
-      return res.status(400).json({ success: false, message: 'Invalid venue ID' });
+    if (!mongoose.Types.ObjectId.isValid(venueId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid venue ID' 
+      });
+    }
 
-    const venue = await Venue.findById(venueId).populate('createdBy').lean();
-    if (!venue)
-      return res.status(404).json({ success: false, message: 'Venue not found' });
+    const venue = await Venue.findById(venueId)
+      .populate({
+        path: 'createdBy',
+        select: 'name email phone',
+      })
+      .populate({
+        path: 'provider',
+        select: 'name email phone',
+      })
+      .lean();
 
-    res.status(200).json({ success: true, data: venue });
+    if (!venue) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Venue not found' 
+      });
+    }
+
+    res.status(200).json({ 
+      success: true, 
+      data: venue 
+    });
   } catch (err) {
     console.error('Error in getVenue:', err.message);
-    res.status(500).json({ success: false, message: 'Failed to fetch venue' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch venue',
+      error: err.message
+    });
   }
 };
 
@@ -576,8 +643,12 @@ exports.getVenue = async (req, res) => {
 exports.updateVenue = async (req, res) => {
   try {
     const venueId = req.params.id;
-    if (!mongoose.Types.ObjectId.isValid(venueId))
-      return res.status(400).json({ success: false, message: 'Invalid venue ID' });
+    if (!mongoose.Types.ObjectId.isValid(venueId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid venue ID' 
+      });
+    }
 
     let data = normalizeFormData(req.body);
     
@@ -608,6 +679,11 @@ exports.updateVenue = async (req, res) => {
     // Parse FAQs
     if (data.faqs) {
       let faqs = data.faqs;
+      
+      if (Array.isArray(faqs)) {
+        faqs = faqs[0];
+      }
+      
       if (typeof faqs === 'string') {
         try {
           faqs = JSON.parse(faqs);
@@ -639,15 +715,35 @@ exports.updateVenue = async (req, res) => {
     const venue = await Venue.findByIdAndUpdate(venueId, data, {
       new: true,
       runValidators: true,
+    })
+      .populate({
+        path: 'createdBy',
+        select: 'name email phone',
+      })
+      .populate({
+        path: 'provider',
+        select: 'name email phone',
+      });
+
+    if (!venue) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Venue not found' 
+      });
+    }
+
+    res.status(200).json({ 
+      success: true, 
+      data: venue,
+      message: 'Venue updated successfully'
     });
-
-    if (!venue)
-      return res.status(404).json({ success: false, message: 'Venue not found' });
-
-    res.status(200).json({ success: true, data: venue });
   } catch (err) {
     console.error('Error in updateVenue:', err.message);
-    res.status(500).json({ success: false, message: 'Failed to update venue' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to update venue',
+      error: err.message
+    });
   }
 };
 
@@ -657,7 +753,10 @@ exports.updatePricing = async (req, res) => {
     const venueId = req.params.id;
 
     if (!mongoose.Types.ObjectId.isValid(venueId)) {
-      return res.status(400).json({ success: false, message: 'Invalid venue ID' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid venue ID' 
+      });
     }
 
     const pricingSchedule = req.body.pricingSchedule
@@ -684,7 +783,10 @@ exports.updatePricing = async (req, res) => {
     );
 
     if (!venue) {
-      return res.status(404).json({ success: false, message: 'Venue not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Venue not found' 
+      });
     }
 
     res.status(200).json({
@@ -694,10 +796,15 @@ exports.updatePricing = async (req, res) => {
         venueName: venue.venueName,
         pricingSchedule: venue.pricingSchedule,
       },
+      message: 'Pricing updated successfully'
     });
   } catch (err) {
     console.error('Error in updatePricing:', err.message);
-    res.status(500).json({ success: false, message: 'Failed to update venue pricing' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to update venue pricing',
+      error: err.message
+    });
   }
 };
 
@@ -706,7 +813,10 @@ exports.getPricing = async (req, res) => {
   try {
     const venueId = req.params.id;
     if (!mongoose.Types.ObjectId.isValid(venueId)) {
-      return res.status(400).json({ success: false, message: 'Invalid venue ID' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid venue ID' 
+      });
     }
 
     const venue = await Venue.findById(venueId)
@@ -714,7 +824,10 @@ exports.getPricing = async (req, res) => {
       .lean();
 
     if (!venue) {
-      return res.status(404).json({ success: false, message: 'Venue not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Venue not found' 
+      });
     }
 
     res.status(200).json({
@@ -727,7 +840,11 @@ exports.getPricing = async (req, res) => {
     });
   } catch (err) {
     console.error('Error in getPricing:', err.message);
-    res.status(500).json({ success: false, message: 'Failed to fetch venue pricing' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch venue pricing',
+      error: err.message
+    });
   }
 };
 
@@ -738,7 +855,10 @@ exports.getPricingByDaySlot = async (req, res) => {
     const { day, slot } = req.query;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ success: false, message: 'Invalid venue ID' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid venue ID' 
+      });
     }
 
     const venue = await Venue.findById(id)
@@ -746,7 +866,10 @@ exports.getPricingByDaySlot = async (req, res) => {
       .lean();
 
     if (!venue) {
-      return res.status(404).json({ success: false, message: 'Venue not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Venue not found' 
+      });
     }
 
     if (day && slot) {
@@ -785,7 +908,11 @@ exports.getPricingByDaySlot = async (req, res) => {
     });
   } catch (err) {
     console.error('Error in getPricingByDaySlot:', err.message);
-    res.status(500).json({ success: false, message: 'Failed to fetch venue pricing' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch venue pricing',
+      error: err.message
+    });
   }
 };
 
@@ -794,7 +921,10 @@ exports.getFAQs = async (req, res) => {
   try {
     const venueId = req.params.id;
     if (!mongoose.Types.ObjectId.isValid(venueId)) {
-      return res.status(400).json({ success: false, message: 'Invalid venue ID' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid venue ID' 
+      });
     }
 
     const venue = await Venue.findById(venueId)
@@ -802,7 +932,10 @@ exports.getFAQs = async (req, res) => {
       .lean();
 
     if (!venue) {
-      return res.status(404).json({ success: false, message: 'Venue not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Venue not found' 
+      });
     }
 
     res.status(200).json({
@@ -815,7 +948,11 @@ exports.getFAQs = async (req, res) => {
     });
   } catch (err) {
     console.error('Error in getFAQs:', err.message);
-    res.status(500).json({ success: false, message: 'Failed to fetch FAQs' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch FAQs',
+      error: err.message
+    });
   }
 };
 
@@ -825,7 +962,10 @@ exports.updateFAQs = async (req, res) => {
     const venueId = req.params.id;
 
     if (!mongoose.Types.ObjectId.isValid(venueId)) {
-      return res.status(400).json({ success: false, message: 'Invalid venue ID' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid venue ID' 
+      });
     }
 
     let faqs = req.body.faqs;
@@ -868,7 +1008,10 @@ exports.updateFAQs = async (req, res) => {
     ).select('venueName faqs');
 
     if (!venue) {
-      return res.status(404).json({ success: false, message: 'Venue not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Venue not found' 
+      });
     }
 
     res.status(200).json({
@@ -878,10 +1021,15 @@ exports.updateFAQs = async (req, res) => {
         venueName: venue.venueName,
         faqs: venue.faqs,
       },
+      message: 'FAQs updated successfully'
     });
   } catch (err) {
     console.error('Error in updateFAQs:', err.message);
-    res.status(500).json({ success: false, message: 'Failed to update FAQs' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to update FAQs',
+      error: err.message
+    });
   }
 };
 
@@ -889,17 +1037,33 @@ exports.updateFAQs = async (req, res) => {
 exports.deleteVenue = async (req, res) => {
   try {
     const venueId = req.params.id;
-    if (!mongoose.Types.ObjectId.isValid(venueId))
-      return res.status(400).json({ success: false, message: 'Invalid venue ID' });
+    if (!mongoose.Types.ObjectId.isValid(venueId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid venue ID' 
+      });
+    }
 
     const venue = await Venue.findByIdAndDelete(venueId);
-    if (!venue)
-      return res.status(404).json({ success: false, message: 'Venue not found' });
+    if (!venue) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Venue not found' 
+      });
+    }
 
-    res.status(200).json({ success: true, message: 'Venue deleted successfully' });
+    res.status(200).json({ 
+      success: true, 
+      message: 'Venue deleted successfully',
+      data: { deletedId: venueId }
+    });
   } catch (err) {
     console.error('Error in deleteVenue:', err.message);
-    res.status(500).json({ success: false, message: 'Failed to delete venue' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to delete venue',
+      error: err.message
+    });
   }
 };
 
@@ -907,19 +1071,36 @@ exports.deleteVenue = async (req, res) => {
 exports.toggleVenueStatus = async (req, res) => {
   try {
     const venueId = req.params.id;
-    if (!mongoose.Types.ObjectId.isValid(venueId))
-      return res.status(400).json({ success: false, message: 'Invalid venue ID' });
+    if (!mongoose.Types.ObjectId.isValid(venueId)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid venue ID' 
+      });
+    }
 
     const venue = await Venue.findById(venueId);
-    if (!venue)
-      return res.status(404).json({ success: false, message: 'Venue not found' });
+    if (!venue) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Venue not found' 
+      });
+    }
 
     venue.isActive = !venue.isActive;
     await venue.save();
-    res.status(200).json({ success: true, data: venue });
+    
+    res.status(200).json({ 
+      success: true, 
+      data: venue,
+      message: `Venue ${venue.isActive ? 'activated' : 'deactivated'} successfully`
+    });
   } catch (err) {
     console.error('Error in toggleVenueStatus:', err.message);
-    res.status(500).json({ success: false, message: 'Failed to toggle venue status' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to toggle venue status',
+      error: err.message
+    });
   }
 };
 
@@ -929,9 +1110,21 @@ exports.getVenueCounts = async (req, res) => {
     const total = await Venue.countDocuments();
     const active = await Venue.countDocuments({ isActive: true });
     const inactive = await Venue.countDocuments({ isActive: false });
-    res.status(200).json({ success: true, total, active, inactive });
+    
+    res.status(200).json({ 
+      success: true, 
+      data: {
+        total, 
+        active, 
+        inactive
+      }
+    });
   } catch (err) {
     console.error('Error in getVenueCounts:', err.message);
-    res.status(500).json({ success: false, message: 'Failed to fetch venue counts' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch venue counts',
+      error: err.message
+    });
   }
 };

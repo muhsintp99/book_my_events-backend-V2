@@ -65,6 +65,54 @@
 // module.exports = router;
 
 
+// const express = require('express');
+// const router = express.Router();
+// const { protect } = require('../../middlewares/authMiddleware');
+// const createUpload = require('../../middlewares/upload');
+// const venueController = require('../../controllers/vendor/venueController');
+
+// const upload = createUpload('venues', {
+//   fileSizeMB: 5,
+//   allowedTypes: ['image/png', 'image/jpeg', 'application/pdf'],
+// });
+
+// // All Venues
+// router
+//   .route('/')
+//   .get(venueController.getVenues)
+//   .post(
+//     protect,
+//     upload.fields([
+//       { name: 'thumbnail', maxCount: 1 },
+//       { name: 'images', maxCount: 10 },
+//     ]),
+//     venueController.createVenue
+//   );
+
+// // Counts and toggle
+// router.get('/count', venueController.getVenueCounts);
+// router.patch('/:id/toggle', venueController.toggleVenueStatus);
+
+// // Pricing routes — placed BEFORE /:id
+// router.get('/:id/pricing', venueController.getPricing);
+// router.put('/:id/pricing', venueController.updatePricing);
+
+// // Single Venue routes
+// router
+//   .route('/:id')
+//   .get(venueController.getVenue)
+//   .put(
+//     upload.fields([
+//       { name: 'thumbnail', maxCount: 1 },
+//       { name: 'images', maxCount: 10 },
+//     ]),
+//     venueController.updateVenue
+//   )
+//   .delete(venueController.deleteVenue);
+
+// module.exports = router;
+
+
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../../middlewares/authMiddleware');
@@ -75,6 +123,12 @@ const upload = createUpload('venues', {
   fileSizeMB: 5,
   allowedTypes: ['image/png', 'image/jpeg', 'application/pdf'],
 });
+
+// Counts route - must be before /:id
+router.get('/count', venueController.getVenueCounts);
+
+// Provider-specific routes - must be before /:id to avoid conflicts
+router.get('/provider/:providerId', venueController.getVenuesByProvider);
 
 // All Venues
 router
@@ -89,15 +143,18 @@ router
     venueController.createVenue
   );
 
-// Counts and toggle
-router.get('/count', venueController.getVenueCounts);
-router.patch('/:id/toggle', venueController.toggleVenueStatus);
-
-// Pricing routes — placed BEFORE /:id
+// Pricing routes - must be before /:id
 router.get('/:id/pricing', venueController.getPricing);
 router.put('/:id/pricing', venueController.updatePricing);
 
-// Single Venue routes
+// FAQ routes - must be before /:id
+router.get('/:id/faqs', venueController.getFAQs);
+router.put('/:id/faqs', venueController.updateFAQs);
+
+// Toggle route - must be before /:id
+router.patch('/:id/toggle', venueController.toggleVenueStatus);
+
+// Single Venue routes - must be LAST
 router
   .route('/:id')
   .get(venueController.getVenue)
