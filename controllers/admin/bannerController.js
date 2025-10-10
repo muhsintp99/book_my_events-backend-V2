@@ -1,26 +1,51 @@
 const mongoose = require("mongoose");
 const Banner = require("../../models/admin/banner");
+
 const {
   successResponse,
   errorResponse,
   paginatedResponse,
 } = require("../../utils/responseFormatter");
 
+const createUpload = require("../../middlewares/upload");
+const upload = createUpload("banners", { fileSizeMB: 2 });
+
+// Helper function to check and populate models
+const getPopulateOptions = () => {
+  const populateArray = [{ path: "zone", select: "name" }];
+  
+  try {
+    mongoose.model('Store');
+    populateArray.push({ path: "store", select: "storeName" });
+  } catch (e) {}
+
+  try {
+    mongoose.model('Vendor');
+    populateArray.push({ path: "vendor", select: "businessName email phoneNumber" });
+  } catch (e) {}
+
+  return populateArray;
+};
+
 // ----------------------- GET ALL BANNERS -----------------------
 exports.getAllBanners = async (req, res) => {
   try {
-    const { page = 1, limit = 10, zone, bannerType, isActive, isFeatured } =
+    const { page = 1, limit = 10, zone, bannerType, isActive, isFeatured, vendor } =
       req.query;
 
-    const filter = {};
+    const filter = {
+      vendor: null  // Only fetch banners where vendor is null
+    };
+    
     if (zone) filter.zone = zone;
     if (bannerType) filter.bannerType = bannerType.toLowerCase();
     if (isActive !== undefined) filter.isActive = isActive === "true";
     if (isFeatured !== undefined) filter.isFeatured = isFeatured === "true";
+    // Remove the vendor filter from query params since we always want vendor: null
+    // if (vendor) filter.vendor = vendor;
 
     const banners = await Banner.find(filter)
-      .populate("zone", "name")
-      .populate("store", "storeName")
+      .populate(getPopulateOptions())
       .sort({ displayOrder: 1, createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -46,12 +71,53 @@ exports.getAllBanners = async (req, res) => {
   }
 };
 
+// ----------------------- GET BANNERS BY VENDOR ID -----------------------
+exports.getBannersByVendor = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const { page = 1, limit = 10, isActive, isFeatured, bannerType } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+      return errorResponse(res, "Invalid vendor ID", 400);
+    }
+
+    const filter = { vendor: vendorId };
+    if (isActive !== undefined) filter.isActive = isActive === "true";
+    if (isFeatured !== undefined) filter.isFeatured = isFeatured === "true";
+    if (bannerType) filter.bannerType = bannerType.toLowerCase();
+
+    const banners = await Banner.find(filter)
+      .populate(getPopulateOptions())
+      .sort({ displayOrder: 1, createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Banner.countDocuments(filter);
+
+    const pagination = {
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / limit),
+      totalItems: total,
+      itemsPerPage: parseInt(limit),
+    };
+
+    return paginatedResponse(
+      res,
+      { banners },
+      pagination,
+      `Banners fetched successfully for vendor`
+    );
+  } catch (error) {
+    console.error("Get vendor banners error:", error);
+    return errorResponse(res, "Error fetching vendor banners", 500);
+  }
+};
+
 // ----------------------- GET BANNER BY ID -----------------------
 exports.getBannerById = async (req, res) => {
   try {
     const banner = await Banner.findById(req.params.id)
-      .populate("zone", "name")
-      .populate("store", "storeName");
+      .populate(getPopulateOptions());
 
     if (!banner) {
       return errorResponse(res, "Banner not found", 404);
@@ -66,37 +132,147 @@ exports.getBannerById = async (req, res) => {
 
 // ----------------------- CREATE BANNER -----------------------
 exports.createBanner = async (req, res) => {
-  try {
-    const { zone, bannerType, title, ...otherData } = req.body;
-
-    console.log("File received:", req.file);
-    console.log("Body received:", req.body);
-
-    // Validate required fields
-    if (!title || !title.trim()) {
-      return errorResponse(res, "Banner title is required", 400);
+  // Handle multer upload with error catching
+  upload.single("image")(req, res, async (uploadErr) => {
+    if (uploadErr) {
+      console.error("Upload error:", uploadErr);
+      return errorResponse(res, uploadErr.message || "Error uploading file", 400);
     }
 
-    if (!bannerType) {
-      return errorResponse(res, "Banner type is required", 400);
+    try {
+      const { zone, bannerType, title, vendor, ...otherData } = req.body;
+
+      console.log("File received:", req.file);
+
+      if (!title || !title.trim()) {
+        return errorResponse(res, "Banner title is required", 400);
+      }
+
+      if (!bannerType) {
+        return errorResponse(res, "Banner type is required", 400);
+      }
+
+      const normalizedBannerType = bannerType.toLowerCase().trim();
+      const validTypes = ["top_deal", "cash_back", "zone_wise"];
+      if (!validTypes.includes(normalizedBannerType)) {
+        return errorResponse(
+          res,
+          `Invalid banner type: ${bannerType}. Valid types are: ${validTypes.join(", ")}`,
+          400
+        );
+      }
+
+      let zoneId = zone;
+      if (zone) {
+        if (!mongoose.Types.ObjectId.isValid(zone)) {
+          const Zone = mongoose.model("Zone");
+          const zoneDoc = await Zone.findOne({ name: zone });
+          if (!zoneDoc) {
+            return errorResponse(
+              res,
+              "Zone not found. Please provide a valid zone ID or name",
+              400
+            );
+          }
+          zoneId = zoneDoc._id;
+        }
+      } else {
+        return errorResponse(res, "Zone is required", 400);
+      }
+
+      // Validate vendor if provided
+      if (vendor) {
+        if (!mongoose.Types.ObjectId.isValid(vendor)) {
+          return errorResponse(res, "Invalid vendor ID format", 400);
+        }
+        
+        try {
+          const Vendor = mongoose.model("Vendor");
+          const vendorDoc = await Vendor.findById(vendor);
+          if (!vendorDoc) {
+            return errorResponse(res, "Vendor not found", 400);
+          }
+        } catch (e) {
+          console.warn('Vendor model not available');
+        }
+      }
+
+      const bannerData = {
+        ...otherData,
+        title: title.trim(),
+        zone: zoneId,
+        bannerType: normalizedBannerType,
+      };
+
+      if (vendor) {
+        bannerData.vendor = vendor;
+      }
+
+      if (req.file) {
+        bannerData.image = req.file.path
+          ? req.file.path.replace(/\\/g, "/")
+          : req.file.location;
+      } else if (!bannerData.image) {
+        return errorResponse(res, "Banner image is required", 400);
+      }
+
+      const banner = new Banner(bannerData);
+      await banner.save();
+
+      const populatedBanner = await Banner.findById(banner._id)
+        .populate(getPopulateOptions());
+
+      return res.status(201).json({
+        success: true,
+        message: "Banner created",
+        banner: populatedBanner,
+      });
+    } catch (error) {
+      console.error("Create banner error:", error);
+
+      if (error.name === "ValidationError") {
+        const errors = Object.values(error.errors).map((err) => err.message);
+        return errorResponse(res, errors.join(", "), 400);
+      }
+
+      if (error.code === 11000) {
+        return errorResponse(res, "A banner with this data already exists", 400);
+      }
+
+      return errorResponse(res, error.message || "Error creating banner", 500);
+    }
+  });
+};
+
+// ----------------------- UPDATE BANNER -----------------------
+exports.updateBanner = async (req, res) => {
+  // Handle multer upload with error catching
+  upload.single("image")(req, res, async (uploadErr) => {
+    if (uploadErr) {
+      console.error("Upload error:", uploadErr);
+      return errorResponse(res, uploadErr.message || "Error uploading file", 400);
     }
 
-    const normalizedBannerType = bannerType.toLowerCase().trim();
-    const validTypes = ["top_deal", "cash_back", "zone_wise"];
-    if (!validTypes.includes(normalizedBannerType)) {
-      return errorResponse(
-        res,
-        `Invalid banner type: ${bannerType}. Valid types are: ${validTypes.join(", ")}`,
-        400
-      );
-    }
+    try {
+      const banner = await Banner.findById(req.params.id);
+      if (!banner) return errorResponse(res, "Banner not found", 404);
 
-    // Handle zone conversion
-    let zoneId = zone;
-    if (zone) {
-      if (!mongoose.Types.ObjectId.isValid(zone)) {
+      const updateData = { ...req.body };
+
+      if (
+        updateData.title !== undefined &&
+        (!updateData.title || !updateData.title.trim())
+      ) {
+        return errorResponse(res, "Banner title cannot be empty", 400);
+      }
+
+      if (updateData.title) {
+        updateData.title = updateData.title.trim();
+      }
+
+      if (updateData.zone && !mongoose.Types.ObjectId.isValid(updateData.zone)) {
         const Zone = mongoose.model("Zone");
-        const zoneDoc = await Zone.findOne({ name: zone });
+        const zoneDoc = await Zone.findOne({ name: updateData.zone });
         if (!zoneDoc) {
           return errorResponse(
             res,
@@ -104,133 +280,64 @@ exports.createBanner = async (req, res) => {
             400
           );
         }
-        zoneId = zoneDoc._id;
+        updateData.zone = zoneDoc._id;
       }
-    } else {
-      return errorResponse(res, "Zone is required", 400);
-    }
 
-    // Build banner data
-    const bannerData = {
-      ...otherData,
-      title: title.trim(),
-      zone: zoneId,
-      bannerType: normalizedBannerType,
-    };
-
-    // Handle file upload
-    if (req.file) {
-      bannerData.image = req.file.path
-        ? req.file.path.replace(/\\/g, "/")
-        : req.file.location;
-    } else if (!bannerData.image) {
-      return errorResponse(res, "Banner image is required", 400);
-    }
-
-    const banner = new Banner(bannerData);
-    await banner.save();
-
-    const populatedBanner = await Banner.findById(banner._id)
-      .populate("zone", "name")
-      .populate("store", "storeName");
-
-    return res.status(201).json({
-      success: true,
-      message: "Banner created",
-      banner: populatedBanner,
-    });
-  } catch (error) {
-    console.error("Create banner error:", error);
-
-    if (error.name === "ValidationError") {
-      const errors = Object.values(error.errors).map((err) => err.message);
-      return errorResponse(res, errors.join(", "), 400);
-    }
-
-    if (error.code === 11000) {
-      return errorResponse(res, "A banner with this data already exists", 400);
-    }
-
-    return errorResponse(res, error.message || "Error creating banner", 500);
-  }
-};
-
-// ----------------------- UPDATE BANNER -----------------------
-exports.updateBanner = async (req, res) => {
-  try {
-    const banner = await Banner.findById(req.params.id);
-    if (!banner) return errorResponse(res, "Banner not found", 404);
-
-    const updateData = { ...req.body };
-
-    // Validate title if provided
-    if (
-      updateData.title !== undefined &&
-      (!updateData.title || !updateData.title.trim())
-    ) {
-      return errorResponse(res, "Banner title cannot be empty", 400);
-    }
-
-    if (updateData.title) {
-      updateData.title = updateData.title.trim();
-    }
-
-    // Handle zone conversion
-    if (updateData.zone && !mongoose.Types.ObjectId.isValid(updateData.zone)) {
-      const Zone = mongoose.model("Zone");
-      const zoneDoc = await Zone.findOne({ name: updateData.zone });
-      if (!zoneDoc) {
-        return errorResponse(
-          res,
-          "Zone not found. Please provide a valid zone ID or name",
-          400
-        );
+      // Validate vendor if being updated
+      if (updateData.vendor) {
+        if (!mongoose.Types.ObjectId.isValid(updateData.vendor)) {
+          return errorResponse(res, "Invalid vendor ID format", 400);
+        }
+        
+        try {
+          const Vendor = mongoose.model("Vendor");
+          const vendorDoc = await Vendor.findById(updateData.vendor);
+          if (!vendorDoc) {
+            return errorResponse(res, "Vendor not found", 400);
+          }
+        } catch (e) {
+          console.warn('Vendor model not available');
+        }
       }
-      updateData.zone = zoneDoc._id;
-    }
 
-    // Normalize bannerType
-    if (updateData.bannerType) {
-      updateData.bannerType = updateData.bannerType.toLowerCase().trim();
-      const validTypes = ["top_deal", "cash_back", "zone_wise"];
-      if (!validTypes.includes(updateData.bannerType)) {
-        return errorResponse(
-          res,
-          `Invalid banner type: ${updateData.bannerType}. Valid types are: ${validTypes.join(", ")}`,
-          400
-        );
+      if (updateData.bannerType) {
+        updateData.bannerType = updateData.bannerType.toLowerCase().trim();
+        const validTypes = ["top_deal", "cash_back", "zone_wise"];
+        if (!validTypes.includes(updateData.bannerType)) {
+          return errorResponse(
+            res,
+            `Invalid banner type: ${updateData.bannerType}. Valid types are: ${validTypes.join(", ")}`,
+            400
+          );
+        }
       }
-    }
 
-    // Handle file upload
-    if (req.file) {
-      updateData.image = req.file.path
-        ? req.file.path.replace(/\\/g, "/")
-        : req.file.location;
-    }
+      if (req.file) {
+        updateData.image = req.file.path
+          ? req.file.path.replace(/\\/g, "/")
+          : req.file.location;
+      }
 
-    const updatedBanner = await Banner.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true, runValidators: true }
-    ).populate([
-      { path: "zone", select: "name" },
-      { path: "store", select: "storeName" },
-    ]);
+      const updatedBanner = await Banner.findByIdAndUpdate(
+        req.params.id,
+        updateData,
+        { new: true, runValidators: true }
+      ).populate(getPopulateOptions());
 
-    return successResponse(
-      res,
-      { banner: updatedBanner },
-      "Banner updated successfully"
-    );
-  } catch (error) {
-    console.error("Update banner error:", error);
-    if (error.name === "ValidationError") {
-      const errors = Object.values(error.errors).map((err) => err.message);
-      return errorResponse(res, errors.join(", "), 400);
+      return successResponse(
+        res,
+        { banner: updatedBanner },
+        "Banner updated successfully"
+      );
+    } catch (error) {
+      console.error("Update banner error:", error);
+      if (error.name === "ValidationError") {
+        const errors = Object.values(error.errors).map((err) => err.message);
+        return errorResponse(res, errors.join(", "), 400);
+      }
+      return errorResponse(res, error.message || "Error updating banner", 500);
     }
-    return errorResponse(res, error.message || "Error updating banner", 500);
-  }
+  });
 };
 
 // ----------------------- DELETE BANNER -----------------------
@@ -263,12 +370,11 @@ exports.toggleBannerStatus = async (req, res) => {
       return errorResponse(res, "No valid fields to update", 400);
     }
 
-    const updatedBanner = await Banner.findByIdAndUpdate(req.params.id, updateData, {
-      new: true,
-    }).populate([
-      { path: "zone", select: "name" },
-      { path: "store", select: "storeName" },
-    ]);
+    const updatedBanner = await Banner.findByIdAndUpdate(
+      req.params.id, 
+      updateData, 
+      { new: true }
+    ).populate(getPopulateOptions());
 
     return successResponse(
       res,
