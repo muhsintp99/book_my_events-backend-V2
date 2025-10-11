@@ -1169,11 +1169,12 @@ const convertLegacyPricing = (oldPricing) => {
 const normalizeFormData = (data) => {
   const normalized = { ...data };
   
-  // Boolean fields
+  // Boolean fields - UPDATED with AC fields
   const booleanFields = [
     'watermarkProtection', 'parkingAvailability', 'wheelchairAccessibility',
     'securityArrangements', 'foodCateringAvailability', 'wifiAvailability',
-    'stageLightingAudio', 'multipleHalls', 'dynamicPricing', 'isActive'
+    'stageLightingAudio', 'multipleHalls', 'dynamicPricing', 'isActive',
+    'acAvailable', 'nonAcAvailable' // NEW AC fields
   ];
   
   // Number fields
@@ -1207,7 +1208,7 @@ const normalizeFormData = (data) => {
     }
   });
   
-  // Normalize string fields
+  // Normalize string fields - UPDATED with acType
   const stringFields = [
     'venueName', 'shortDescription', 'venueAddress', 'language',
     'contactPhone', 'contactEmail', 'contactWebsite',
@@ -1216,7 +1217,7 @@ const normalizeFormData = (data) => {
     'parkingCapacity', 'washroomsInfo', 'dressingRooms',
     'customPackages', 'cancellationPolicy', 'extraCharges',
     'seatingArrangement', 'nearbyTransport', 'accessibilityInfo',
-    'module'
+    'module', 'acType' // NEW acType field
   ];
   
   stringFields.forEach(field => {
@@ -1224,6 +1225,14 @@ const normalizeFormData = (data) => {
       normalized[field] = normalized[field][0];
     }
   });
+  
+  // Validate acType enum
+  if (normalized.acType) {
+    const validAcTypes = ['Central AC', 'Split AC', 'Window AC', 'Coolers', 'Not Specified'];
+    if (!validAcTypes.includes(normalized.acType)) {
+      normalized.acType = 'Not Specified';
+    }
+  }
   
   return normalized;
 };
@@ -1244,7 +1253,7 @@ exports.createVenue = async (req, res) => {
         : parsed;
     }
 
-    // Parse categories - NEW
+    // Parse categories
     if (data.categories) {
       let categories = data.categories;
       
@@ -1268,7 +1277,7 @@ exports.createVenue = async (req, res) => {
       data.categories = [];
     }
 
-    // Parse module - NEW
+    // Parse module
     if (data.module && mongoose.Types.ObjectId.isValid(data.module)) {
       data.module = new mongoose.Types.ObjectId(data.module);
     } else {
@@ -1537,7 +1546,7 @@ exports.updateVenue = async (req, res) => {
         : parsed;
     }
 
-    // Parse categories - NEW
+    // Parse categories
     if (data.categories) {
       let categories = data.categories;
       
@@ -1557,7 +1566,7 @@ exports.updateVenue = async (req, res) => {
       }
     }
 
-    // Parse module - NEW
+    // Parse module
     if (data.module && mongoose.Types.ObjectId.isValid(data.module)) {
       data.module = new mongoose.Types.ObjectId(data.module);
     }

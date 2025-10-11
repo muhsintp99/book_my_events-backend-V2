@@ -170,7 +170,7 @@ const venueSchema = new mongoose.Schema(
     longitude: { type: Number },
     language: { type: String, default: 'EN' },
     
-    // Categories - NEW
+    // Categories
     categories: [{ 
       type: mongoose.Schema.Types.ObjectId, 
       ref: 'Category' 
@@ -206,6 +206,15 @@ const venueSchema = new mongoose.Schema(
     stageLightingAudio: { type: Boolean, default: false },
     washroomsInfo: { type: String },
     dressingRooms: { type: String },
+    
+    // AC/Non-AC Availability - NEW FIELDS
+    acAvailable: { type: Boolean, default: false },
+    nonAcAvailable: { type: Boolean, default: false },
+    acType: { 
+      type: String, 
+      enum: ['Central AC', 'Split AC', 'Window AC', 'Coolers', 'Not Specified'],
+      default: 'Not Specified'
+    },
     
     // Pricing & Packages
     discount: { type: Number },
