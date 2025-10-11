@@ -228,6 +228,9 @@ exports.createCategory = async (req, res) => {
   }
 };
 
+
+
+
 // ✅ Update Category (handle single Module)
 exports.updateCategory = async (req, res) => {
   try {

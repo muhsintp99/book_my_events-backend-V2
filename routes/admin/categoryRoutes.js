@@ -50,6 +50,9 @@ const handleUpload = (req, res, next) => {
 
 // ---------------- ROUTES ----------------
 
+
+
+
 // Create category
 router.post('/', handleUpload, categoryController.createCategory);
 
