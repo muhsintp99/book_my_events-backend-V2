@@ -12,7 +12,7 @@ exports.welcomeEmail = (user) => `
 
 exports.vendorEmail = (user, password) => `
   <div style="font-family:Arial,sans-serif;line-height:1.6">
-    <h2>Welcome Vendor 🎉</h2>
+    <h2>Welcome to Book My Event 🎉</h2>
     <p>Hi <strong>${user.firstName}</strong>,</p>
     <p>Your vendor account has been successfully created.</p>
     <p><strong>Vendor ID:</strong> ${user.userId}</p>
