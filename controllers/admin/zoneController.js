@@ -31,6 +31,54 @@ async function validateCoordinatesAndGetLocation(coordinates) {
   }
 }
 
+
+// Detect user's location and return lat, lng, district
+exports.reverseGeocode = async (req, res) => {
+  try {
+    const { lat, lng } = req.query;
+
+    if (!lat || !lng) {
+      return res.status(400).json({ message: "Latitude and longitude are required." });
+    }
+
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}`;
+    const { data } = await axios.get(url);
+
+    if (data.status !== "OK" || !data.results.length) {
+      return res.status(400).json({ message: "Unable to detect location." });
+    }
+
+    const result = data.results[0];
+
+    // Extract city and district
+    let city = null;
+    let district = null;
+
+    result.address_components.forEach((comp) => {
+      if (comp.types.includes("locality")) city = comp.long_name;
+      if (comp.types.includes("administrative_area_level_2")) district = comp.long_name;
+    });
+
+    // Match district with your Zone model if needed
+    const matchedZone = await Zone.findOne({
+      name: { $regex: new RegExp(district || city, "i") },
+    });
+
+    res.status(200).json({
+      success: true,
+      lat,
+      lng,
+      city: city || "Unknown",
+      district: matchedZone ? matchedZone.name : district || "Unknown",
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Error detecting location",
+      error: err.message,
+    });
+  }
+};
 // Create Zone
 exports.createZone = async (req, res) => {
   try {

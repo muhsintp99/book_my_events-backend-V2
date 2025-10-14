@@ -2,6 +2,9 @@ const express = require("express");
 const router = express.Router();
 const zoneController = require("../../controllers/admin/zoneController");
 
+
+
+router.get("/reverse-geocode", zoneController.reverseGeocode);
 router.post("/", zoneController.createZone);
 router.get("/", zoneController.getZones);
 router.get("/:id", zoneController.getZoneById);
