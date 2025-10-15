@@ -496,8 +496,6 @@ const fs = require('fs').promises;
 const path = require('path');
 
 // ================= HELPERS =================
-
-// Delete multiple files safely
 const deleteFiles = async (files = []) => {
   if (!files.length) return;
   await Promise.all(
@@ -512,7 +510,6 @@ const deleteFiles = async (files = []) => {
   );
 };
 
-// Unified response helper
 const sendResponse = (res, status, success, message, data = null, meta = null) => {
   const response = { success, message };
   if (data) response.data = data;
@@ -524,31 +521,31 @@ const sendResponse = (res, status, success, message, data = null, meta = null) =
 exports.createVehicle = async (req, res) => {
   const body = { ...req.body };
 
-  // Provider validation
-  if (!body.provider) {
+  // ✅ Zone validation
+  if (!body.zone) {
+    return sendResponse(res, 400, false, 'Zone is required');
+  }
+
+  // ✅ Provider auto-fill
+  if (!body.provider && req.user) {
     body.provider = req.user._id;
-  } else if (body.provider.toString() !== req.user._id.toString() && req.user.role === 'vendor') {
+  } else if (req.user?.role === 'vendor' && body.provider && body.provider.toString() !== req.user._id.toString()) {
     return sendResponse(res, 403, false, 'Unauthorized: Invalid provider');
   }
 
   // Handle uploads
-  if (req.files?.images) body.images = req.files.images.map(f => f.filename);
+  if (req.files?.images) body.images = req.files.images.map((f) => f.filename);
   if (req.files?.thumbnail?.[0]) body.thumbnail = req.files.thumbnail[0].filename;
-  if (req.files?.documents) body.documents = req.files.documents.map(f => f.filename);
+  if (req.files?.documents) body.documents = req.files.documents.map((f) => f.filename);
 
   try {
     const vehicle = await Vehicle.create(body);
-    await vehicle.populate('brand category provider');
+    await vehicle.populate('brand category provider zone');
     sendResponse(res, 201, true, 'Vehicle created successfully', vehicle);
   } catch (error) {
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
-      return sendResponse(
-        res,
-        400,
-        false,
-        `${field === 'vinNumber' ? 'VIN number' : 'License plate number'} already exists`
-      );
+      return sendResponse(res, 400, false, `${field === 'vinNumber' ? 'VIN number' : 'License plate number'} already exists`);
     }
     sendResponse(res, 400, false, error.message);
   }
@@ -562,8 +559,6 @@ exports.getVehicles = async (req, res) => {
   const skip = (pageNum - 1) * limitNum;
 
   let query = {};
-  if (req.user.role === 'vendor') query.provider = req.user._id;
-
   if (search) {
     query.$or = [
       { name: { $regex: search, $options: 'i' } },
@@ -574,40 +569,19 @@ exports.getVehicles = async (req, res) => {
   }
 
   const [vehicles, totalItems] = await Promise.all([
-    Vehicle.find(query).populate('brand category provider').skip(skip).limit(limitNum).lean(),
+    Vehicle.find(query).populate('brand category provider zone').skip(skip).limit(limitNum).lean(),
     Vehicle.countDocuments(query),
   ]);
 
-  const totalPages = Math.ceil(totalItems / limitNum);
-
   sendResponse(res, 200, true, 'Vehicles fetched successfully', vehicles, {
     currentPage: pageNum,
-    totalPages,
+    totalPages: Math.ceil(totalItems / limitNum),
     totalItems,
-    itemsPerPage: limitNum,
-  });
-};
-
-exports.getVehiclesByProvider = async (req, res) => {
-  const { providerId } = req.params;
-
-  if (req.user.role === 'vendor' && req.user._id.toString() !== providerId) {
-    return sendResponse(res, 403, false, 'Forbidden: Not your vehicles');
-  }
-
-  const vehicles = await Vehicle.find({ provider: providerId })
-    .populate('brand category provider')
-    .lean();
-
-  sendResponse(res, 200, true, 'Vehicles fetched successfully', vehicles, {
-    count: vehicles.length,
   });
 };
 
 exports.getVehicle = async (req, res) => {
-  const vehicle = await Vehicle.findById(req.params.id)
-    .populate('brand category provider')
-    .lean();
+  const vehicle = await Vehicle.findById(req.params.id).populate('brand category provider zone').lean();
   if (!vehicle) return sendResponse(res, 404, false, 'Vehicle not found');
   sendResponse(res, 200, true, 'Vehicle fetched successfully', vehicle);
 };
@@ -617,27 +591,20 @@ exports.updateVehicle = async (req, res) => {
   const vehicle = await Vehicle.findById(req.params.id);
   if (!vehicle) return sendResponse(res, 404, false, 'Vehicle not found');
 
-  if (req.user.role === 'vendor' && vehicle.provider.toString() !== req.user._id.toString()) {
-    return sendResponse(res, 403, false, 'Unauthorized: Not your vehicle');
-  }
-
   const oldImages = [...vehicle.images];
   const oldThumbnail = vehicle.thumbnail;
   const oldDocuments = [...vehicle.documents];
 
-  // Handle file uploads
-  if (req.files?.images) vehicle.images = req.files.images.map(f => f.filename);
+  if (req.files?.images) vehicle.images = req.files.images.map((f) => f.filename);
   if (req.files?.thumbnail?.[0]) vehicle.thumbnail = req.files.thumbnail[0].filename;
-  if (req.files?.documents) vehicle.documents = req.files.documents.map(f => f.filename);
+  if (req.files?.documents) vehicle.documents = req.files.documents.map((f) => f.filename);
 
   const allowedFields = [
-    'name', 'description', 'brand', 'category', 'model', 'type',
+    'name', 'description', 'brand', 'category', 'zone', 'model', 'type',
     'engineCapacity', 'enginePower', 'seatingCapacity', 'airCondition',
     'fuelType', 'transmissionType', 'pricing', 'discount', 'searchTags',
     'vinNumber', 'licensePlateNumber',
   ];
-
-  if (req.user.role === 'admin' && req.body.provider) allowedFields.push('provider');
 
   for (const key of allowedFields) {
     if (req.body[key] !== undefined) vehicle[key] = req.body[key];
@@ -645,23 +612,12 @@ exports.updateVehicle = async (req, res) => {
 
   try {
     await vehicle.save();
-
     if (req.files?.images) await deleteFiles(oldImages);
     if (req.files?.thumbnail && oldThumbnail) await deleteFiles([oldThumbnail]);
     if (req.files?.documents) await deleteFiles(oldDocuments);
-
-    await vehicle.populate('brand category provider');
+    await vehicle.populate('brand category provider zone');
     sendResponse(res, 200, true, 'Vehicle updated successfully', vehicle);
   } catch (error) {
-    if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)[0];
-      return sendResponse(
-        res,
-        400,
-        false,
-        `${field === 'vinNumber' ? 'VIN number' : 'License plate number'} already exists`
-      );
-    }
     sendResponse(res, 400, false, error.message);
   }
 };
@@ -671,10 +627,6 @@ exports.deleteVehicle = async (req, res) => {
   const vehicle = await Vehicle.findById(req.params.id);
   if (!vehicle) return sendResponse(res, 404, false, 'Vehicle not found');
 
-  if (req.user.role === 'vendor' && vehicle.provider.toString() !== req.user._id.toString()) {
-    return sendResponse(res, 403, false, 'Unauthorized: Not your vehicle');
-  }
-
   await Promise.all([
     deleteFiles(vehicle.images),
     vehicle.thumbnail ? deleteFiles([vehicle.thumbnail]) : null,
@@ -683,39 +635,4 @@ exports.deleteVehicle = async (req, res) => {
 
   await vehicle.deleteOne();
   sendResponse(res, 200, true, 'Vehicle deleted successfully');
-};
-
-// ================= BLOCK / REACTIVATE =================
-exports.blockVehicle = async (req, res) => {
-  const vehicle = await Vehicle.findById(req.params.id);
-  if (!vehicle) return sendResponse(res, 404, false, 'Vehicle not found');
-
-  if (req.user.role === 'vendor' && vehicle.provider.toString() !== req.user._id.toString()) {
-    return sendResponse(res, 403, false, 'Unauthorized: Not your vehicle');
-  }
-
-  vehicle.isActive = false;
-  vehicle.statusChangedAt = new Date();
-  vehicle.statusChangedBy = req.user._id;
-
-  await vehicle.save();
-  await vehicle.populate('brand category provider');
-  sendResponse(res, 200, true, 'Vehicle blocked successfully', vehicle);
-};
-
-exports.reactivateVehicle = async (req, res) => {
-  const vehicle = await Vehicle.findById(req.params.id);
-  if (!vehicle) return sendResponse(res, 404, false, 'Vehicle not found');
-
-  if (req.user.role === 'vendor' && vehicle.provider.toString() !== req.user._id.toString()) {
-    return sendResponse(res, 403, false, 'Unauthorized: Not your vehicle');
-  }
-
-  vehicle.isActive = true;
-  vehicle.statusChangedAt = new Date();
-  vehicle.statusChangedBy = req.user._id;
-
-  await vehicle.save();
-  await vehicle.populate('brand category provider');
-  sendResponse(res, 200, true, 'Vehicle reactivated successfully', vehicle);
 };

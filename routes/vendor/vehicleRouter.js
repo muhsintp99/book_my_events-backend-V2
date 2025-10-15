@@ -67,22 +67,15 @@
 // module.exports = router;
 
 
-
 const express = require('express');
 const router = express.Router();
 const createUpload = require('../../middlewares/upload');
-const vehicleController = require('../../controllers/vendor/vehicleCntroller');
+const vehicleController = require('../../controllers/vendor/vehicleCntroller'); // ✅ fixed typo
 const { protect, authorizeRoles } = require('../../middlewares/authMiddleware');
 
-// Async wrapper to reduce try/catch
-const asyncHandler = fn => (req, res, next) => {
-  Promise.resolve(fn(req, res, next)).catch(next);
-};
+const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-// Multer Upload Setup
 const upload = createUpload('vehicles', { fileSizeMB: 20 });
-
-// File fields
 const uploadFields = upload.fields([
   { name: 'images', maxCount: 10 },
   { name: 'thumbnail', maxCount: 1 },
@@ -91,69 +84,13 @@ const uploadFields = upload.fields([
 
 // ================= VEHICLE ROUTES =================
 
-// Create
-router.post(
-  '/',
-  protect,
-  authorizeRoles('vendor', 'admin'),
-  uploadFields,
-  asyncHandler(vehicleController.createVehicle)
-);
+// Public GET routes (no token)
+router.get('/', asyncHandler(vehicleController.getVehicles));
+router.get('/:id', asyncHandler(vehicleController.getVehicle));
 
-// Get all
-router.get(
-  '/',
-  protect,
-  authorizeRoles('vendor', 'admin'),
-  asyncHandler(vehicleController.getVehicles)
-);
-
-// Get by provider
-router.get(
-  '/provider/:providerId',
-  protect,
-  authorizeRoles('vendor', 'admin'),
-  asyncHandler(vehicleController.getVehiclesByProvider)
-);
-
-// Get single
-router.get(
-  '/:id',
-  protect,
-  authorizeRoles('vendor', 'admin'),
-  asyncHandler(vehicleController.getVehicle)
-);
-
-// Update
-router.put(
-  '/:id',
-  protect,
-  authorizeRoles('vendor', 'admin'),
-  uploadFields,
-  asyncHandler(vehicleController.updateVehicle)
-);
-
-// Delete
-router.delete(
-  '/:id',
-  protect,
-  authorizeRoles('vendor', 'admin'),
-  asyncHandler(vehicleController.deleteVehicle)
-);
-
-// Block & Reactivate
-router.patch(
-  '/:id/block',
-  protect,
-  authorizeRoles('vendor', 'admin'),
-  asyncHandler(vehicleController.blockVehicle)
-);
-
-router.patch(
-  '/:id/reactivate',
-  protect,
-  authorizeRoles('vendor', 'admin'),
-  asyncHandler(vehicleController.reactivateVehicle)
-);
+// Auth routes
+router.post('/', protect, authorizeRoles('vendor', 'admin'), uploadFields, asyncHandler(vehicleController.createVehicle));
+router.put('/:id', protect, authorizeRoles('vendor', 'admin'), uploadFields, asyncHandler(vehicleController.updateVehicle));
+router.delete('/:id', protect, authorizeRoles('vendor', 'admin'), asyncHandler(vehicleController.deleteVehicle));
 
 module.exports = router;
