@@ -9,7 +9,7 @@ const VehicleCategorySchema = new Schema({
   parentCategory: { type: String, trim: true },
   displayOrder: { type: Number, default: 0 },
   brands: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Brand' }],
-  module: { type: mongoose.Schema.Types.ObjectId, ref: 'Module', required: true },
+  module: { type: mongoose.Schema.Types.ObjectId, ref: 'Module', required: true }, // Must be ObjectId
   isActive: { type: Boolean, default: true },
   isFeatured: { type: Boolean, default: false },
   metaTitle: { type: String, trim: true },
@@ -28,10 +28,15 @@ VehicleCategorySchema.pre('validate', async function (next) {
       const prefix = `VCAT${year}`;
       
       // Get all vehicleCategoryIds for this year and extract numbers
-      const vehicleCategories = await mongoose.model('VehicleCategory')
-        .find({ vehicleCategoryId: { $regex: `^${prefix}` } })
-        .select('vehicleCategoryId')
-        .lean();
+     const vehicleCategories = await VehicleCategory.find({
+  module: new mongoose.Types.ObjectId(moduleId), // ✅ Use `new`
+  isActive: true
+})
+  .populate('brands', '-__v')
+  .populate('module', '-__v')
+  .sort({ createdAt: -1 })
+  .lean();
+
       
       let nextNumber = 1;
       

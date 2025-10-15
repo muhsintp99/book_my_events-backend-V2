@@ -57,6 +57,7 @@ app.use("/api/vehicle-categories", require("./routes/admin/vehiclecategoryRoutes
 app.use("/api/brands", require("./routes/admin/brandRoutes"));
 app.use("/api/coupons", require("./routes/admin/couponsRouters"));
 app.use("/api/banners", require("./routes/admin/bannerRoutes"));
+app.use("/api/vehicle-banners", require("./routes/admin/vehicleBannerRoutes"));
 app.use("/api/zones", require("./routes/admin/zoneRoutes"));
 
 // Vendor Routes

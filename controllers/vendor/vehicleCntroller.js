@@ -586,6 +586,8 @@ exports.getVehicle = async (req, res) => {
   sendResponse(res, 200, true, 'Vehicle fetched successfully', vehicle);
 };
 
+
+
 // ================= UPDATE =================
 exports.updateVehicle = async (req, res) => {
   const vehicle = await Vehicle.findById(req.params.id);

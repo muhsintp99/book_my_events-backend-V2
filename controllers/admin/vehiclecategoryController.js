@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const mongoose = require('mongoose');  // <-- add this
 const VehicleCategory = require('../../models/admin/vehiclecategoryModel');
 
 // Utility to delete image file
@@ -84,6 +85,7 @@ exports.createVehicleCategory = async (req, res) => {
     });
   }
 };
+
 
 // ✅ Update Vehicle Category
 exports.updateVehicleCategory = async (req, res) => {
@@ -264,7 +266,7 @@ exports.getVehicleCategoriesByModule = async (req, res) => {
     }
 
     const vehicleCategories = await VehicleCategory.find({
-      module: moduleId,
+      module: mongoose.Types.ObjectId(moduleId), // <-- Cast to ObjectId
       isActive: true
     })
       .populate('brands', '-__v')
