@@ -586,7 +586,45 @@ exports.getVehicle = async (req, res) => {
   sendResponse(res, 200, true, 'Vehicle fetched successfully', vehicle);
 };
 
+// ✅ NEW: Get vehicles by provider ID
+exports.getVehiclesByProvider = async (req, res) => {
+  const { providerId } = req.params;
+  const { page = 1, limit = 10, search } = req.query;
+  const pageNum = parseInt(page, 10);
+  const limitNum = parseInt(limit, 10);
+  const skip = (pageNum - 1) * limitNum;
 
+  let query = { provider: providerId };
+  
+  if (search) {
+    query.$and = [
+      { provider: providerId },
+      {
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { model: { $regex: search, $options: 'i' } },
+          { vinNumber: { $regex: search, $options: 'i' } },
+          { licensePlateNumber: { $regex: search, $options: 'i' } },
+        ],
+      },
+    ];
+  }
+
+  try {
+    const [vehicles, totalItems] = await Promise.all([
+      Vehicle.find(query).populate('brand category provider zone').skip(skip).limit(limitNum).lean(),
+      Vehicle.countDocuments(query),
+    ]);
+
+    sendResponse(res, 200, true, 'Provider vehicles fetched successfully', vehicles, {
+      currentPage: pageNum,
+      totalPages: Math.ceil(totalItems / limitNum),
+      totalItems,
+    });
+  } catch (error) {
+    sendResponse(res, 400, false, error.message);
+  }
+};
 
 // ================= UPDATE =================
 exports.updateVehicle = async (req, res) => {

@@ -66,11 +66,10 @@
 
 // module.exports = router;
 
-
 const express = require('express');
 const router = express.Router();
 const createUpload = require('../../middlewares/upload');
-const vehicleController = require('../../controllers/vendor/vehicleCntroller'); // ✅ fixed typo
+const vehicleController = require('../../controllers/vendor/vehicleCntroller');
 const { protect, authorizeRoles } = require('../../middlewares/authMiddleware');
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -86,9 +85,10 @@ const uploadFields = upload.fields([
 
 // Public GET routes (no token)
 router.get('/', asyncHandler(vehicleController.getVehicles));
+router.get('/provider/:providerId', asyncHandler(vehicleController.getVehiclesByProvider));
 router.get('/:id', asyncHandler(vehicleController.getVehicle));
 
-// Auth routes
+// Auth routes (require token)
 router.post('/', protect, authorizeRoles('vendor', 'admin'), uploadFields, asyncHandler(vehicleController.createVehicle));
 router.put('/:id', protect, authorizeRoles('vendor', 'admin'), uploadFields, asyncHandler(vehicleController.updateVehicle));
 router.delete('/:id', protect, authorizeRoles('vendor', 'admin'), asyncHandler(vehicleController.deleteVehicle));
