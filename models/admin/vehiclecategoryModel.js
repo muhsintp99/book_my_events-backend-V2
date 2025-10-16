@@ -9,7 +9,7 @@ const VehicleCategorySchema = new Schema({
   parentCategory: { type: String, trim: true },
   displayOrder: { type: Number, default: 0 },
   brands: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Brand' }],
-  module: { type: mongoose.Schema.Types.ObjectId, ref: 'Module', required: true }, // Must be ObjectId
+  module: { type: mongoose.Schema.Types.ObjectId, ref: 'Module', required: true },
   isActive: { type: Boolean, default: true },
   isFeatured: { type: Boolean, default: false },
   metaTitle: { type: String, trim: true },
@@ -20,41 +20,35 @@ const VehicleCategorySchema = new Schema({
   deletedAt: { type: Date }
 }, { timestamps: true });
 
-// ✅ Auto-generate vehicleCategoryId
+// ✅ Auto-generate vehicleCategoryId (fixed)
 VehicleCategorySchema.pre('validate', async function (next) {
   if (this.isNew && !this.vehicleCategoryId) {
     try {
+      const VehicleCategoryModel = mongoose.model('VehicleCategory'); // <-- Use mongoose.model()
       const year = new Date().getFullYear();
       const prefix = `VCAT${year}`;
-      
-      // Get all vehicleCategoryIds for this year and extract numbers
-     const vehicleCategories = await VehicleCategory.find({
-  module: new mongoose.Types.ObjectId(moduleId), // ✅ Use `new`
-  isActive: true
-})
-  .populate('brands', '-__v')
-  .populate('module', '-__v')
-  .sort({ createdAt: -1 })
-  .lean();
 
-      
+      // Get all vehicleCategoryIds for this year and extract numbers
+      const vehicleCategories = await VehicleCategoryModel.find({
+        module: this.module,
+      }).select('vehicleCategoryId');
+
       let nextNumber = 1;
-      
+
       if (vehicleCategories.length > 0) {
-        // Extract all numbers and find the maximum
         const numbers = vehicleCategories
           .map(cat => parseInt(cat.vehicleCategoryId.replace(prefix, ''), 10))
           .filter(num => !isNaN(num));
-        
+
         if (numbers.length > 0) {
           const maxNumber = Math.max(...numbers);
           nextNumber = maxNumber + 1;
         }
       }
-      
+
       const serial = String(nextNumber).padStart(3, '0');
       this.vehicleCategoryId = `${prefix}${serial}`;
-      
+
       next();
     } catch (err) {
       next(err);
