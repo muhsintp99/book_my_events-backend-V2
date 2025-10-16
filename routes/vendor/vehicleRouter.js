@@ -83,12 +83,21 @@ const uploadFields = upload.fields([
 
 // ================= VEHICLE ROUTES =================
 
-// Public GET routes (no token)
-router.get('/', asyncHandler(vehicleController.getVehicles));
-router.get('/provider/:providerId', asyncHandler(vehicleController.getVehiclesByProvider));
-router.get('/:id', asyncHandler(vehicleController.getVehicle));
+// ✅ FIX: Add optional authentication to GET routes
+// This allows both public access AND authenticated vendor-specific filtering
+const optionalAuth = (req, res, next) => {
+  if (req.headers.authorization) {
+    return protect(req, res, next);
+  }
+  next();
+};
 
-// Auth routes (require token)
+// GET routes with optional authentication
+router.get('/', optionalAuth, asyncHandler(vehicleController.getVehicles));
+router.get('/provider/:providerId', asyncHandler(vehicleController.getVehiclesByProvider));
+router.get('/:id', optionalAuth, asyncHandler(vehicleController.getVehicle));
+
+// Protected routes (require authentication)
 router.post('/', protect, authorizeRoles('vendor', 'admin'), uploadFields, asyncHandler(vehicleController.createVehicle));
 router.put('/:id', protect, authorizeRoles('vendor', 'admin'), uploadFields, asyncHandler(vehicleController.updateVehicle));
 router.delete('/:id', protect, authorizeRoles('vendor', 'admin'), asyncHandler(vehicleController.deleteVehicle));

@@ -517,6 +517,12 @@ const sendResponse = (res, status, success, message, data = null, meta = null) =
   return res.status(status).json(response);
 };
 
+// ✅ Provider population with excluded sensitive fields
+const populateProvider = {
+  path: 'provider',
+  select: '-password -email -refreshToken -resetPasswordToken -resetPasswordExpire -firstName -lastName -vinNumber'
+};
+
 // ================= CREATE =================
 exports.createVehicle = async (req, res) => {
   const body = { ...req.body };
@@ -540,7 +546,12 @@ exports.createVehicle = async (req, res) => {
 
   try {
     const vehicle = await Vehicle.create(body);
-    await vehicle.populate('brand category provider zone');
+    await vehicle.populate([
+      'brand',
+      'category',
+      populateProvider,
+      'zone'
+    ]);
     sendResponse(res, 201, true, 'Vehicle created successfully', vehicle);
   } catch (error) {
     if (error.code === 11000) {
@@ -559,34 +570,79 @@ exports.getVehicles = async (req, res) => {
   const skip = (pageNum - 1) * limitNum;
 
   let query = {};
+  
+  // ✅ FIX: Filter by provider for vendors
+  if (req.user?.role === 'vendor') {
+    query.provider = req.user._id;
+  }
+
   if (search) {
-    query.$or = [
+    const searchConditions = [
       { name: { $regex: search, $options: 'i' } },
       { model: { $regex: search, $options: 'i' } },
       { vinNumber: { $regex: search, $options: 'i' } },
       { licensePlateNumber: { $regex: search, $options: 'i' } },
     ];
+
+    // ✅ FIX: Properly combine provider filter with search
+    if (query.provider) {
+      query.$and = [
+        { provider: query.provider },
+        { $or: searchConditions }
+      ];
+      delete query.provider; // Remove from root since it's in $and
+    } else {
+      query.$or = searchConditions;
+    }
   }
 
-  const [vehicles, totalItems] = await Promise.all([
-    Vehicle.find(query).populate('brand category provider zone').skip(skip).limit(limitNum).lean(),
-    Vehicle.countDocuments(query),
-  ]);
+  try {
+    const [vehicles, totalItems] = await Promise.all([
+      Vehicle.find(query)
+        .populate('brand')
+        .populate('category')
+        .populate(populateProvider)
+        .populate('zone')
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      Vehicle.countDocuments(query),
+    ]);
 
-  sendResponse(res, 200, true, 'Vehicles fetched successfully', vehicles, {
-    currentPage: pageNum,
-    totalPages: Math.ceil(totalItems / limitNum),
-    totalItems,
-  });
+    sendResponse(res, 200, true, 'Vehicles fetched successfully', vehicles, {
+      currentPage: pageNum,
+      totalPages: Math.ceil(totalItems / limitNum),
+      totalItems,
+    });
+  } catch (error) {
+    sendResponse(res, 400, false, error.message);
+  }
 };
 
 exports.getVehicle = async (req, res) => {
-  const vehicle = await Vehicle.findById(req.params.id).populate('brand category provider zone').lean();
-  if (!vehicle) return sendResponse(res, 404, false, 'Vehicle not found');
-  sendResponse(res, 200, true, 'Vehicle fetched successfully', vehicle);
+  try {
+    let query = { _id: req.params.id };
+    
+    // ✅ FIX: Vendors can only view their own vehicles
+    if (req.user?.role === 'vendor') {
+      query.provider = req.user._id;
+    }
+
+    const vehicle = await Vehicle.findOne(query)
+      .populate('brand')
+      .populate('category')
+      .populate(populateProvider)
+      .populate('zone')
+      .lean();
+    
+    if (!vehicle) return sendResponse(res, 404, false, 'Vehicle not found');
+    sendResponse(res, 200, true, 'Vehicle fetched successfully', vehicle);
+  } catch (error) {
+    sendResponse(res, 400, false, error.message);
+  }
 };
 
-// ✅ NEW: Get vehicles by provider ID
+// ✅ Get vehicles by provider ID
 exports.getVehiclesByProvider = async (req, res) => {
   const { providerId } = req.params;
   const { page = 1, limit = 10, search } = req.query;
@@ -612,7 +668,14 @@ exports.getVehiclesByProvider = async (req, res) => {
 
   try {
     const [vehicles, totalItems] = await Promise.all([
-      Vehicle.find(query).populate('brand category provider zone').skip(skip).limit(limitNum).lean(),
+      Vehicle.find(query)
+        .populate('brand')
+        .populate('category')
+        .populate(populateProvider)
+        .populate('zone')
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
       Vehicle.countDocuments(query),
     ]);
 
@@ -628,34 +691,46 @@ exports.getVehiclesByProvider = async (req, res) => {
 
 // ================= UPDATE =================
 exports.updateVehicle = async (req, res) => {
-  const vehicle = await Vehicle.findById(req.params.id);
-  if (!vehicle) return sendResponse(res, 404, false, 'Vehicle not found');
-
-  const oldImages = [...vehicle.images];
-  const oldThumbnail = vehicle.thumbnail;
-  const oldDocuments = [...vehicle.documents];
-
-  if (req.files?.images) vehicle.images = req.files.images.map((f) => f.filename);
-  if (req.files?.thumbnail?.[0]) vehicle.thumbnail = req.files.thumbnail[0].filename;
-  if (req.files?.documents) vehicle.documents = req.files.documents.map((f) => f.filename);
-
-  const allowedFields = [
-    'name', 'description', 'brand', 'category', 'zone', 'model', 'type',
-    'engineCapacity', 'enginePower', 'seatingCapacity', 'airCondition',
-    'fuelType', 'transmissionType', 'pricing', 'discount', 'searchTags',
-    'vinNumber', 'licensePlateNumber',
-  ];
-
-  for (const key of allowedFields) {
-    if (req.body[key] !== undefined) vehicle[key] = req.body[key];
-  }
-
   try {
+    let query = { _id: req.params.id };
+    
+    // ✅ FIX: Vendors can only update their own vehicles
+    if (req.user?.role === 'vendor') {
+      query.provider = req.user._id;
+    }
+
+    const vehicle = await Vehicle.findOne(query);
+    if (!vehicle) return sendResponse(res, 404, false, 'Vehicle not found');
+
+    const oldImages = [...vehicle.images];
+    const oldThumbnail = vehicle.thumbnail;
+    const oldDocuments = [...vehicle.documents];
+
+    if (req.files?.images) vehicle.images = req.files.images.map((f) => f.filename);
+    if (req.files?.thumbnail?.[0]) vehicle.thumbnail = req.files.thumbnail[0].filename;
+    if (req.files?.documents) vehicle.documents = req.files.documents.map((f) => f.filename);
+
+    const allowedFields = [
+      'name', 'description', 'brand', 'category', 'zone', 'model', 'type',
+      'engineCapacity', 'enginePower', 'seatingCapacity', 'airCondition',
+      'fuelType', 'transmissionType', 'pricing', 'discount', 'searchTags',
+      'vinNumber', 'licensePlateNumber',
+    ];
+
+    for (const key of allowedFields) {
+      if (req.body[key] !== undefined) vehicle[key] = req.body[key];
+    }
+
     await vehicle.save();
     if (req.files?.images) await deleteFiles(oldImages);
     if (req.files?.thumbnail && oldThumbnail) await deleteFiles([oldThumbnail]);
     if (req.files?.documents) await deleteFiles(oldDocuments);
-    await vehicle.populate('brand category provider zone');
+    await vehicle.populate([
+      'brand',
+      'category',
+      populateProvider,
+      'zone'
+    ]);
     sendResponse(res, 200, true, 'Vehicle updated successfully', vehicle);
   } catch (error) {
     sendResponse(res, 400, false, error.message);
@@ -664,15 +739,26 @@ exports.updateVehicle = async (req, res) => {
 
 // ================= DELETE =================
 exports.deleteVehicle = async (req, res) => {
-  const vehicle = await Vehicle.findById(req.params.id);
-  if (!vehicle) return sendResponse(res, 404, false, 'Vehicle not found');
+  try {
+    let query = { _id: req.params.id };
+    
+    // ✅ FIX: Vendors can only delete their own vehicles
+    if (req.user?.role === 'vendor') {
+      query.provider = req.user._id;
+    }
 
-  await Promise.all([
-    deleteFiles(vehicle.images),
-    vehicle.thumbnail ? deleteFiles([vehicle.thumbnail]) : null,
-    deleteFiles(vehicle.documents),
-  ]);
+    const vehicle = await Vehicle.findOne(query);
+    if (!vehicle) return sendResponse(res, 404, false, 'Vehicle not found');
 
-  await vehicle.deleteOne();
-  sendResponse(res, 200, true, 'Vehicle deleted successfully');
+    await Promise.all([
+      deleteFiles(vehicle.images),
+      vehicle.thumbnail ? deleteFiles([vehicle.thumbnail]) : null,
+      deleteFiles(vehicle.documents),
+    ]);
+
+    await vehicle.deleteOne();
+    sendResponse(res, 200, true, 'Vehicle deleted successfully');
+  } catch (error) {
+    sendResponse(res, 400, false, error.message);
+  }
 };
