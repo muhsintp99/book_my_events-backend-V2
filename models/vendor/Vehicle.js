@@ -171,7 +171,9 @@ const VehicleSchema = new mongoose.Schema(
     description: { type: String, trim: true, maxlength: [500, 'Description cannot be more than 500 characters'] },
     brand: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand' },
     category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
-    zone: { type: mongoose.Schema.Types.ObjectId, ref: 'Zone', required: [true, 'Zone is required'] }, // ✅ Added
+    zone: { type: mongoose.Schema.Types.ObjectId, ref: 'Zone' },
+    latitude: { type: Number },
+    longitude: { type: Number },
     model: { type: String, trim: true },
     type: {
       type: String,
@@ -231,7 +233,8 @@ VehicleSchema.pre('save', function (next) {
 
 VehicleSchema.index({ provider: 1, isActive: 1 });
 VehicleSchema.index({ brand: 1, category: 1 });
-VehicleSchema.index({ zone: 1 }); // ✅ Added
+VehicleSchema.index({ zone: 1 });
+VehicleSchema.index({ latitude: 1, longitude: 1 }); // Index for location queries
 VehicleSchema.index({ vinNumber: 1 }, { unique: true, sparse: true });
 VehicleSchema.index({ licensePlateNumber: 1 }, { unique: true, sparse: true });
 

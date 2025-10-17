@@ -527,11 +527,6 @@ const populateProvider = {
 exports.createVehicle = async (req, res) => {
   const body = { ...req.body };
 
-  // ✅ Zone validation
-  if (!body.zone) {
-    return sendResponse(res, 400, false, 'Zone is required');
-  }
-
   // ✅ Provider auto-fill
   if (!body.provider && req.user) {
     body.provider = req.user._id;
@@ -714,7 +709,7 @@ exports.updateVehicle = async (req, res) => {
       'name', 'description', 'brand', 'category', 'zone', 'model', 'type',
       'engineCapacity', 'enginePower', 'seatingCapacity', 'airCondition',
       'fuelType', 'transmissionType', 'pricing', 'discount', 'searchTags',
-      'vinNumber', 'licensePlateNumber',
+      'vinNumber', 'licensePlateNumber', 'latitude', 'longitude'
     ];
 
     for (const key of allowedFields) {
