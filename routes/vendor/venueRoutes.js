@@ -183,6 +183,9 @@ const upload = createUpload('venues', {
 // Counts route - must be before /:id
 router.get('/count', venueController.getVenueCounts);
 
+router.get('/reverse-geocode', venueController.getVenuesByLocation);
+
+
 // Category and Module specific routes - must be before /:id
 router.get('/category/:categoryId', venueController.getVenuesByCategory);
 router.get('/module/:moduleId', venueController.getVenuesByModule);

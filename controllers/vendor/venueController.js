@@ -1434,6 +1434,108 @@ exports.getVenues = async (req, res) => {
   }
 };
 
+
+// Add this function to your venueController.js file
+
+exports.getVenuesByLocation = async (req, res) => {
+  try {
+    const { lat, lng } = req.query;
+
+    // Validate required parameters
+    if (!lat || !lng) {
+      return res.status(400).json({
+        success: false,
+        message: 'Latitude (lat) and Longitude (lng) are required',
+      });
+    }
+
+    // Parse and validate coordinates
+    const latitude = parseFloat(lat);
+    const longitude = parseFloat(lng);
+
+    if (isNaN(latitude) || isNaN(longitude)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid latitude or longitude values',
+      });
+    }
+
+    // Define zone radius in kilometers (adjust based on your requirements)
+    // Default: 10km for same zone/area
+    const zoneRadiusKm = 10;
+
+    // Find all active venues with valid coordinates
+    const venues = await Venue.find({
+      latitude: { $exists: true, $ne: null },
+      longitude: { $exists: true, $ne: null },
+      isActive: true
+    })
+      .populate({
+        path: 'categories',
+        select: 'title image categoryId module isActive',
+        populate: { path: 'module', select: 'title moduleId' }
+      })
+      .populate({
+        path: 'module',
+        select: 'title moduleId icon isActive'
+      })
+      .populate('createdBy', 'name email phone')
+      .populate('provider', 'name email phone')
+      .lean();
+
+    // Calculate distance for each venue and filter by zone
+    const venuesInZone = [];
+    
+    venues.forEach(venue => {
+      // Haversine formula to calculate distance
+      const lat1 = latitude * Math.PI / 180;
+      const lat2 = venue.latitude * Math.PI / 180;
+      const deltaLat = (venue.latitude - latitude) * Math.PI / 180;
+      const deltaLng = (venue.longitude - longitude) * Math.PI / 180;
+
+      const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+                Math.cos(lat1) * Math.cos(lat2) *
+                Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = 6378.1 * c; // Distance in kilometers
+
+      // Only include venues within the zone radius
+      if (distance <= zoneRadiusKm) {
+        venuesInZone.push({
+          ...venue,
+          distance: parseFloat(distance.toFixed(2)),
+          distanceUnit: 'km'
+        });
+      }
+    });
+
+    // Sort by distance (nearest first)
+    venuesInZone.sort((a, b) => a.distance - b.distance);
+
+    res.status(200).json({
+      success: true,
+      count: venuesInZone.length,
+      searchParams: {
+        latitude,
+        longitude,
+        zoneRadius: zoneRadiusKm,
+        unit: 'km'
+      },
+      data: venuesInZone,
+      message: venuesInZone.length === 0 
+        ? `No venues found within ${zoneRadiusKm}km zone` 
+        : 'Venues in zone fetched successfully'
+    });
+  } catch (err) {
+    console.error('Error fetching venues by location:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch venues by location',
+      error: err.message
+    });
+  }
+};
+
 // Get venues by provider ID
 exports.getVenuesByProvider = async (req, res) => {
   try {
