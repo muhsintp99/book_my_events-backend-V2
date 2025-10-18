@@ -69,10 +69,8 @@
 const express = require('express');
 const router = express.Router();
 const createUpload = require('../../middlewares/upload');
-const vehicleController = require('../../controllers/vendor/vehicleCntroller');
+const vehicleController = require('../../controllers/vendor/vehicleController'); // FIXED import
 const { protect, authorizeRoles } = require('../../middlewares/authMiddleware');
-
-const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 const upload = createUpload('vehicles', { fileSizeMB: 20 });
 const uploadFields = upload.fields([
@@ -81,10 +79,7 @@ const uploadFields = upload.fields([
   { name: 'documents', maxCount: 5 },
 ]);
 
-// ================= VEHICLE ROUTES =================
-
-// ✅ FIX: Add optional authentication to GET routes
-// This allows both public access AND authenticated vendor-specific filtering
+// Optional auth for GET routes
 const optionalAuth = (req, res, next) => {
   if (req.headers.authorization) {
     return protect(req, res, next);
@@ -92,14 +87,33 @@ const optionalAuth = (req, res, next) => {
   next();
 };
 
-// GET routes with optional authentication
-router.get('/', optionalAuth, asyncHandler(vehicleController.getVehicles));
-router.get('/provider/:providerId', asyncHandler(vehicleController.getVehiclesByProvider));
-router.get('/:id', optionalAuth, asyncHandler(vehicleController.getVehicle));
+// Public / optional authentication
+router.get('/', optionalAuth, vehicleController.getVehicles);
+router.get('/provider/:providerId', vehicleController.getVehiclesByProvider);
+router.get('/:id', optionalAuth, vehicleController.getVehicle);
 
-// Protected routes (require authentication)
-router.post('/', protect, authorizeRoles('vendor', 'admin'), uploadFields, asyncHandler(vehicleController.createVehicle));
-router.put('/:id', protect, authorizeRoles('vendor', 'admin'), uploadFields, asyncHandler(vehicleController.updateVehicle));
-router.delete('/:id', protect, authorizeRoles('vendor', 'admin'), asyncHandler(vehicleController.deleteVehicle));
+// Protected routes
+router.post(
+  '/',
+  protect,
+  authorizeRoles('vendor', 'admin'),
+  uploadFields,
+  vehicleController.createVehicle
+);
+
+router.put(
+  '/:id',
+  protect,
+  authorizeRoles('vendor', 'admin'),
+  uploadFields,
+  vehicleController.updateVehicle
+);
+
+router.delete(
+  '/:id',
+  protect,
+  authorizeRoles('vendor', 'admin'),
+  vehicleController.deleteVehicle
+);
 
 module.exports = router;

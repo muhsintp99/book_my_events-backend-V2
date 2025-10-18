@@ -60,8 +60,6 @@
 //   }
 // };
 
-
-
 // // ✅ Get Single Vehicle
 // exports.getVehicle = async (req, res) => {
 //   try {
@@ -190,7 +188,7 @@
 //   }
 // };
 
-// const Vehicle = require('../../models/vendor/Vehicle'); 
+// const Vehicle = require('../../models/vendor/Vehicle');
 // const fs = require('fs').promises;
 // const path = require('path');
 
@@ -228,18 +226,18 @@
 
 //     // Create vehicle
 //     const vehicle = await Vehicle.create(body);
-    
+
 //     // Populate the provider field before sending response
 //     await vehicle.populate('brand category provider');
-    
+
 //     res.status(201).json({ success: true, data: vehicle });
 //   } catch (error) {
 //     // Handle duplicate key errors
 //     if (error.code === 11000) {
 //       const field = Object.keys(error.keyPattern)[0];
-//       return res.status(400).json({ 
-//         success: false, 
-//         message: `${field === 'vinNumber' ? 'VIN number' : 'License plate number'} already exists` 
+//       return res.status(400).json({
+//         success: false,
+//         message: `${field === 'vinNumber' ? 'VIN number' : 'License plate number'} already exists`
 //       });
 //     }
 //     res.status(400).json({ success: false, message: error.message });
@@ -386,12 +384,12 @@
 //       'enginePower', 'seatingCapacity', 'airCondition', 'fuelType', 'transmissionType',
 //       'pricing', 'discount', 'searchTags', 'vinNumber', 'licensePlateNumber',
 //     ];
-    
+
 //     // Only allow admin to change provider
 //     if (req.user.role === 'admin' && req.body.provider) {
 //       allowedFields.push('provider');
 //     }
-    
+
 //     for (const key of allowedFields) {
 //       if (req.body[key] !== undefined) vehicle[key] = req.body[key];
 //     }
@@ -410,9 +408,9 @@
 //   } catch (error) {
 //     if (error.code === 11000) {
 //       const field = Object.keys(error.keyPattern)[0];
-//       return res.status(400).json({ 
-//         success: false, 
-//         message: `${field === 'vinNumber' ? 'VIN number' : 'License plate number'} already exists` 
+//       return res.status(400).json({
+//         success: false,
+//         message: `${field === 'vinNumber' ? 'VIN number' : 'License plate number'} already exists`
 //       });
 //     }
 //     res.status(400).json({ success: false, message: error.message });
@@ -457,10 +455,10 @@
 
 //     vehicle.isActive = false;
 //     await vehicle.save();
-    
+
 //     // Populate before sending response
 //     await vehicle.populate('brand category provider');
-    
+
 //     res.json({ success: true, data: vehicle });
 //   } catch (error) {
 //     res.status(500).json({ success: false, message: error.message });
@@ -479,281 +477,549 @@
 
 //     vehicle.isActive = true;
 //     await vehicle.save();
-    
+
 //     // Populate before sending response
 //     await vehicle.populate('brand category provider');
-    
+
 //     res.json({ success: true, data: vehicle });
 //   } catch (error) {
 //     res.status(500).json({ success: false, message: error.message });
 //   }
 // };
 
-
-
-const Vehicle = require('../../models/vendor/Vehicle');
-const fs = require('fs').promises;
-const path = require('path');
+const Vehicle = require("../../models/vendor/Vehicle");
+const fs = require("fs").promises;
+const path = require("path");
+const mongoose = require("mongoose");
+const Category = require("../../models/admin/category");
 
 // ================= HELPERS =================
 const deleteFiles = async (files = []) => {
   if (!files.length) return;
   await Promise.all(
     files.map(async (file) => {
-      const filePath = path.resolve(__dirname, '../../uploads/vehicles', file);
+      const filePath = path.resolve(__dirname, "../../Uploads/vehicles", file);
       try {
         await fs.unlink(filePath);
       } catch (err) {
-        if (err.code !== 'ENOENT') console.error(`Failed to delete ${file}:`, err);
+        if (err.code !== "ENOENT")
+          console.error(`Failed to delete ${file}:`, err);
       }
     })
   );
 };
 
-const sendResponse = (res, status, success, message, data = null, meta = null) => {
+const sendResponse = (
+  res,
+  status,
+  success,
+  message,
+  data = null,
+  meta = null
+) => {
   const response = { success, message };
   if (data) response.data = data;
   if (meta) response.meta = meta;
   return res.status(status).json(response);
 };
 
-// ✅ Provider population with excluded sensitive fields
 const populateProvider = {
-  path: 'provider',
-  select: '-password -email -refreshToken -resetPasswordToken -resetPasswordExpire -firstName -lastName -vinNumber'
+  path: "provider",
+  select:
+    "-password -email -refreshToken -resetPasswordToken -resetPasswordExpire -firstName -lastName -vinNumber",
+};
+
+const parseCategories = (categories) => {
+  if (!categories) return [];
+
+  let parsed = categories;
+
+  if (typeof parsed === "string") {
+    parsed = parsed.trim();
+    try {
+      parsed = JSON.parse(parsed);
+      if (typeof parsed === "string") {
+        parsed = JSON.parse(parsed);
+      }
+    } catch {
+      parsed = parsed
+        .replace(/[\[\]"']/g, "")
+        .split(",")
+        .map((c) => c.trim())
+        .filter((c) => c);
+    }
+  }
+
+  if (Array.isArray(parsed)) {
+    const validIds = parsed
+      .flat()
+      .filter((c) => c && mongoose.Types.ObjectId.isValid(c))
+      .map((c) => new mongoose.Types.ObjectId(c));
+    return validIds;
+  }
+
+  return [];
 };
 
 // ================= CREATE =================
 exports.createVehicle = async (req, res) => {
   const body = { ...req.body };
 
-  // ✅ Provider auto-fill
+  // Provider auto-fill
   if (!body.provider && req.user) {
     body.provider = req.user._id;
-  } else if (req.user?.role === 'vendor' && body.provider && body.provider.toString() !== req.user._id.toString()) {
-    return sendResponse(res, 403, false, 'Unauthorized: Invalid provider');
+  } else if (
+    req.user?.role === "vendor" &&
+    body.provider &&
+    body.provider.toString() !== req.user._id.toString()
+  ) {
+    return sendResponse(res, 403, false, "Unauthorized: Invalid provider");
+  }
+
+  // Trim and sanitize string fields
+  if (body.brand) body.brand = body.brand.trim();
+  if (body.type) body.type = body.type.trim().toLowerCase();
+  if (body.fuelType) body.fuelType = body.fuelType.trim().toLowerCase();
+  if (body.transmissionType)
+    body.transmissionType = body.transmissionType.trim().toLowerCase();
+  if (body.model) body.model = body.model.trim();
+  if (body.name) body.name = body.name.trim();
+  if (body.description) body.description = body.description.trim();
+  if (body.vinNumber) body.vinNumber = body.vinNumber.trim();
+  if (body.licensePlateNumber)
+    body.licensePlateNumber = body.licensePlateNumber.trim();
+  if (body.searchTags) {
+    body.searchTags = Array.isArray(body.searchTags)
+      ? body.searchTags.map((tag) => tag.trim())
+      : body.searchTags.split(",").map((tag) => tag.trim());
+  }
+
+  // Convert airCondition to boolean
+  if (body.airCondition !== undefined) {
+    if (typeof body.airCondition === "string") {
+      body.airCondition = body.airCondition.trim().toLowerCase() === "true";
+    } else {
+      body.airCondition = !!body.airCondition;
+    }
+  }
+
+  // Parse categories
+  if (body.categories) {
+    body.category = parseCategories(body.categories);
+    delete body.categories;
+  } else if (body.category) {
+    body.category = parseCategories(body.category);
+  } else {
+    body.category = [];
   }
 
   // Handle uploads
   if (req.files?.images) body.images = req.files.images.map((f) => f.filename);
-  if (req.files?.thumbnail?.[0]) body.thumbnail = req.files.thumbnail[0].filename;
-  if (req.files?.documents) body.documents = req.files.documents.map((f) => f.filename);
+  if (req.files?.thumbnail?.[0])
+    body.thumbnail = req.files.thumbnail[0].filename;
+  if (req.files?.documents)
+    body.documents = req.files.documents.map((f) => f.filename);
 
   try {
+    // Verify categories exist
+    if (body.category && body.category.length > 0) {
+      const existingCategories = await Category.find({
+        _id: { $in: body.category },
+      }).select("_id title");
+
+      if (existingCategories.length === 0) {
+        console.warn(
+          "⚠️ WARNING: None of the provided category IDs exist in the database"
+        );
+      } else if (existingCategories.length < body.category.length) {
+        const foundIds = existingCategories.map((c) => c._id.toString());
+        const missingIds = body.category.filter(
+          (id) => !foundIds.includes(id.toString())
+        );
+        console.warn("⚠️ WARNING: Some category IDs not found:", missingIds);
+      }
+    }
+
+    // Verify brand exists
+    if (body.brand && !mongoose.Types.ObjectId.isValid(body.brand)) {
+      return sendResponse(res, 400, false, "Invalid brand ID");
+    }
+    if (body.brand) {
+      const existingBrand = await mongoose
+        .model("Brand")
+        .findById(body.brand)
+        .select("_id");
+      if (!existingBrand) {
+        return sendResponse(res, 400, false, "Brand does not exist");
+      }
+    }
+
     const vehicle = await Vehicle.create(body);
-    await vehicle.populate([
-      'brand',
-      'category',
-      populateProvider,
-      'zone'
-    ]);
-    sendResponse(res, 201, true, 'Vehicle created successfully', vehicle);
+
+    // Populate after creation
+    const populatedVehicle = await Vehicle.findById(vehicle._id)
+      .populate("brand")
+      .populate({
+        path: "category",
+        model: "VehicleCategory",
+        select: "title image vehicleCategoryId module isActive",
+      })
+      .populate(populateProvider)
+      .populate("zone")
+      .lean();
+
+    sendResponse(
+      res,
+      201,
+      true,
+      "Vehicle created successfully",
+      populatedVehicle
+    );
   } catch (error) {
+    console.error("Error creating vehicle:", error);
+    // Cleanup uploaded files if vehicle creation fails
+    if (body.images?.length) await deleteFiles(body.images);
+    if (body.thumbnail) await deleteFiles([body.thumbnail]);
+    if (body.documents?.length) await deleteFiles(body.documents);
+
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
-      return sendResponse(res, 400, false, `${field === 'vinNumber' ? 'VIN number' : 'License plate number'} already exists`);
+      return sendResponse(
+        res,
+        400,
+        false,
+        `${
+          field === "vinNumber" ? "VIN number" : "License plate number"
+        } already exists`
+      );
     }
     sendResponse(res, 400, false, error.message);
   }
 };
 
-// ================= READ =================
+// ================= GET ALL VEHICLES =================
 exports.getVehicles = async (req, res) => {
-  const { page = 1, limit = 10, search } = req.query;
-  const pageNum = parseInt(page, 10);
-  const limitNum = parseInt(limit, 10);
-  const skip = (pageNum - 1) * limitNum;
-
-  let query = {};
-  
-  // ✅ FIX: Filter by provider for vendors
-  if (req.user?.role === 'vendor') {
-    query.provider = req.user._id;
-  }
-
-  if (search) {
-    const searchConditions = [
-      { name: { $regex: search, $options: 'i' } },
-      { model: { $regex: search, $options: 'i' } },
-      { vinNumber: { $regex: search, $options: 'i' } },
-      { licensePlateNumber: { $regex: search, $options: 'i' } },
-    ];
-
-    // ✅ FIX: Properly combine provider filter with search
-    if (query.provider) {
-      query.$and = [
-        { provider: query.provider },
-        { $or: searchConditions }
-      ];
-      delete query.provider; // Remove from root since it's in $and
-    } else {
-      query.$or = searchConditions;
-    }
-  }
-
   try {
-    const [vehicles, totalItems] = await Promise.all([
+    const {
+      page = 1,
+      limit = 10,
+      brand,
+      category,
+      type,
+      fuelType,
+      transmissionType,
+      minPrice,
+      maxPrice,
+      search,
+      isActive,
+      zone,
+    } = req.query;
+
+    const query = {};
+
+    // Build filters
+    if (brand) query.brand = brand;
+    if (category) query.category = category;
+    if (type) query.type = type.toLowerCase();
+    if (fuelType) query.fuelType = fuelType.toLowerCase();
+    if (transmissionType) query.transmissionType = transmissionType.toLowerCase();
+    if (isActive !== undefined) query.isActive = isActive === "true";
+    if (zone) query.zone = zone;
+
+    // Price range filter
+    if (minPrice || maxPrice) {
+      query.$or = [
+        { "pricing.hourly": {} },
+        { "pricing.perDay": {} },
+        { "pricing.distanceWise": {} },
+      ];
+      if (minPrice) {
+        query.$or.forEach((priceQuery) => {
+          const key = Object.keys(priceQuery)[0];
+          priceQuery[key].$gte = Number(minPrice);
+        });
+      }
+      if (maxPrice) {
+        query.$or.forEach((priceQuery) => {
+          const key = Object.keys(priceQuery)[0];
+          priceQuery[key].$lte = Number(maxPrice);
+        });
+      }
+    }
+
+    // Search functionality
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { model: { $regex: search, $options: "i" } },
+        { searchTags: { $in: [new RegExp(search, "i")] } },
+      ];
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const [vehicles, total] = await Promise.all([
       Vehicle.find(query)
-        .populate('brand')
-        .populate('category')
+        .populate("brand")
+        .populate({
+          path: "category",
+          model: "VehicleCategory",
+          select: "title image vehicleCategoryId module isActive",
+        })
         .populate(populateProvider)
-        .populate('zone')
+        .populate("zone")
         .skip(skip)
-        .limit(limitNum)
+        .limit(Number(limit))
+        .sort({ createdAt: -1 })
         .lean(),
       Vehicle.countDocuments(query),
     ]);
 
-    sendResponse(res, 200, true, 'Vehicles fetched successfully', vehicles, {
-      currentPage: pageNum,
-      totalPages: Math.ceil(totalItems / limitNum),
-      totalItems,
-    });
+    const meta = {
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(total / Number(limit)),
+    };
+
+    sendResponse(res, 200, true, "Vehicles retrieved successfully", vehicles, meta);
   } catch (error) {
-    sendResponse(res, 400, false, error.message);
+    console.error("Error fetching vehicles:", error);
+    sendResponse(res, 500, false, error.message);
   }
 };
 
+// ================= GET SINGLE VEHICLE =================
 exports.getVehicle = async (req, res) => {
   try {
-    let query = { _id: req.params.id };
-    
-    // ✅ FIX: Vendors can only view their own vehicles
-    if (req.user?.role === 'vendor') {
-      query.provider = req.user._id;
+    const vehicle = await Vehicle.findById(req.params.id)
+      .populate("brand")
+      .populate({
+        path: "category",
+        model: "VehicleCategory",
+        select: "title image vehicleCategoryId module isActive",
+      })
+      .populate(populateProvider)
+      .populate("zone")
+      .lean();
+
+    if (!vehicle) {
+      return sendResponse(res, 404, false, "Vehicle not found");
     }
 
-    const vehicle = await Vehicle.findOne(query)
-      .populate('brand')
-      .populate('category')
-      .populate(populateProvider)
-      .populate('zone')
-      .lean();
-    
-    if (!vehicle) return sendResponse(res, 404, false, 'Vehicle not found');
-    sendResponse(res, 200, true, 'Vehicle fetched successfully', vehicle);
+    sendResponse(res, 200, true, "Vehicle retrieved successfully", vehicle);
   } catch (error) {
-    sendResponse(res, 400, false, error.message);
+    console.error("Error fetching vehicle:", error);
+    sendResponse(res, 500, false, error.message);
   }
 };
 
-// ✅ Get vehicles by provider ID
+// ================= GET VEHICLES BY PROVIDER =================
 exports.getVehiclesByProvider = async (req, res) => {
-  const { providerId } = req.params;
-  const { page = 1, limit = 10, search } = req.query;
-  const pageNum = parseInt(page, 10);
-  const limitNum = parseInt(limit, 10);
-  const skip = (pageNum - 1) * limitNum;
-
-  let query = { provider: providerId };
-  
-  if (search) {
-    query.$and = [
-      { provider: providerId },
-      {
-        $or: [
-          { name: { $regex: search, $options: 'i' } },
-          { model: { $regex: search, $options: 'i' } },
-          { vinNumber: { $regex: search, $options: 'i' } },
-          { licensePlateNumber: { $regex: search, $options: 'i' } },
-        ],
-      },
-    ];
-  }
-
   try {
-    const [vehicles, totalItems] = await Promise.all([
+    const { providerId } = req.params;
+    const { page = 1, limit = 10, isActive } = req.query;
+
+    const query = { provider: providerId };
+    if (isActive !== undefined) query.isActive = isActive === "true";
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const [vehicles, total] = await Promise.all([
       Vehicle.find(query)
-        .populate('brand')
-        .populate('category')
+        .populate("brand")
+        .populate({
+          path: "category",
+          model: "VehicleCategory",
+          select: "title image vehicleCategoryId module isActive",
+        })
         .populate(populateProvider)
-        .populate('zone')
+        .populate("zone")
         .skip(skip)
-        .limit(limitNum)
+        .limit(Number(limit))
+        .sort({ createdAt: -1 })
         .lean(),
       Vehicle.countDocuments(query),
     ]);
 
-    sendResponse(res, 200, true, 'Provider vehicles fetched successfully', vehicles, {
-      currentPage: pageNum,
-      totalPages: Math.ceil(totalItems / limitNum),
-      totalItems,
-    });
+    const meta = {
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(total / Number(limit)),
+    };
+
+    sendResponse(
+      res,
+      200,
+      true,
+      "Provider vehicles retrieved successfully",
+      vehicles,
+      meta
+    );
   } catch (error) {
-    sendResponse(res, 400, false, error.message);
+    console.error("Error fetching provider vehicles:", error);
+    sendResponse(res, 500, false, error.message);
   }
 };
 
-// ================= UPDATE =================
+// ================= UPDATE VEHICLE =================
 exports.updateVehicle = async (req, res) => {
   try {
-    let query = { _id: req.params.id };
-    
-    // ✅ FIX: Vendors can only update their own vehicles
-    if (req.user?.role === 'vendor') {
-      query.provider = req.user._id;
+    const vehicle = await Vehicle.findById(req.params.id);
+
+    if (!vehicle) {
+      return sendResponse(res, 404, false, "Vehicle not found");
     }
 
-    const vehicle = await Vehicle.findOne(query);
-    if (!vehicle) return sendResponse(res, 404, false, 'Vehicle not found');
-
-    const oldImages = [...vehicle.images];
-    const oldThumbnail = vehicle.thumbnail;
-    const oldDocuments = [...vehicle.documents];
-
-    if (req.files?.images) vehicle.images = req.files.images.map((f) => f.filename);
-    if (req.files?.thumbnail?.[0]) vehicle.thumbnail = req.files.thumbnail[0].filename;
-    if (req.files?.documents) vehicle.documents = req.files.documents.map((f) => f.filename);
-
-    const allowedFields = [
-      'name', 'description', 'brand', 'category', 'zone', 'model', 'type',
-      'engineCapacity', 'enginePower', 'seatingCapacity', 'airCondition',
-      'fuelType', 'transmissionType', 'pricing', 'discount', 'searchTags',
-      'vinNumber', 'licensePlateNumber', 'latitude', 'longitude'
-    ];
-
-    for (const key of allowedFields) {
-      if (req.body[key] !== undefined) vehicle[key] = req.body[key];
+    // Authorization check
+    if (
+      req.user.role === "vendor" &&
+      vehicle.provider.toString() !== req.user._id.toString()
+    ) {
+      return sendResponse(res, 403, false, "Unauthorized to update this vehicle");
     }
 
+    const body = { ...req.body };
+
+    // Trim and sanitize string fields
+    if (body.brand) body.brand = body.brand.trim();
+    if (body.type) body.type = body.type.trim().toLowerCase();
+    if (body.fuelType) body.fuelType = body.fuelType.trim().toLowerCase();
+    if (body.transmissionType)
+      body.transmissionType = body.transmissionType.trim().toLowerCase();
+    if (body.model) body.model = body.model.trim();
+    if (body.name) body.name = body.name.trim();
+    if (body.description) body.description = body.description.trim();
+    if (body.vinNumber) body.vinNumber = body.vinNumber.trim();
+    if (body.licensePlateNumber)
+      body.licensePlateNumber = body.licensePlateNumber.trim();
+    if (body.searchTags) {
+      body.searchTags = Array.isArray(body.searchTags)
+        ? body.searchTags.map((tag) => tag.trim())
+        : body.searchTags.split(",").map((tag) => tag.trim());
+    }
+
+    // Convert airCondition to boolean
+    if (body.airCondition !== undefined) {
+      if (typeof body.airCondition === "string") {
+        body.airCondition = body.airCondition.trim().toLowerCase() === "true";
+      } else {
+        body.airCondition = !!body.airCondition;
+      }
+    }
+
+    // Parse categories
+    if (body.categories) {
+      body.category = parseCategories(body.categories);
+      delete body.categories;
+    } else if (body.category) {
+      body.category = parseCategories(body.category);
+    }
+
+    // Track old files for cleanup
+    const filesToDelete = [];
+
+    // Handle new file uploads
+    if (req.files?.images) {
+      if (vehicle.images?.length) filesToDelete.push(...vehicle.images);
+      body.images = req.files.images.map((f) => f.filename);
+    }
+    if (req.files?.thumbnail?.[0]) {
+      if (vehicle.thumbnail) filesToDelete.push(vehicle.thumbnail);
+      body.thumbnail = req.files.thumbnail[0].filename;
+    }
+    if (req.files?.documents) {
+      if (vehicle.documents?.length) filesToDelete.push(...vehicle.documents);
+      body.documents = req.files.documents.map((f) => f.filename);
+    }
+
+    // Verify brand if changed
+    if (body.brand && body.brand !== vehicle.brand?.toString()) {
+      if (!mongoose.Types.ObjectId.isValid(body.brand)) {
+        return sendResponse(res, 400, false, "Invalid brand ID");
+      }
+      const existingBrand = await mongoose
+        .model("Brand")
+        .findById(body.brand)
+        .select("_id");
+      if (!existingBrand) {
+        return sendResponse(res, 400, false, "Brand does not exist");
+      }
+    }
+
+    // Update vehicle
+    Object.assign(vehicle, body);
     await vehicle.save();
-    if (req.files?.images) await deleteFiles(oldImages);
-    if (req.files?.thumbnail && oldThumbnail) await deleteFiles([oldThumbnail]);
-    if (req.files?.documents) await deleteFiles(oldDocuments);
-    await vehicle.populate([
-      'brand',
-      'category',
-      populateProvider,
-      'zone'
-    ]);
-    sendResponse(res, 200, true, 'Vehicle updated successfully', vehicle);
+
+    // Cleanup old files
+    if (filesToDelete.length) await deleteFiles(filesToDelete);
+
+    // Populate and return updated vehicle
+    const updatedVehicle = await Vehicle.findById(vehicle._id)
+      .populate("brand")
+      .populate({
+        path: "category",
+        model: "VehicleCategory",
+        select: "title image vehicleCategoryId module isActive",
+      })
+      .populate(populateProvider)
+      .populate("zone")
+      .lean();
+
+    sendResponse(res, 200, true, "Vehicle updated successfully", updatedVehicle);
   } catch (error) {
-    sendResponse(res, 400, false, error.message);
+    console.error("Error updating vehicle:", error);
+    
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return sendResponse(
+        res,
+        400,
+        false,
+        `${
+          field === "vinNumber" ? "VIN number" : "License plate number"
+        } already exists`
+      );
+    }
+    sendResponse(res, 500, false, error.message);
   }
 };
 
-// ================= DELETE =================
+// ================= DELETE VEHICLE =================
 exports.deleteVehicle = async (req, res) => {
   try {
-    let query = { _id: req.params.id };
-    
-    // ✅ FIX: Vendors can only delete their own vehicles
-    if (req.user?.role === 'vendor') {
-      query.provider = req.user._id;
+    const vehicle = await Vehicle.findById(req.params.id);
+
+    if (!vehicle) {
+      return sendResponse(res, 404, false, "Vehicle not found");
     }
 
-    const vehicle = await Vehicle.findOne(query);
-    if (!vehicle) return sendResponse(res, 404, false, 'Vehicle not found');
+    // Authorization check
+    if (
+      req.user.role === "vendor" &&
+      vehicle.provider.toString() !== req.user._id.toString()
+    ) {
+      return sendResponse(res, 403, false, "Unauthorized to delete this vehicle");
+    }
 
-    await Promise.all([
-      deleteFiles(vehicle.images),
-      vehicle.thumbnail ? deleteFiles([vehicle.thumbnail]) : null,
-      deleteFiles(vehicle.documents),
-    ]);
+    // Collect all files to delete
+    const filesToDelete = [
+      ...(vehicle.images || []),
+      ...(vehicle.documents || []),
+    ];
+    if (vehicle.thumbnail) filesToDelete.push(vehicle.thumbnail);
 
+    // Delete vehicle
     await vehicle.deleteOne();
-    sendResponse(res, 200, true, 'Vehicle deleted successfully');
+
+    // Cleanup files
+    if (filesToDelete.length) await deleteFiles(filesToDelete);
+
+    sendResponse(res, 200, true, "Vehicle deleted successfully");
   } catch (error) {
-    sendResponse(res, 400, false, error.message);
+    console.error("Error deleting vehicle:", error);
+    sendResponse(res, 500, false, error.message);
   }
 };

@@ -170,7 +170,8 @@ const VehicleSchema = new mongoose.Schema(
     },
     description: { type: String, trim: true, maxlength: [500, 'Description cannot be more than 500 characters'] },
     brand: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand' },
-    category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
+    category: [{ type: mongoose.Schema.Types.ObjectId, ref: 'VehicleCategory' }],
+
     zone: { type: mongoose.Schema.Types.ObjectId, ref: 'Zone' },
     latitude: { type: Number },
     longitude: { type: Number },

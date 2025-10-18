@@ -38,7 +38,7 @@ const User = require('../models/User');
 exports.protect = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    console.log('Authorization Header:', authHeader); // Log header for debugging
+    // console.log('Authorization Header:', authHeader); // Log header for debugging
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ success: false, message: 'Not authorized, token missing' });
