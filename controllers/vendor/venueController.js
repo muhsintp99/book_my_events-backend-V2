@@ -1,323 +1,3 @@
-// const Venue = require("../../models/vendor/Venue");
-
-// // ================= CREATE =================
-// exports.createVenue = async (req, res) => {
-//   try {
-//     const data = req.body;
-
-//     // Require provider from authenticated user
-//     if (!req.user?._id) {
-//       return res.status(401).json({
-//         success: false,
-//         message: "Authentication required",
-//       });
-//     }
-//     data.provider = req.user._id;
-
-//     // Convert file paths to relative URLs
-//     if (req.files?.thumbnail) {
-//       const relativePath = req.files.thumbnail[0].path.replace(/\\/g, '/').split('Uploads/')[1];
-//       data.thumbnail = `/uploads/${relativePath}`;
-//     }
-//     if (req.files?.images) {
-//       data.images = req.files.images.map(f => {
-//         const relativePath = f.path.replace(/\\/g, '/').split('Uploads/')[1];
-//         return `/uploads/${relativePath}`;
-//       });
-//     }
-
-//     const venue = await Venue.create(data);
-//     await venue.populate("provider");
-
-//     res.status(201).json({ success: true, data: venue });
-//   } catch (err) {
-//     console.error(`Error creating venue: ${err.message}`);
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
-// // Admin creates venue for a specific provider by ID
-// exports.createVenueForProvider = async (req, res) => {
-//   try {
-//     const data = req.body;
-//     data.provider = req.params.providerId;
-
-//     // Convert file paths to relative URLs
-//     if (req.files?.thumbnail) {
-//       const relativePath = req.files.thumbnail[0].path.replace(/\\/g, '/').split('Uploads/')[1];
-//       data.thumbnail = `/uploads/${relativePath}`;
-//     }
-//     if (req.files?.images) {
-//       data.images = req.files.images.map(f => {
-//         const relativePath = f.path.replace(/\\/g, '/').split('Uploads/')[1];
-//         return `/uploads/${relativePath}`;
-//       });
-//     }
-
-//     const venue = await Venue.create(data);
-//     await venue.populate("provider");
-
-//     res.status(201).json({ success: true, data: venue });
-//   } catch (err) {
-//     console.error(`Error creating venue for provider: ${err.message}`);
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
-// // ================= READ =================
-// exports.getVenues = async (req, res) => {
-//   try {
-//     const venues = await Venue.find().populate("provider").lean();
-//     res.status(200).json({ success: true, count: venues.length, data: venues });
-//   } catch (err) {
-//     console.error(`Error fetching venues: ${err.message}`);
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
-// // --- Get venues by provider ID ---
-// exports.getVenuesByProvider = async (req, res) => {
-//   try {
-//     const providerId = req.params.providerId;
-//     if (!providerId) {
-//       return res.status(400).json({ success: false, message: "Provider ID is required" });
-//     }
-
-//     const venues = await Venue.find({ provider: providerId }).populate("provider").lean();
-//     res.status(200).json({ success: true, count: venues.length, data: venues });
-//   } catch (err) {
-//     console.error(`Error fetching venues by provider: ${err.message}`);
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
-// // Internal function to get venues by provider (used in other services)
-// exports.getVenuesByProviderInternal = async (providerId) => {
-//   const venues = await Venue.find({ provider: providerId }).populate("provider").lean();
-//   return venues;
-// };
-
-// // Get single venue by ID
-// exports.getVenue = async (req, res) => {
-//   try {
-//     const venue = await Venue.findById(req.params.id).populate("provider").lean();
-
-//     if (!venue)
-//       return res.status(404).json({ success: false, message: "Venue not found" });
-
-//     res.status(200).json({ success: true, data: venue });
-//   } catch (err) {
-//     console.error(`Error fetching venue: ${err.message}`);
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
-// // ================= UPDATE =================
-// exports.updateVenue = async (req, res) => {
-//   try {
-//     const data = req.body;
-
-//     if (req.files?.thumbnail) data.thumbnail = req.files.thumbnail[0].path;
-//     if (req.files?.images) data.images = req.files.images.map(f => f.path);
-
-//     const venue = await Venue.findByIdAndUpdate(req.params.id, data, {
-//       new: true,
-//       runValidators: true,
-//     }).populate("provider");
-
-//     if (!venue)
-//       return res.status(404).json({ success: false, message: "Venue not found" });
-
-//     res.status(200).json({ success: true, data: venue });
-//   } catch (err) {
-//     console.error(`Error updating venue: ${err.message}`);
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
-// // ================= DELETE =================
-// exports.deleteVenue = async (req, res) => {
-//   try {
-//     const venue = await Venue.findByIdAndDelete(req.params.id);
-//     if (!venue) return res.status(404).json({ success: false, message: "Venue not found" });
-
-//     res.status(200).json({ success: true, message: "Venue deleted" });
-//   } catch (err) {
-//     console.error(`Error deleting venue: ${err.message}`);
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
-// // ================= TOGGLE STATUS =================
-// exports.toggleVenueStatus = async (req, res) => {
-//   try {
-//     const venue = await Venue.findById(req.params.id);
-//     if (!venue) return res.status(404).json({ success: false, message: "Venue not found" });
-
-//     venue.isActive = !venue.isActive;
-//     await venue.save();
-
-//     res.status(200).json({ success: true, data: venue });
-//   } catch (err) {
-//     console.error(`Error toggling venue status: ${err.message}`);
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
-// // ================= COUNTS =================
-// exports.getVenueCounts = async (req, res) => {
-//   try {
-//     const total = await Venue.countDocuments();
-//     const active = await Venue.countDocuments({ isActive: true });
-//     const inactive = await Venue.countDocuments({ isActive: false });
-
-//     res.status(200).json({ success: true, total, active, inactive });
-//   } catch (err) {
-//     console.error(`Error fetching venue counts: ${err.message}`);
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-// const mongoose = require('mongoose');
-// const Venue = require('../../models/vendor/Venue');
-
-// exports.createVenue = async (req, res) => {
-//   try {
-//     const data = req.body;
-//     // Ensure searchTags is an array
-//     if (data.searchTags && !Array.isArray(data.searchTags)) {
-//       data.searchTags = [data.searchTags];
-//     }
-//     // Handle provider
-//     if (!data.provider) {
-//       data.provider = null; // Set to null for optional provider
-//     }
-//     // Handle file uploads
-//     if (req.files?.thumbnail) {
-//       data.thumbnail = req.files.thumbnail[0].path;
-//     }
-//     if (req.files?.images) {
-//       data.images = req.files.images.map(f => f.path);
-//     }
-//     const venue = await Venue.create(data);
-//     res.status(201).json({ success: true, data: venue });
-//   } catch (err) {
-//     console.error('Error in createVenue:', err.message);
-//     res.status(500).json({ success: false, message: 'Failed to create venue' });
-//   }
-// };
-
-// exports.getVenues = async (req, res) => {
-//   try {
-//     const venues = await Venue.find()
-//       .populate('provider')
-//       .lean();
-//     res.status(200).json({
-//       success: true,
-//       count: venues.length,
-//       data: venues,
-//     });
-//   } catch (err) {
-//     console.error('Error in getVenues:', err.message);
-//     res.status(500).json({ success: false, message: 'Failed to fetch venues' });
-//   }
-// };
-
-// exports.getVenue = async (req, res) => {
-//   try {
-//     const venueId = req.params.id;
-//     if (!mongoose.Types.ObjectId.isValid(venueId)) {
-//       return res.status(400).json({ success: false, message: 'Invalid venue ID' });
-//     }
-//     const venue = await Venue.findById(venueId)
-//       .populate('provider')
-//       .lean();
-//     if (!venue) {
-//       return res.status(404).json({ success: false, message: 'Venue not found' });
-//     }
-//     res.status(200).json({ success: true, data: venue });
-//   } catch (err) {
-//     console.error('Error in getVenue:', err.message);
-//     res.status(500).json({ success: false, message: 'Failed to fetch venue' });
-//   }
-// };
-
-// exports.updateVenue = async (req, res) => {
-//   try {
-//     const venueId = req.params.id;
-//     if (!mongoose.Types.ObjectId.isValid(venueId)) {
-//       return res.status(400).json({ success: false, message: 'Invalid venue ID' });
-//     }
-//     const data = req.body;
-//     if (data.searchTags && !Array.isArray(data.searchTags)) {
-//       data.searchTags = [data.searchTags];
-//     }
-//     if (req.files?.thumbnail) {
-//       data.thumbnail = req.files.thumbnail[0].path;
-//     }
-//     if (req.files?.images) {
-//       data.images = req.files.images.map(f => f.path);
-//     }
-//     const venue = await Venue.findByIdAndUpdate(venueId, data, {
-//       new: true,
-//       runValidators: true,
-//     });
-//     if (!venue) {
-//       return res.status(404).json({ success: false, message: 'Venue not found' });
-//     }
-//     res.status(200).json({ success: true, data: venue });
-//   } catch (err) {
-//     console.error('Error in updateVenue:', err.message);
-//     res.status(500).json({ success: false, message: 'Failed to update venue' });
-//   }
-// };
-
-// exports.deleteVenue = async (req, res) => {
-//   try {
-//     const venueId = req.params.id;
-//     if (!mongoose.Types.ObjectId.isValid(venueId)) {
-//       return res.status(400).json({ success: false, message: 'Invalid venue ID' });
-//     }
-//     const venue = await Venue.findByIdAndDelete(venueId);
-//     if (!venue) {
-//       return res.status(404).json({ success: false, message: 'Venue not found' });
-//     }
-//     res.status(200).json({ success: true, message: 'Venue deleted successfully' });
-//   } catch (err) {
-//     console.error('Error in deleteVenue:', err.message);
-//     res.status(500).json({ success: false, message: 'Failed to delete venue' });
-//   }
-// };
-
-// exports.toggleVenueStatus = async (req, res) => {
-//   try {
-//     const venueId = req.params.id;
-//     if (!mongoose.Types.ObjectId.isValid(venueId)) {
-//       return res.status(400).json({ success: false, message: 'Invalid venue ID' });
-//     }
-//     const venue = await Venue.findById(venueId);
-//     if (!venue) {
-//       return res.status(404).json({ success: false, message: 'Venue not found' });
-//     }
-//     venue.isActive = !venue.isActive;
-//     await venue.save();
-//     res.status(200).json({ success: true, data: venue });
-//   } catch (err) {
-//     console.error('Error in toggleVenueStatus:', err.message);
-//     res.status(500).json({ success: false, message: 'Failed to toggle venue status' });
-//   }
-// };
-
-// exports.getVenueCounts = async (req, res) => {
-//   try {
-//     const total = await Venue.countDocuments();
-//     const active = await Venue.countDocuments({ isActive: true });
-//     const inactive = await Venue.countDocuments({ isActive: false });
-//     res.status(200).json({ success: true, total, active, inactive });
-//   } catch (err) {
-//     console.error('Error in getVenueCounts:', err.message);
-//     res.status(500).json({ success: false, message: 'Failed to fetch venue counts' });
-//   }
-// };
 
 // const mongoose = require('mongoose');
 // const Venue = require('../../models/vendor/Venue');
@@ -351,18 +31,19 @@
 //   return newPricing;
 // };
 
-// // Helper function to normalize form data (handle arrays from duplicate keys)
+// // Helper function to normalize form data
 // const normalizeFormData = (data) => {
 //   const normalized = { ...data };
   
-//   // List of boolean fields
+//   // Boolean fields - UPDATED with AC fields
 //   const booleanFields = [
 //     'watermarkProtection', 'parkingAvailability', 'wheelchairAccessibility',
 //     'securityArrangements', 'foodCateringAvailability', 'wifiAvailability',
-//     'stageLightingAudio', 'multipleHalls', 'dynamicPricing', 'isActive'
+//     'stageLightingAudio', 'multipleHalls', 'dynamicPricing', 'isActive',
+//     'acAvailable', 'nonAcAvailable' // NEW AC fields
 //   ];
   
-//   // List of number fields
+//   // Number fields
 //   const numberFields = [
 //     'latitude', 'longitude', 'discount', 'advanceDeposit',
 //     'maxGuestsSeated', 'maxGuestsStanding', 'rating', 'reviewCount'
@@ -393,7 +74,7 @@
 //     }
 //   });
   
-//   // Normalize string fields (but NOT faqs, pricingSchedule, or searchTags)
+//   // Normalize string fields - UPDATED with acType
 //   const stringFields = [
 //     'venueName', 'shortDescription', 'venueAddress', 'language',
 //     'contactPhone', 'contactEmail', 'contactWebsite',
@@ -401,7 +82,8 @@
 //     'openingHours', 'closingHours', 'holidaySchedule',
 //     'parkingCapacity', 'washroomsInfo', 'dressingRooms',
 //     'customPackages', 'cancellationPolicy', 'extraCharges',
-//     'seatingArrangement', 'nearbyTransport', 'accessibilityInfo'
+//     'seatingArrangement', 'nearbyTransport', 'accessibilityInfo',
+//     'module', 'acType' // NEW acType field
 //   ];
   
 //   stringFields.forEach(field => {
@@ -409,6 +91,14 @@
 //       normalized[field] = normalized[field][0];
 //     }
 //   });
+  
+//   // Validate acType enum
+//   if (normalized.acType) {
+//     const validAcTypes = ['Central AC', 'Split AC', 'Window AC', 'Coolers', 'Not Specified'];
+//     if (!validAcTypes.includes(normalized.acType)) {
+//       normalized.acType = 'Not Specified';
+//     }
+//   }
   
 //   return normalized;
 // };
@@ -418,7 +108,7 @@
 //   try {
 //     let data = normalizeFormData(req.body);
 
-//     // Parse pricing schedule if it exists
+//     // Parse pricing schedule
 //     if (data.pricingSchedule) {
 //       const parsed = typeof data.pricingSchedule === 'string' 
 //         ? JSON.parse(data.pricingSchedule) 
@@ -427,6 +117,37 @@
 //       data.pricingSchedule = Array.isArray(parsed) 
 //         ? convertLegacyPricing(parsed) 
 //         : parsed;
+//     }
+
+//     // Parse categories
+//     if (data.categories) {
+//       let categories = data.categories;
+      
+//       if (typeof categories === 'string') {
+//         try {
+//           categories = JSON.parse(categories);
+//         } catch {
+//           categories = categories.split(',').map(c => c.trim()).filter(c => c);
+//         }
+//       }
+      
+//       if (Array.isArray(categories)) {
+//         data.categories = categories
+//           .flat()
+//           .filter(c => c && mongoose.Types.ObjectId.isValid(c))
+//           .map(c => new mongoose.Types.ObjectId(c));
+//       } else {
+//         data.categories = [];
+//       }
+//     } else {
+//       data.categories = [];
+//     }
+
+//     // Parse module
+//     if (data.module && mongoose.Types.ObjectId.isValid(data.module)) {
+//       data.module = new mongoose.Types.ObjectId(data.module);
+//     } else {
+//       data.module = null;
 //     }
 
 //     // Parse search tags
@@ -450,16 +171,14 @@
 //       data.searchTags = [];
 //     }
 
-//     // Parse FAQs - handle if it comes as array from form-data
+//     // Parse FAQs
 //     if (data.faqs) {
 //       let faqs = data.faqs;
       
-//       // If it's an array (from form-data duplicates), take the first one
 //       if (Array.isArray(faqs)) {
 //         faqs = faqs[0];
 //       }
       
-//       // Now parse if it's a string
 //       if (typeof faqs === 'string') {
 //         try {
 //           faqs = JSON.parse(faqs);
@@ -469,7 +188,6 @@
 //         }
 //       }
       
-//       // Validate FAQ structure
 //       if (Array.isArray(faqs)) {
 //         data.faqs = faqs.filter(faq => 
 //           faq && 
@@ -503,7 +221,7 @@
 //       });
 //     }
 
-//     // Set provider field if provided in request, otherwise use createdBy
+//     // Set provider field
 //     if (data.provider && mongoose.Types.ObjectId.isValid(data.provider)) {
 //       data.provider = data.provider;
 //     } else {
@@ -514,6 +232,14 @@
 //       ...data,
 //       createdBy: req.user._id,
 //     });
+
+//     // Populate categories and module
+//     await venue.populate([
+//       { path: 'categories', select: 'title image categoryId module isActive' },
+//       { path: 'module', select: 'title moduleId icon isActive' },
+//       { path: 'createdBy', select: 'name email phone' },
+//       { path: 'provider', select: 'name email phone' }
+//     ]);
 
 //     res.status(201).json({
 //       success: true,
@@ -533,6 +259,15 @@
 // exports.getVenues = async (req, res) => {
 //   try {
 //     const venues = await Venue.find()
+//       .populate({
+//         path: 'categories',
+//         select: 'title image categoryId module isActive',
+//         populate: { path: 'module', select: 'title moduleId' }
+//       })
+//       .populate({
+//         path: 'module',
+//         select: 'title moduleId icon isActive'
+//       })
 //       .populate({
 //         path: 'createdBy',
 //         select: 'name email phone',
@@ -565,6 +300,108 @@
 //   }
 // };
 
+
+// // Add this function to your venueController.js file
+
+// exports.getVenuesByLocation = async (req, res) => {
+//   try {
+//     const { lat, lng } = req.query;
+
+//     // Validate required parameters
+//     if (!lat || !lng) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Latitude (lat) and Longitude (lng) are required',
+//       });
+//     }
+
+//     // Parse and validate coordinates
+//     const latitude = parseFloat(lat);
+//     const longitude = parseFloat(lng);
+
+//     if (isNaN(latitude) || isNaN(longitude)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Invalid latitude or longitude values',
+//       });
+//     }
+
+//     // Define zone radius in kilometers (adjust based on your requirements)
+//     // Default: 10km for same zone/area
+//     const zoneRadiusKm = 10;
+
+//     // Find all active venues with valid coordinates
+//     const venues = await Venue.find({
+//       latitude: { $exists: true, $ne: null },
+//       longitude: { $exists: true, $ne: null },
+//       isActive: true
+//     })
+//       .populate({
+//         path: 'categories',
+//         select: 'title image categoryId module isActive',
+//         populate: { path: 'module', select: 'title moduleId' }
+//       })
+//       .populate({
+//         path: 'module',
+//         select: 'title moduleId icon isActive'
+//       })
+//       .populate('createdBy', 'name email phone')
+//       .populate('provider', 'name email phone')
+//       .lean();
+
+//     // Calculate distance for each venue and filter by zone
+//     const venuesInZone = [];
+    
+//     venues.forEach(venue => {
+//       // Haversine formula to calculate distance
+//       const lat1 = latitude * Math.PI / 180;
+//       const lat2 = venue.latitude * Math.PI / 180;
+//       const deltaLat = (venue.latitude - latitude) * Math.PI / 180;
+//       const deltaLng = (venue.longitude - longitude) * Math.PI / 180;
+
+//       const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+//                 Math.cos(lat1) * Math.cos(lat2) *
+//                 Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+//       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//       const distance = 6378.1 * c; // Distance in kilometers
+
+//       // Only include venues within the zone radius
+//       if (distance <= zoneRadiusKm) {
+//         venuesInZone.push({
+//           ...venue,
+//           distance: parseFloat(distance.toFixed(2)),
+//           distanceUnit: 'km'
+//         });
+//       }
+//     });
+
+//     // Sort by distance (nearest first)
+//     venuesInZone.sort((a, b) => a.distance - b.distance);
+
+//     res.status(200).json({
+//       success: true,
+//       count: venuesInZone.length,
+//       searchParams: {
+//         latitude,
+//         longitude,
+//         zoneRadius: zoneRadiusKm,
+//         unit: 'km'
+//       },
+//       data: venuesInZone,
+//       message: venuesInZone.length === 0 
+//         ? `No venues found within ${zoneRadiusKm}km zone` 
+//         : 'Venues in zone fetched successfully'
+//     });
+//   } catch (err) {
+//     console.error('Error fetching venues by location:', err);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Failed to fetch venues by location',
+//       error: err.message
+//     });
+//   }
+// };
+
 // // Get venues by provider ID
 // exports.getVenuesByProvider = async (req, res) => {
 //   try {
@@ -574,12 +411,19 @@
 //       return res.status(400).json({ success: false, message: 'Invalid provider ID' });
 //     }
 
-//     // Ensure we cast to ObjectId
 //     const providerObjectId = new mongoose.Types.ObjectId(providerId);
 
 //     const venues = await Venue.find({
 //       $or: [{ provider: providerObjectId }, { createdBy: providerObjectId }],
 //     })
+//       .populate({
+//         path: 'categories',
+//         select: 'title image categoryId module isActive'
+//       })
+//       .populate({
+//         path: 'module',
+//         select: 'title moduleId icon isActive'
+//       })
 //       .populate('createdBy', 'name email')
 //       .populate('provider', 'name email')
 //       .sort({ createdAt: -1 })
@@ -596,6 +440,7 @@
 //     res.status(500).json({ success: false, message: 'Failed to fetch venues by provider', error: err.message });
 //   }
 // };
+
 // // Get single venue
 // exports.getVenue = async (req, res) => {
 //   try {
@@ -608,6 +453,15 @@
 //     }
 
 //     const venue = await Venue.findById(venueId)
+//       .populate({
+//         path: 'categories',
+//         select: 'title image categoryId module isActive',
+//         populate: { path: 'module', select: 'title moduleId' }
+//       })
+//       .populate({
+//         path: 'module',
+//         select: 'title moduleId icon isActive'
+//       })
 //       .populate({
 //         path: 'createdBy',
 //         select: 'name email phone',
@@ -652,12 +506,37 @@
 
 //     let data = normalizeFormData(req.body);
     
-//     // Parse pricing schedule if it exists
+//     // Parse pricing schedule
 //     if (data.pricingSchedule && typeof data.pricingSchedule === 'string') {
 //       const parsed = JSON.parse(data.pricingSchedule);
 //       data.pricingSchedule = Array.isArray(parsed) 
 //         ? convertLegacyPricing(parsed) 
 //         : parsed;
+//     }
+
+//     // Parse categories
+//     if (data.categories) {
+//       let categories = data.categories;
+      
+//       if (typeof categories === 'string') {
+//         try {
+//           categories = JSON.parse(categories);
+//         } catch {
+//           categories = categories.split(',').map(c => c.trim()).filter(c => c);
+//         }
+//       }
+      
+//       if (Array.isArray(categories)) {
+//         data.categories = categories
+//           .flat()
+//           .filter(c => c && mongoose.Types.ObjectId.isValid(c))
+//           .map(c => new mongoose.Types.ObjectId(c));
+//       }
+//     }
+
+//     // Parse module
+//     if (data.module && mongoose.Types.ObjectId.isValid(data.module)) {
+//       data.module = new mongoose.Types.ObjectId(data.module);
 //     }
     
 //     // Parse search tags
@@ -717,6 +596,14 @@
 //       runValidators: true,
 //     })
 //       .populate({
+//         path: 'categories',
+//         select: 'title image categoryId module isActive'
+//       })
+//       .populate({
+//         path: 'module',
+//         select: 'title moduleId icon isActive'
+//       })
+//       .populate({
 //         path: 'createdBy',
 //         select: 'name email phone',
 //       })
@@ -742,6 +629,96 @@
 //     res.status(500).json({ 
 //       success: false, 
 //       message: 'Failed to update venue',
+//       error: err.message
+//     });
+//   }
+// };
+
+// // Get venues by category
+// exports.getVenuesByCategory = async (req, res) => {
+//   try {
+//     const { categoryId } = req.params;
+
+//     if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+//       return res.status(400).json({ 
+//         success: false, 
+//         message: 'Invalid category ID' 
+//       });
+//     }
+
+//     const venues = await Venue.find({ 
+//       categories: categoryId,
+//       isActive: true 
+//     })
+//       .populate({
+//         path: 'categories',
+//         select: 'title image categoryId module isActive'
+//       })
+//       .populate({
+//         path: 'module',
+//         select: 'title moduleId icon isActive'
+//       })
+//       .populate('createdBy', 'name email')
+//       .populate('provider', 'name email')
+//       .sort({ createdAt: -1 })
+//       .lean();
+
+//     res.status(200).json({
+//       success: true,
+//       count: venues.length,
+//       data: venues,
+//       message: venues.length === 0 ? 'No venues found for this category' : 'Venues fetched successfully'
+//     });
+//   } catch (err) {
+//     console.error('Error fetching venues by category:', err);
+//     res.status(500).json({ 
+//       success: false, 
+//       message: 'Failed to fetch venues by category',
+//       error: err.message
+//     });
+//   }
+// };
+
+// // Get venues by module
+// exports.getVenuesByModule = async (req, res) => {
+//   try {
+//     const { moduleId } = req.params;
+
+//     if (!mongoose.Types.ObjectId.isValid(moduleId)) {
+//       return res.status(400).json({ 
+//         success: false, 
+//         message: 'Invalid module ID' 
+//       });
+//     }
+
+//     const venues = await Venue.find({ 
+//       module: moduleId,
+//       isActive: true 
+//     })
+//       .populate({
+//         path: 'categories',
+//         select: 'title image categoryId module isActive'
+//       })
+//       .populate({
+//         path: 'module',
+//         select: 'title moduleId icon isActive'
+//       })
+//       .populate('createdBy', 'name email')
+//       .populate('provider', 'name email')
+//       .sort({ createdAt: -1 })
+//       .lean();
+
+//     res.status(200).json({
+//       success: true,
+//       count: venues.length,
+//       data: venues,
+//       message: venues.length === 0 ? 'No venues found for this module' : 'Venues fetched successfully'
+//     });
+//   } catch (err) {
+//     console.error('Error fetching venues by module:', err);
+//     res.status(500).json({ 
+//       success: false, 
+//       message: 'Failed to fetch venues by module',
 //       error: err.message
 //     });
 //   }
@@ -916,7 +893,7 @@
 //   }
 // };
 
-// // Get FAQs for a venue
+// // Get FAQs
 // exports.getFAQs = async (req, res) => {
 //   try {
 //     const venueId = req.params.id;
@@ -956,7 +933,7 @@
 //   }
 // };
 
-// // Update FAQs for a venue
+// // Update FAQs
 // exports.updateFAQs = async (req, res) => {
 //   try {
 //     const venueId = req.params.id;
@@ -988,7 +965,6 @@
 //       });
 //     }
 
-//     // Validate and clean FAQs
 //     const validFAQs = faqs.filter(faq => 
 //       faq && 
 //       typeof faq === 'object' && 
@@ -1129,10 +1105,6 @@
 //   }
 // };
 
-
-
-
-
 const mongoose = require('mongoose');
 const Venue = require('../../models/vendor/Venue');
 
@@ -1169,12 +1141,12 @@ const convertLegacyPricing = (oldPricing) => {
 const normalizeFormData = (data) => {
   const normalized = { ...data };
   
-  // Boolean fields - UPDATED with AC fields
+  // Boolean fields
   const booleanFields = [
     'watermarkProtection', 'parkingAvailability', 'wheelchairAccessibility',
     'securityArrangements', 'foodCateringAvailability', 'wifiAvailability',
     'stageLightingAudio', 'multipleHalls', 'dynamicPricing', 'isActive',
-    'acAvailable', 'nonAcAvailable' // NEW AC fields
+    'acAvailable', 'nonAcAvailable'
   ];
   
   // Number fields
@@ -1208,7 +1180,7 @@ const normalizeFormData = (data) => {
     }
   });
   
-  // Normalize string fields - UPDATED with acType
+  // Normalize string fields
   const stringFields = [
     'venueName', 'shortDescription', 'venueAddress', 'language',
     'contactPhone', 'contactEmail', 'contactWebsite',
@@ -1217,7 +1189,7 @@ const normalizeFormData = (data) => {
     'parkingCapacity', 'washroomsInfo', 'dressingRooms',
     'customPackages', 'cancellationPolicy', 'extraCharges',
     'seatingArrangement', 'nearbyTransport', 'accessibilityInfo',
-    'module', 'acType' // NEW acType field
+    'module', 'acType'
   ];
   
   stringFields.forEach(field => {
@@ -1235,6 +1207,173 @@ const normalizeFormData = (data) => {
   }
   
   return normalized;
+};
+
+// Helper function to calculate distance between two coordinates
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in kilometers
+};
+
+// Helper function to get day of week from date
+const getDayOfWeek = (dateString) => {
+  const date = new Date(dateString);
+  const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  return days[date.getDay()];
+};
+
+// NEW: Advanced Venue Search API
+exports.searchVenues = async (req, res) => {
+  try {
+    const { keyword, date, latitude, longitude, radius = 10, limit = 50, page = 1 } = req.query;
+
+    // Build search query
+    const searchQuery = { isActive: true };
+
+    // Keyword search (searches in multiple fields)
+    if (keyword && keyword.trim()) {
+      const keywordRegex = new RegExp(keyword.trim(), 'i');
+      searchQuery.$or = [
+        { venueName: keywordRegex },
+        { shortDescription: keywordRegex },
+        { venueAddress: keywordRegex },
+        { searchTags: { $in: [keywordRegex] } },
+        { language: keywordRegex },
+        { seatingArrangement: keywordRegex }
+      ];
+    }
+
+    // Location filter
+    let useLocationFilter = false;
+    let userLat, userLon, searchRadius;
+
+    if (latitude && longitude) {
+      userLat = parseFloat(latitude);
+      userLon = parseFloat(longitude);
+      searchRadius = parseFloat(radius);
+
+      if (isNaN(userLat) || isNaN(userLon)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid latitude or longitude values',
+        });
+      }
+
+      if (isNaN(searchRadius) || searchRadius <= 0) {
+        searchRadius = 10; // Default 10km
+      }
+
+      useLocationFilter = true;
+      // Filter venues with valid coordinates
+      searchQuery.latitude = { $exists: true, $ne: null };
+      searchQuery.longitude = { $exists: true, $ne: null };
+    }
+
+    // Fetch venues
+    let venues = await Venue.find(searchQuery)
+      .populate({
+        path: 'categories',
+        select: 'title image categoryId module isActive',
+        populate: { path: 'module', select: 'title moduleId' }
+      })
+      .populate({
+        path: 'module',
+        select: 'title moduleId icon isActive'
+      })
+      .populate('createdBy', 'name email phone')
+      .populate('provider', 'name email phone')
+      .lean();
+
+    // Apply location filtering and calculate distances
+    if (useLocationFilter) {
+      venues = venues.map(venue => {
+        const distance = calculateDistance(
+          userLat,
+          userLon,
+          venue.latitude,
+          venue.longitude
+        );
+        return {
+          ...venue,
+          distance: parseFloat(distance.toFixed(2)),
+          distanceUnit: 'km'
+        };
+      }).filter(venue => venue.distance <= searchRadius);
+
+      // Sort by distance
+      venues.sort((a, b) => a.distance - b.distance);
+    }
+
+    // Date-based availability filter
+    if (date) {
+      const dayOfWeek = getDayOfWeek(date);
+      
+      venues = venues.filter(venue => {
+        // Check if venue has pricing for the requested day
+        if (!venue.pricingSchedule || !venue.pricingSchedule[dayOfWeek]) {
+          return false;
+        }
+
+        const daySchedule = venue.pricingSchedule[dayOfWeek];
+        // Check if at least one slot (morning or evening) is available
+        return (daySchedule.morning && Object.keys(daySchedule.morning).length > 0) ||
+               (daySchedule.evening && Object.keys(daySchedule.evening).length > 0);
+      });
+
+      // Add availability info to each venue
+      venues = venues.map(venue => ({
+        ...venue,
+        requestedDate: date,
+        requestedDay: dayOfWeek,
+        availableSlots: venue.pricingSchedule[dayOfWeek]
+      }));
+    }
+
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const paginatedVenues = venues.slice(skip, skip + parseInt(limit));
+    const totalResults = venues.length;
+    const totalPages = Math.ceil(totalResults / parseInt(limit));
+
+    // Build response
+    const response = {
+      success: true,
+      count: paginatedVenues.length,
+      totalResults,
+      page: parseInt(page),
+      totalPages,
+      searchParams: {
+        keyword: keyword || null,
+        date: date || null,
+        dayOfWeek: date ? getDayOfWeek(date) : null,
+        latitude: useLocationFilter ? userLat : null,
+        longitude: useLocationFilter ? userLon : null,
+        radius: useLocationFilter ? searchRadius : null,
+        unit: useLocationFilter ? 'km' : null
+      },
+      data: paginatedVenues,
+      message: paginatedVenues.length === 0 
+        ? 'No venues found matching your search criteria' 
+        : 'Venues fetched successfully'
+    };
+
+    res.status(200).json(response);
+
+  } catch (err) {
+    console.error('Error in searchVenues:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to search venues',
+      error: err.message
+    });
+  }
 };
 
 // Create Venue
@@ -1434,14 +1573,11 @@ exports.getVenues = async (req, res) => {
   }
 };
 
-
-// Add this function to your venueController.js file
-
+// Get venues by location
 exports.getVenuesByLocation = async (req, res) => {
   try {
     const { lat, lng } = req.query;
 
-    // Validate required parameters
     if (!lat || !lng) {
       return res.status(400).json({
         success: false,
@@ -1449,7 +1585,6 @@ exports.getVenuesByLocation = async (req, res) => {
       });
     }
 
-    // Parse and validate coordinates
     const latitude = parseFloat(lat);
     const longitude = parseFloat(lng);
 
@@ -1460,11 +1595,8 @@ exports.getVenuesByLocation = async (req, res) => {
       });
     }
 
-    // Define zone radius in kilometers (adjust based on your requirements)
-    // Default: 10km for same zone/area
     const zoneRadiusKm = 10;
 
-    // Find all active venues with valid coordinates
     const venues = await Venue.find({
       latitude: { $exists: true, $ne: null },
       longitude: { $exists: true, $ne: null },
@@ -1483,23 +1615,11 @@ exports.getVenuesByLocation = async (req, res) => {
       .populate('provider', 'name email phone')
       .lean();
 
-    // Calculate distance for each venue and filter by zone
     const venuesInZone = [];
     
     venues.forEach(venue => {
-      // Haversine formula to calculate distance
-      const lat1 = latitude * Math.PI / 180;
-      const lat2 = venue.latitude * Math.PI / 180;
-      const deltaLat = (venue.latitude - latitude) * Math.PI / 180;
-      const deltaLng = (venue.longitude - longitude) * Math.PI / 180;
+      const distance = calculateDistance(latitude, longitude, venue.latitude, venue.longitude);
 
-      const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-                Math.cos(lat1) * Math.cos(lat2) *
-                Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const distance = 6378.1 * c; // Distance in kilometers
-
-      // Only include venues within the zone radius
       if (distance <= zoneRadiusKm) {
         venuesInZone.push({
           ...venue,
@@ -1509,7 +1629,6 @@ exports.getVenuesByLocation = async (req, res) => {
       }
     });
 
-    // Sort by distance (nearest first)
     venuesInZone.sort((a, b) => a.distance - b.distance);
 
     res.status(200).json({

@@ -169,6 +169,82 @@
 
 // module.exports = router;
 
+
+
+
+
+
+
+
+
+
+
+
+
+// const express = require('express');
+// const router = express.Router();
+// const { protect } = require('../../middlewares/authMiddleware');
+// const createUpload = require('../../middlewares/upload');
+// const venueController = require('../../controllers/vendor/venueController');
+
+// const upload = createUpload('venues', {
+//   fileSizeMB: 5,
+//   allowedTypes: ['image/png', 'image/jpeg', 'application/pdf'],
+// });
+
+// // Counts route - must be before /:id
+// router.get('/count', venueController.getVenueCounts);
+
+// router.get('/reverse-geocode', venueController.getVenuesByLocation);
+
+
+// // Category and Module specific routes - must be before /:id
+// router.get('/category/:categoryId', venueController.getVenuesByCategory);
+// router.get('/module/:moduleId', venueController.getVenuesByModule);
+
+// // Provider-specific routes - must be before /:id
+// router.get('/provider/:providerId', venueController.getVenuesByProvider);
+
+// // All Venues
+// router
+//   .route('/')
+//   .get(venueController.getVenues)
+//   .post(
+//     protect,
+//     upload.fields([
+//       { name: 'thumbnail', maxCount: 1 },
+//       { name: 'images', maxCount: 10 },
+//     ]),
+//     venueController.createVenue
+//   );
+
+// // Pricing routes - must be before /:id
+// router.get('/:id/pricing', venueController.getPricing);
+// router.put('/:id/pricing', venueController.updatePricing);
+
+// // FAQ routes - must be before /:id
+// router.get('/:id/faqs', venueController.getFAQs);
+// router.put('/:id/faqs', venueController.updateFAQs);
+
+// // Toggle route - must be before /:id
+// router.patch('/:id/toggle', venueController.toggleVenueStatus);
+
+// // Single Venue routes - must be LAST
+// router
+//   .route('/:id')
+//   .get(venueController.getVenue)
+//   .put(
+//     upload.fields([
+//       { name: 'thumbnail', maxCount: 1 },
+//       { name: 'images', maxCount: 10 },
+//     ]),
+//     venueController.updateVenue
+//   )
+//   .delete(venueController.deleteVenue);
+
+// module.exports = router;
+
+
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../../middlewares/authMiddleware');
@@ -180,20 +256,29 @@ const upload = createUpload('venues', {
   allowedTypes: ['image/png', 'image/jpeg', 'application/pdf'],
 });
 
-// Counts route - must be before /:id
+// ============================================
+// IMPORTANT: Static routes MUST come before dynamic routes (/:id)
+// ============================================
+
+// Counts route
 router.get('/count', venueController.getVenueCounts);
 
+// SEARCH ROUTE - Must be before /:id
+router.get('/search', venueController.searchVenues);
+
+// Location-based search route
 router.get('/reverse-geocode', venueController.getVenuesByLocation);
 
-
-// Category and Module specific routes - must be before /:id
+// Category-specific routes
 router.get('/category/:categoryId', venueController.getVenuesByCategory);
+
+// Module-specific routes
 router.get('/module/:moduleId', venueController.getVenuesByModule);
 
-// Provider-specific routes - must be before /:id
+// Provider-specific routes
 router.get('/provider/:providerId', venueController.getVenuesByProvider);
 
-// All Venues
+// All Venues (GET all & POST new)
 router
   .route('/')
   .get(venueController.getVenues)
@@ -206,18 +291,21 @@ router
     venueController.createVenue
   );
 
-// Pricing routes - must be before /:id
+// Pricing routes - Must be before /:id
 router.get('/:id/pricing', venueController.getPricing);
+router.get('/:id/pricing/day-slot', venueController.getPricingByDaySlot);
 router.put('/:id/pricing', venueController.updatePricing);
 
-// FAQ routes - must be before /:id
+// FAQ routes - Must be before /:id
 router.get('/:id/faqs', venueController.getFAQs);
 router.put('/:id/faqs', venueController.updateFAQs);
 
-// Toggle route - must be before /:id
+// Toggle route - Must be before /:id
 router.patch('/:id/toggle', venueController.toggleVenueStatus);
 
-// Single Venue routes - must be LAST
+// ============================================
+// Single Venue routes - MUST BE LAST
+// ============================================
 router
   .route('/:id')
   .get(venueController.getVenue)
