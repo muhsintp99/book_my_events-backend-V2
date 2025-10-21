@@ -245,6 +245,8 @@
 // module.exports = router;
 
 
+// venueRoutes.js (Updated)
+
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../../middlewares/authMiddleware');
@@ -271,6 +273,9 @@ router.get('/sort', venueController.sortVenues);
 
 // Location-based search route
 router.get('/reverse-geocode', venueController.getVenuesByLocation);
+
+// NEW: Top Picks route
+router.get('/top-picks', venueController.getTopPicks);
 
 // Category-specific routes
 router.get('/category/:categoryId', venueController.getVenuesByCategory);
@@ -303,8 +308,11 @@ router.put('/:id/pricing', venueController.updatePricing);
 router.get('/:id/faqs', venueController.getFAQs);
 router.put('/:id/faqs', venueController.updateFAQs);
 
-// Toggle route - Must be before /:id
-router.patch('/:id/toggle', venueController.toggleVenueStatus);
+// NEW: Toggle active status route
+router.patch('/:id/toggle-active', venueController.toggleActiveStatus);
+
+// NEW: Toggle top pick status route
+router.patch('/:id/toggle-top-pick', venueController.toggleTopPickStatus);
 
 // ============================================
 // Single Venue routes - MUST BE LAST

@@ -297,6 +297,8 @@
 
 
 
+// Venue Model (Updated)
+
 const mongoose = require('mongoose');
 
 // Pricing structure for each slot type
@@ -480,6 +482,12 @@ const venueSchema = new mongoose.Schema(
       default: true,
       index: true // Important index for filtering active venues
     },
+    // NEW: Top Pick Status
+    isTopPick: {
+      type: Boolean,
+      default: false,
+      index: true
+    }
   },
   { 
     timestamps: true,
@@ -508,7 +516,10 @@ const venueSchema = new mongoose.Schema(
       { isActive: 1, rating: -1 },
       
       // Text index for full-text search
-      { venueName: 'text', shortDescription: 'text', venueAddress: 'text', searchTags: 'text' }
+      { venueName: 'text', shortDescription: 'text', venueAddress: 'text', searchTags: 'text' },
+      
+      // NEW: Compound index for top picks
+      { isActive: 1, isTopPick: 1 }
     ]
   }
 );
