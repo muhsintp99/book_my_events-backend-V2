@@ -266,6 +266,9 @@ router.get('/count', venueController.getVenueCounts);
 // SEARCH ROUTE - Must be before /:id
 router.get('/search', venueController.searchVenues);
 
+// NEW: Sort route - Must be before /:id
+router.get('/sort', venueController.sortVenues);
+
 // Location-based search route
 router.get('/reverse-geocode', venueController.getVenuesByLocation);
 

@@ -2357,3 +2357,123 @@ exports.getVenueCounts = async (req, res) => {
     });
   }
 };
+
+// NEW: Sort Venues
+exports.sortVenues = async (req, res) => {
+  try {
+    const { sortBy, latitude, longitude } = req.query;
+    const validSortOptions = ['highPrice', 'lowPrice', 'topRated', 'lowRated', 'highCapacity', 'lowCapacity'];
+
+    if (!sortBy || !validSortOptions.includes(sortBy)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or missing sortBy parameter. Use: highPrice, lowPrice, topRated, lowRated, highCapacity, lowCapacity',
+      });
+    }
+
+    let venues = await Venue.find({ isActive: true })
+      .populate({
+        path: 'categories',
+        select: 'title image categoryId module isActive',
+        populate: { path: 'module', select: 'title moduleId' }
+      })
+      .populate({
+        path: 'module',
+        select: 'title moduleId icon isActive'
+      })
+      .populate('createdBy', 'name email phone')
+      .populate('provider', 'name email phone')
+      .lean();
+
+    // Apply location filtering if latitude and longitude are provided
+    let useLocationFilter = false;
+    let userLat, userLon, searchRadius = 10;
+
+    if (latitude && longitude) {
+      userLat = parseFloat(latitude);
+      userLon = parseFloat(longitude);
+
+      if (isNaN(userLat) || isNaN(userLon)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid latitude or longitude values',
+        });
+      }
+
+      useLocationFilter = true;
+      venues = venues.map(venue => {
+        const distance = calculateDistance(userLat, userLon, venue.latitude, venue.longitude);
+        return {
+          ...venue,
+          distance: parseFloat(distance.toFixed(2)),
+          distanceUnit: 'km'
+        };
+      }).filter(venue => venue.distance <= searchRadius);
+    }
+
+    // Filter venues by capacity
+    const venuesWithData = venues.map(venue => {
+      let maxPrice = 0;
+      if (venue.pricingSchedule) {
+        Object.values(venue.pricingSchedule).forEach(day => {
+          if (day.morning && day.morning.perDay > maxPrice) maxPrice = day.morning.perDay;
+          if (day.evening && day.evening.perDay > maxPrice) maxPrice = day.evening.perDay;
+        });
+      }
+      const rating = venue.rating || 0;
+      const capacity = (venue.maxGuestsSeated || 0) + (venue.maxGuestsStanding || 0);
+
+      return { ...venue, maxPrice, rating, capacity };
+    });
+
+    let filteredVenues;
+    if (sortBy === 'lowCapacity') {
+      filteredVenues = venuesWithData.filter(venue => venue.capacity <= 500);
+    } else if (sortBy === 'highCapacity') {
+      filteredVenues = venuesWithData.filter(venue => venue.capacity > 500);
+    } else {
+      filteredVenues = venuesWithData; // No capacity filter for other sorts
+    }
+
+    // Sort based on the selected criterion
+    let sortedVenues;
+    switch (sortBy) {
+      case 'highPrice':
+        sortedVenues = [...filteredVenues].sort((a, b) => b.maxPrice - a.maxPrice);
+        break;
+      case 'lowPrice':
+        sortedVenues = [...filteredVenues].sort((a, b) => a.maxPrice - b.maxPrice);
+        break;
+      case 'topRated':
+        sortedVenues = [...filteredVenues].sort((a, b) => b.rating - a.rating);
+        break;
+      case 'lowRated':
+        sortedVenues = [...filteredVenues].sort((a, b) => a.rating - b.rating);
+        break;
+      case 'highCapacity':
+        sortedVenues = [...filteredVenues].sort((a, b) => b.capacity - a.capacity);
+        break;
+      case 'lowCapacity':
+        sortedVenues = [...filteredVenues].sort((a, b) => a.capacity - b.capacity);
+        break;
+      default:
+        sortedVenues = filteredVenues;
+    }
+
+    res.status(200).json({
+      success: true,
+      count: sortedVenues.length,
+      sortBy: sortBy,
+      searchParams: useLocationFilter ? { latitude: userLat, longitude: userLon, radius: searchRadius, unit: 'km' } : null,
+      data: sortedVenues,
+      message: 'Venues sorted successfully',
+    });
+  } catch (err) {
+    console.error('Error in sortVenues:', err.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to sort venues',
+      error: err.message,
+    });
+  }
+};
