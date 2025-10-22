@@ -1,5 +1,3 @@
-// venueController.js (Updated)
-
 const mongoose = require('mongoose');
 const Venue = require('../../models/vendor/Venue');
 
@@ -136,7 +134,7 @@ const getMaxPrice = (pricingSchedule) => {
   return maxPrice;
 };
 
-// NEW: Advanced Filter Venues API
+// Advanced Filter Venues API
 exports.filterVenues = async (req, res) => {
   try {
     const {
@@ -146,7 +144,7 @@ exports.filterVenues = async (req, res) => {
       radius = 10,
       
       // Category and Module
-      categoryId,
+      categoryId, // Now accepts comma-separated IDs or array
       moduleId,
       
       // Capacity filters
@@ -192,16 +190,35 @@ exports.filterVenues = async (req, res) => {
     // Build base query
     const query = { isActive: true };
 
-    // Category filter
-    if (categoryId) {
-      if (!mongoose.Types.ObjectId.isValid(categoryId)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid category ID',
-        });
-      }
-      query.categories = new mongoose.Types.ObjectId(categoryId);
+    // Category filter (support multiple categories)
+   // Category filter (support multiple categories)
+if (categoryId) {
+  let categoryIds = categoryId;
+  if (typeof categoryId === 'string') {
+    categoryIds = categoryId.split(',').map(id => id.trim()).filter(id => mongoose.Types.ObjectId.isValid(id));
+  } else if (Array.isArray(categoryId)) {
+    categoryIds = categoryId.filter(id => mongoose.Types.ObjectId.isValid(id));
+  }
+  
+  if (categoryIds.length > 0) {
+    query.categories = { $in: categoryIds.map(id => new mongoose.Types.ObjectId(id)) };
+    // console.log('Applied category filter with IDs:', categoryIds);
+    
+    // Debug: Check how many venues exist for each category
+    for (const id of categoryIds) {
+      const count = await Venue.countDocuments({ 
+        categories: new mongoose.Types.ObjectId(id),
+        isActive: true 
+      });
+      console.log(`Category ${id} has ${count} active venues`);
     }
+  } else {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid category ID(s)',
+    });
+  }
+}
 
     // Module filter
     if (moduleId) {
@@ -264,13 +281,13 @@ exports.filterVenues = async (req, res) => {
 
     // Text-based filters (partial match)
     if (parkingCapacity) {
-      query.parkingCapacity = new RegExp(parkingCapacity, 'i');
+      query.parkingCapacity = new Regexp(parkingCapacity, 'i');
     }
     if (washroomsInfo) {
-      query.washroomsInfo = new RegExp(washroomsInfo, 'i');
+      query.washroomsInfo = new Regexp(washroomsInfo, 'i');
     }
     if (dressingRooms) {
-      query.dressingRooms = new RegExp(dressingRooms, 'i');
+      query.dressingRooms = new Regexp(dressingRooms, 'i');
     }
 
     // Location filter setup
@@ -348,13 +365,14 @@ exports.filterVenues = async (req, res) => {
         '0-100': { min: 0, max: 100 },
         '100-300': { min: 100, max: 300 },
         '300-500': { min: 300, max: 500 },
-        '500+': { min: 500, max: Infinity }
+        '500+': { min: 500, max: Number.MAX_SAFE_INTEGER }
       };
 
       const range = ranges[capacityRange];
       if (range) {
         venues = venues.filter(venue => 
-          venue.totalCapacity >= range.min && venue.totalCapacity < range.max
+          venue.totalCapacity >= range.min && 
+          (range.max === Number.MAX_SAFE_INTEGER || venue.totalCapacity <= range.max)
         );
       }
     }
@@ -1554,7 +1572,7 @@ exports.deleteVenue = async (req, res) => {
   }
 };
 
-// NEW: Toggle Active Status
+// Toggle Active Status
 exports.toggleActiveStatus = async (req, res) => {
   try {
     const venueId = req.params.id;
@@ -1591,7 +1609,7 @@ exports.toggleActiveStatus = async (req, res) => {
   }
 };
 
-// NEW: Toggle Top Pick Status
+// Toggle Top Pick Status
 exports.toggleTopPickStatus = async (req, res) => {
   try {
     const venueId = req.params.id;
@@ -1764,7 +1782,9 @@ exports.sortVenues = async (req, res) => {
   }
 };
 
-// NEW: Get Top Picks
+// Ascended Master
+
+// Get Top Picks
 exports.getTopPicks = async (req, res) => {
   try {
     const { lat, lng, radius = 10 } = req.query;
