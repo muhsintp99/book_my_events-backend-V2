@@ -134,6 +134,183 @@ const getMaxPrice = (pricingSchedule) => {
   return maxPrice;
 };
 
+// Create Venue
+exports.createVenue = async (req, res) => {
+  try {
+    let data = normalizeFormData(req.body);
+
+    // Parse pricing schedule
+    if (data.pricingSchedule) {
+      const parsed = typeof data.pricingSchedule === 'string' 
+        ? JSON.parse(data.pricingSchedule) 
+        : data.pricingSchedule;
+      
+      data.pricingSchedule = Array.isArray(parsed) 
+        ? convertLegacyPricing(parsed) 
+        : parsed;
+    }
+
+    // Parse categories
+    if (data.categories) {
+      let categories = data.categories;
+      
+      if (typeof categories === 'string') {
+        try {
+          categories = JSON.parse(categories);
+        } catch {
+          categories = categories.split(',').map(c => c.trim()).filter(c => c);
+        }
+      }
+      
+      if (Array.isArray(categories)) {
+        data.categories = categories
+          .flat()
+          .filter(c => c && mongoose.Types.ObjectId.isValid(c))
+          .map(c => new mongoose.Types.ObjectId(c));
+      } else {
+        data.categories = [];
+      }
+    } else {
+      data.categories = [];
+    }
+
+    // Parse packages
+    if (data.packages) {
+      let packages = data.packages;
+      
+      if (typeof packages === 'string') {
+        try {
+          packages = JSON.parse(packages);
+        } catch {
+          packages = packages.split(',').map(p => p.trim()).filter(p => p);
+        }
+      }
+      
+      if (Array.isArray(packages)) {
+        data.packages = packages
+          .flat()
+          .filter(p => p && mongoose.Types.ObjectId.isValid(p))
+          .map(p => new mongoose.Types.ObjectId(p));
+      } else {
+        data.packages = [];
+      }
+    } else {
+      data.packages = [];
+    }
+
+    // Parse module
+    if (data.module && mongoose.Types.ObjectId.isValid(data.module)) {
+      data.module = new mongoose.Types.ObjectId(data.module);
+    } else {
+      data.module = null;
+    }
+
+    // Parse search tags
+    if (data.searchTags) {
+      let tags = data.searchTags;
+      if (typeof tags === 'string') {
+        try {
+          let parsed = JSON.parse(tags);
+          if (typeof parsed === 'string') {
+            parsed = JSON.parse(parsed);
+          }
+          tags = Array.isArray(parsed) ? parsed : [parsed];
+        } catch {
+          tags = tags.split(',').map(t => t.trim()).filter(t => t);
+        }
+      }
+      data.searchTags = Array.isArray(tags)
+        ? tags.flat().filter(t => t && typeof t === 'string' && t.trim()).map(t => t.trim())
+        : [];
+    } else {
+      data.searchTags = [];
+    }
+
+    // Parse FAQs
+    if (data.faqs) {
+      let faqs = data.faqs;
+      
+      if (Array.isArray(faqs)) {
+        faqs = faqs[0];
+      }
+      
+      if (typeof faqs === 'string') {
+        try {
+          faqs = JSON.parse(faqs);
+        } catch (err) {
+          console.error('Error parsing FAQs:', err);
+          faqs = [];
+        }
+      }
+      
+      if (Array.isArray(faqs)) {
+        data.faqs = faqs.filter(faq => 
+          faq && 
+          typeof faq === 'object' && 
+          faq.question && 
+          faq.answer &&
+          typeof faq.question === 'string' &&
+          typeof faq.answer === 'string'
+        ).map(faq => ({
+          question: faq.question.trim(),
+          answer: faq.answer.trim()
+        }));
+      } else {
+        data.faqs = [];
+      }
+    } else {
+      data.faqs = [];
+    }
+
+    if (!data.user) data.user = null;
+
+    // Handle file uploads
+    if (req.files?.thumbnail) data.thumbnail = req.files.thumbnail[0].path;
+    if (req.files?.images) data.images = req.files.images.map(f => f.path);
+    
+    // Check authentication
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized: Please log in to create a venue',
+      });
+    }
+
+    // Set provider field
+    if (data.provider && mongoose.Types.ObjectId.isValid(data.provider)) {
+      data.provider = data.provider;
+    } else {
+      data.provider = req.user._id;
+    }
+
+    const venue = await Venue.create({
+      ...data,
+      createdBy: req.user._id,
+    });
+
+    // Populate categories, module, and packages (no select restriction for packages)
+    await venue.populate([
+      { path: 'categories', select: 'title image categoryId module isActive' },
+      { path: 'module', select: 'title moduleId icon isActive' },
+      { path: 'packages' }, // Removed select to include all package fields
+      { path: 'createdBy', select: 'name email phone' },
+      { path: 'provider', select: 'name email phone' }
+    ]);
+
+    res.status(201).json({
+      success: true,
+      data: venue,
+      message: 'Venue created successfully',
+    });
+  } catch (err) {
+    console.error('Error in createVenue:', err);
+    res.status(500).json({
+      success: false,
+      message: err.message || 'Failed to create venue',
+    });
+  }
+};
+
 // Advanced Filter Venues API
 exports.filterVenues = async (req, res) => {
   try {
@@ -143,12 +320,13 @@ exports.filterVenues = async (req, res) => {
       longitude,
       radius = 10,
       
-      // Category and Module
+      // Category, Module, and Package
       categoryId,
       moduleId,
+      packageId,
       
       // Capacity filters
-      capacityRange, // e.g., '100-500', '10000+'
+      capacityRange,
       minCapacity,
       maxCapacity,
       
@@ -193,7 +371,6 @@ exports.filterVenues = async (req, res) => {
       const decodedCapacityRange = decodeURIComponent(capacityRange);
       console.log(`Received capacityRange: ${decodedCapacityRange}`);
 
-      // Handle ranges like '100-500' or '10000+'
       let min, max;
       if (decodedCapacityRange.endsWith('+')) {
         min = parseInt(decodedCapacityRange.replace('+', ''));
@@ -303,6 +480,17 @@ exports.filterVenues = async (req, res) => {
       query.module = new mongoose.Types.ObjectId(moduleId);
     }
 
+    // Package filter
+    if (packageId) {
+      if (!mongoose.Types.ObjectId.isValid(packageId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid package ID',
+        });
+      }
+      query.packages = new mongoose.Types.ObjectId(packageId);
+    }
+
     // Rating filter
     if (minRating !== undefined) {
       const min = parseFloat(minRating);
@@ -397,6 +585,10 @@ exports.filterVenues = async (req, res) => {
       .populate({
         path: 'module',
         select: 'title moduleId icon isActive'
+      })
+      .populate({
+        path: 'packages',
+        select: 'title subtitle description packageType priceRange isActive'
       })
       .populate('createdBy', 'name email phone')
       .populate('provider', 'name email phone')
@@ -510,6 +702,7 @@ exports.filterVenues = async (req, res) => {
       location: useLocationFilter ? { latitude: userLat, longitude: userLon, radius: searchRadius, unit: 'km' } : null,
       categoryId: categoryId || null,
       moduleId: moduleId || null,
+      packageId: packageId || null,
       capacityRange: capacityRange || null,
       capacity: {
         min: minCapacity || null,
@@ -566,7 +759,7 @@ exports.filterVenues = async (req, res) => {
 // Advanced Venue Search API
 exports.searchVenues = async (req, res) => {
   try {
-    const { keyword, date, latitude, longitude, radius = 10, limit = 50, page = 1 } = req.query;
+    const { keyword, date, latitude, longitude, radius = 10, limit = 50, page = 1, packageId } = req.query;
 
     // Build search query
     const searchQuery = { isActive: true };
@@ -582,6 +775,17 @@ exports.searchVenues = async (req, res) => {
         { language: keywordRegex },
         { seatingArrangement: keywordRegex }
       ];
+    }
+
+    // Package filter
+    if (packageId) {
+      if (!mongoose.Types.ObjectId.isValid(packageId)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid package ID',
+        });
+      }
+      searchQuery.packages = new mongoose.Types.ObjectId(packageId);
     }
 
     // Location filter
@@ -619,6 +823,10 @@ exports.searchVenues = async (req, res) => {
       .populate({
         path: 'module',
         select: 'title moduleId icon isActive'
+      })
+      .populate({
+        path: 'packages',
+        select: 'title subtitle description packageType priceRange isActive'
       })
       .populate('createdBy', 'name email phone')
       .populate('provider', 'name email phone')
@@ -685,7 +893,7 @@ exports.searchVenues = async (req, res) => {
         latitude: useLocationFilter ? userLat : null,
         longitude: useLocationFilter ? userLon : null,
         radius: useLocationFilter ? searchRadius : null,
-        unit: useLocationFilter ? 'km' : null
+        packageId: packageId || null
       },
       data: paginatedVenues,
       message: paginatedVenues.length === 0 
@@ -705,159 +913,6 @@ exports.searchVenues = async (req, res) => {
   }
 };
 
-// Create Venue
-exports.createVenue = async (req, res) => {
-  try {
-    let data = normalizeFormData(req.body);
-
-    // Parse pricing schedule
-    if (data.pricingSchedule) {
-      const parsed = typeof data.pricingSchedule === 'string' 
-        ? JSON.parse(data.pricingSchedule) 
-        : data.pricingSchedule;
-      
-      data.pricingSchedule = Array.isArray(parsed) 
-        ? convertLegacyPricing(parsed) 
-        : parsed;
-    }
-
-    // Parse categories
-    if (data.categories) {
-      let categories = data.categories;
-      
-      if (typeof categories === 'string') {
-        try {
-          categories = JSON.parse(categories);
-        } catch {
-          categories = categories.split(',').map(c => c.trim()).filter(c => c);
-        }
-      }
-      
-      if (Array.isArray(categories)) {
-        data.categories = categories
-          .flat()
-          .filter(c => c && mongoose.Types.ObjectId.isValid(c))
-          .map(c => new mongoose.Types.ObjectId(c));
-      } else {
-        data.categories = [];
-      }
-    } else {
-      data.categories = [];
-    }
-
-    // Parse module
-    if (data.module && mongoose.Types.ObjectId.isValid(data.module)) {
-      data.module = new mongoose.Types.ObjectId(data.module);
-    } else {
-      data.module = null;
-    }
-
-    // Parse search tags
-    if (data.searchTags) {
-      let tags = data.searchTags;
-      if (typeof tags === 'string') {
-        try {
-          let parsed = JSON.parse(tags);
-          if (typeof parsed === 'string') {
-            parsed = JSON.parse(parsed);
-          }
-          tags = Array.isArray(parsed) ? parsed : [parsed];
-        } catch {
-          tags = tags.split(',').map(t => t.trim()).filter(t => t);
-        }
-      }
-      data.searchTags = Array.isArray(tags)
-        ? tags.flat().filter(t => t && typeof t === 'string' && t.trim()).map(t => t.trim())
-        : [];
-    } else {
-      data.searchTags = [];
-    }
-
-    // Parse FAQs
-    if (data.faqs) {
-      let faqs = data.faqs;
-      
-      if (Array.isArray(faqs)) {
-        faqs = faqs[0];
-      }
-      
-      if (typeof faqs === 'string') {
-        try {
-          faqs = JSON.parse(faqs);
-        } catch (err) {
-          console.error('Error parsing FAQs:', err);
-          faqs = [];
-        }
-      }
-      
-      if (Array.isArray(faqs)) {
-        data.faqs = faqs.filter(faq => 
-          faq && 
-          typeof faq === 'object' && 
-          faq.question && 
-          faq.answer &&
-          typeof faq.question === 'string' &&
-          typeof faq.answer === 'string'
-        ).航空
-        data.faqs = faqs.map(faq => ({
-          question: faq.question.trim(),
-          answer: faq.answer.trim()
-        }));
-      } else {
-        data.faqs = [];
-      }
-    } else {
-      data.faqs = [];
-    }
-
-    if (!data.user) data.user = null;
-
-    // Handle file uploads
-    if (req.files?.thumbnail) data.thumbnail = req.files.thumbnail[0].path;
-    if (req.files?.images) data.images = req.files.images.map(f => f.path);
-    
-    // Check authentication
-    if (!req.user || !req.user._id) {
-      return res.status(401).json({
-        success: false,
-        message: 'Unauthorized: Please log in to create a venue',
-      });
-    }
-
-    // Set provider field
-    if (data.provider && mongoose.Types.ObjectId.isValid(data.provider)) {
-      data.provider = data.provider;
-    } else {
-      data.provider = req.user._id;
-    }
-
-    const venue = await Venue.create({
-      ...data,
-      createdBy: req.user._id,
-    });
-
-    // Populate categories and module
-    await venue.populate([
-      { path: 'categories', select: 'title image categoryId module isActive' },
-      { path: 'module', select: 'title moduleId icon isActive' },
-      { path: 'createdBy', select: 'name email phone' },
-      { path: 'provider', select: 'name email phone' }
-    ]);
-
-    res.status(201).json({
-      success: true,
-      data: venue,
-      message: 'Venue created successfully',
-    });
-  } catch (err) {
-    console.error('Error in createVenue:', err);
-    res.status(500).json({
-      success: false,
-      message: err.message || 'Failed to create venue',
-    });
-  }
-};
-
 // Get all venues
 exports.getVenues = async (req, res) => {
   try {
@@ -870,6 +925,10 @@ exports.getVenues = async (req, res) => {
       .populate({
         path: 'module',
         select: 'title moduleId icon isActive'
+      })
+      .populate({
+        path: 'packages',
+        select: 'title subtitle description packageType priceRange isActive'
       })
       .populate({
         path: 'createdBy',
@@ -941,6 +1000,10 @@ exports.getVenuesByLocation = async (req, res) => {
         path: 'module',
         select: 'title moduleId icon isActive'
       })
+      .populate({
+        path: 'packages',
+        select: 'title subtitle description packageType priceRange isActive'
+      })
       .populate('createdBy', 'name email phone')
       .populate('provider', 'name email phone')
       .lean();
@@ -1007,6 +1070,10 @@ exports.getVenuesByProvider = async (req, res) => {
         path: 'module',
         select: 'title moduleId icon isActive'
       })
+      .populate({
+        path: 'packages',
+        select: 'title subtitle description packageType priceRange isActive'
+      })
       .populate('createdBy', 'name email')
       .populate('provider', 'name email')
       .sort({ createdAt: -1 })
@@ -1044,6 +1111,10 @@ exports.getVenue = async (req, res) => {
       .populate({
         path: 'module',
         select: 'title moduleId icon isActive'
+      })
+      .populate({
+        path: 'packages',
+        select: 'title subtitle description packageType priceRange isActive'
       })
       .populate({
         path: 'createdBy',
@@ -1117,6 +1188,26 @@ exports.updateVenue = async (req, res) => {
       }
     }
 
+    // Parse packages
+    if (data.packages) {
+      let packages = data.packages;
+      
+      if (typeof packages === 'string') {
+        try {
+          packages = JSON.parse(packages);
+        } catch {
+          packages = packages.split(',').map(p => p.trim()).filter(p => p);
+        }
+      }
+      
+      if (Array.isArray(packages)) {
+        data.packages = packages
+          .flat()
+          .filter(p => p && mongoose.Types.ObjectId.isValid(p))
+          .map(p => new mongoose.Types.ObjectId(p));
+      }
+    }
+
     // Parse module
     if (data.module && mongoose.Types.ObjectId.isValid(data.module)) {
       data.module = new mongoose.Types.ObjectId(data.module);
@@ -1164,7 +1255,7 @@ exports.updateVenue = async (req, res) => {
           typeof faq.question === 'string' &&
           typeof faq.answer === 'string'
         ).map(faq => ({
-         roles: faq.question.trim(),
+          question: faq.question.trim(),
           answer: faq.answer.trim()
         }));
       }
@@ -1185,6 +1276,10 @@ exports.updateVenue = async (req, res) => {
       .populate({
         path: 'module',
         select: 'title moduleId icon isActive'
+      })
+      .populate({
+        path: 'packages',
+        select: 'title subtitle description packageType priceRange isActive'
       })
       .populate({
         path: 'createdBy',
@@ -1241,6 +1336,10 @@ exports.getVenuesByCategory = async (req, res) => {
         path: 'module',
         select: 'title moduleId icon isActive'
       })
+      .populate({
+        path: 'packages',
+        select: 'title subtitle description packageType priceRange isActive'
+      })
       .populate('createdBy', 'name email')
       .populate('provider', 'name email')
       .sort({ createdAt: -1 })
@@ -1250,7 +1349,7 @@ exports.getVenuesByCategory = async (req, res) => {
       success: true,
       count: venues.length,
       data: venues,
-      message: venues.length === 0 ? 'No venues found for this category' : 'Venues fetched Declarations successfully'
+      message: venues.length === 0 ? 'No venues found for this category' : 'Venues fetched successfully'
     });
   } catch (err) {
     console.error('Error fetching venues by category:', err);
@@ -1285,6 +1384,10 @@ exports.getVenuesByModule = async (req, res) => {
       .populate({
         path: 'module',
         select: 'title moduleId icon isActive'
+      })
+      .populate({
+        path: 'packages',
+        select: 'title subtitle description packageType priceRange isActive'
       })
       .populate('createdBy', 'name email')
       .populate('provider', 'name email')
@@ -1748,6 +1851,10 @@ exports.sortVenues = async (req, res) => {
         path: 'module',
         select: 'title moduleId icon isActive'
       })
+      .populate({
+        path: 'packages',
+        select: 'title subtitle description packageType priceRange isActive'
+      })
       .populate('createdBy', 'name email phone')
       .populate('provider', 'name email phone')
       .lean();
@@ -1876,6 +1983,10 @@ exports.getTopPicks = async (req, res) => {
       .populate({
         path: 'module',
         select: 'title moduleId icon isActive'
+      })
+      .populate({
+        path: 'packages',
+        select: 'title subtitle description packageType priceRange isActive'
       })
       .populate('createdBy', 'name email phone')
       .populate('provider', 'name email phone')

@@ -50,7 +50,6 @@ exports.createPackage = async (req, res) => {
     } else {
       finalPackageId = `PKG-${uuidv4()}`;
     }
-
     // Parse includes & price
     const parsedIncludes = includes ? JSON.parse(includes) : [];
     const parsedPrice = priceRange ? JSON.parse(priceRange) : { min: 0, max: 0 };

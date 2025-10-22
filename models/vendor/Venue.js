@@ -377,6 +377,13 @@ const venueSchema = new mongoose.Schema(
       index: true // Index for module filtering
     },
     
+    // Packages
+    packages: [{ 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: 'Package',
+      index: true // Index for package filtering
+    }],
+    
     // Contact Information
     contactPhone: { type: String },
     contactEmail: { type: String, lowercase: true, trim: true },
@@ -494,32 +501,35 @@ const venueSchema = new mongoose.Schema(
     // Add compound indexes at schema level
     indexes: [
       // Compound index for location-based searches
-      { latitude: 1, longitude: 1, isActive: 1 },
+      { key: { latitude: 1, longitude: 1, isActive: 1 } },
       
       // Compound index for category + active status
-      { categories: 1, isActive: 1 },
+      { key: { categories: 1, isActive: 1 } },
       
       // Compound index for module + active status
-      { module: 1, isActive: 1 },
+      { key: { module: 1, isActive: 1 } },
+      
+      // Compound index for package + active status
+      { key: { packages: 1, isActive: 1 } },
       
       // Compound index for provider queries
-      { provider: 1, isActive: 1 },
-      { createdBy: 1, isActive: 1 },
+      { key: { provider: 1, isActive: 1 } },
+      { key: { createdBy: 1, isActive: 1 } },
       
       // Compound index for feature-based filtering
-      { isActive: 1, acAvailable: 1, parkingAvailability: 1 },
+      { key: { isActive: 1, acAvailable: 1, parkingAvailability: 1 } },
       
       // Compound index for capacity-based searches
-      { isActive: 1, maxGuestsSeated: 1 },
+      { key: { isActive: 1, maxGuestsSeated: 1 } },
       
       // Compound index for rating sorting
-      { isActive: 1, rating: -1 },
+      { key: { isActive: 1, rating: -1 } },
+      
+      // Compound index for top picks
+      { key: { isActive: 1, isTopPick: 1 } },
       
       // Text index for full-text search
-      { venueName: 'text', shortDescription: 'text', venueAddress: 'text', searchTags: 'text' },
-      
-      // NEW: Compound index for top picks
-      { isActive: 1, isTopPick: 1 }
+      { key: { venueName: 'text', shortDescription: 'text', venueAddress: 'text', searchTags: 'text' } }
     ]
   }
 );
@@ -614,6 +624,11 @@ venueSchema.statics.advancedSearch = async function(filters) {
     query.module = filters.moduleId;
   }
   
+  // Package filter
+  if (filters.packageId) {
+    query.packages = filters.packageId;
+  }
+  
   // Amenity filters
   if (filters.acAvailable !== undefined) {
     query.acAvailable = filters.acAvailable;
@@ -639,6 +654,7 @@ venueSchema.statics.advancedSearch = async function(filters) {
   return this.find(query)
     .populate('categories', 'title image categoryId module isActive')
     .populate('module', 'title moduleId icon isActive')
+    .populate('packages') // Removed select to include all package fields
     .populate('createdBy', 'name email phone')
     .populate('provider', 'name email phone')
     .lean();
@@ -646,6 +662,34 @@ venueSchema.statics.advancedSearch = async function(filters) {
 
 // Pre-save middleware to update searchTags
 venueSchema.pre('save', function(next) {
+  // Initialize searchTags if not present
+  if (!this.searchTags) {
+    this.searchTags = [];
+  }
+
+  // Parse searchTags if provided as a stringified array
+  if (this.isModified('searchTags') && this.searchTags.length > 0) {
+    const parsedTags = [];
+    this.searchTags.forEach(tag => {
+      if (typeof tag === 'string') {
+        try {
+          // Attempt to parse if it's a stringified JSON array
+          const parsed = JSON.parse(tag);
+          if (Array.isArray(parsed)) {
+            parsedTags.push(...parsed.map(t => t.trim().toLowerCase()));
+          } else {
+            parsedTags.push(tag.trim().toLowerCase());
+          }
+        } catch {
+          // If not a JSON string, treat as a regular tag
+          parsedTags.push(tag.trim().toLowerCase());
+        }
+      }
+    });
+    // Remove duplicates and empty tags
+    this.searchTags = [...new Set(parsedTags.filter(tag => tag))];
+  }
+
   // Automatically add venue name to search tags if not present
   if (this.venueName && !this.searchTags.includes(this.venueName.toLowerCase())) {
     this.searchTags.push(this.venueName.toLowerCase());
@@ -668,6 +712,30 @@ venueSchema.pre('save', function(next) {
 venueSchema.pre('findOneAndUpdate', function(next) {
   this.options.runValidators = true;
   this.options.new = true;
+
+  // Handle searchTags in updates
+  const update = this.getUpdate();
+  if (update.searchTags) {
+    let parsedTags = [];
+    if (typeof update.searchTags === 'string') {
+      try {
+        parsedTags = JSON.parse(update.searchTags);
+        if (!Array.isArray(parsedTags)) {
+          parsedTags = [update.searchTags];
+        }
+      } catch {
+        parsedTags = update.searchTags.split(',').map(tag => tag.trim());
+      }
+    } else if (Array.isArray(update.searchTags)) {
+      parsedTags = update.searchTags;
+    }
+    // Flatten and clean tags
+    update.searchTags = [...new Set(parsedTags
+      .flat()
+      .map(tag => tag.trim().toLowerCase())
+      .filter(tag => tag))];
+  }
+
   next();
 });
 
