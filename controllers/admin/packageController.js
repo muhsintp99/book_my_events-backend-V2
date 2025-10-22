@@ -1,226 +1,291 @@
-const mongoose = require('mongoose');
+const fs = require('fs');
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 const Package = require('../../models/admin/Package');
+const Module = require('../../models/admin/module');
 
-// ================== STATS ==================
-exports.getPackageCounts = async (req, res, next) => {
-  try {
-    const total = await Package.countDocuments();
-    const active = await Package.countDocuments({ isActive: true });
-    res.status(200).json({ success: true, total, active });
-  } catch (err) {
-    next(err);
+// 🧰 Helper: Delete file if exists
+const deleteFileIfExists = (filePath) => {
+  if (filePath && fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
   }
 };
 
-// ================== FEATURED ==================
-exports.getFeaturedPackages = async (req, res, next) => {
+// 🧰 Helper: Populate package → module & categories
+const populatePackage = async (packageId) => {
+  return await Package.findById(packageId)
+    .populate('module', '-__v')
+    .populate('categories', '-__v');
+};
+
+// ✅ Create Package
+exports.createPackage = async (req, res) => {
   try {
-    const featured = await Package.find({ isFeatured: true });
-    res.status(200).json({ success: true, data: featured });
-  } catch (err) {
-    next(err);
-  }
-};
+    const {
+      module,
+      categories, // Multiple categories supported
+      title,
+      subtitle,
+      description,
+      packageType,
+      includes,
+      priceRange,
+      createdBy,
+      packageId,
+    } = req.body;
 
-// ================== CREATE ==================
-exports.createPackage = async (req, res, next) => {
-  try {
-    const pkg = await Package.create({ ...req.body, provider: req.user._id });
-    res.status(201).json({ success: true, data: pkg });
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.createPackageForProvider = async (req, res, next) => {
-  try {
-    const { providerId } = req.params;
-    const pkg = await Package.create({ ...req.body, provider: providerId });
-    res.status(201).json({ success: true, data: pkg });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// ================== LISTING ==================
-exports.getPackages = async (req, res, next) => {
-  try {
-    const packages = await Package.find()
-      .populate('provider', 'name email phone')
-      .populate('linkedVenue', 'venueName venueAddress')
-      .select('-__v');
-    res.status(200).json({ success: true, count: packages.length, data: packages });
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.getPackagesByProvider = async (req, res, next) => {
-  try {
-    const { providerId } = req.params;
-    const packages = await Package.find({ provider: providerId })
-      .populate('provider', 'name email phone')
-      .populate('linkedVenue', 'venueName venueAddress')
-      .select('-__v');
-    res.status(200).json({ success: true, count: packages.length, data: packages });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// Internal use only
-exports.getPackagesByProviderInternal = async (providerId) => {
-  return await Package.find({ provider: providerId });
-};
-
-// ================== PACKAGES BY VENUE ==================
-exports.getPackagesByVenue = async (req, res, next) => {
-  try {
-    const { venueId } = req.params;
-    const packages = await Package.find({ linkedVenue: venueId, isActive: true })
-      .populate('provider', 'name email phone')
-      .populate('linkedVenue', 'venueName venueAddress')
-      .select('-__v');
-    res.status(200).json({ success: true, count: packages.length, data: packages });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// Internal use only
-exports.getPackagesByVenueInternal = async (venueId) => {
-  return await Package.find({ linkedVenue: venueId, isActive: true });
-};
-
-// ================== SINGLE PACKAGE ==================
-exports.getPackage = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    let pkg = null;
-
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      pkg = await Package.findById(id)
-        .populate('provider', 'name email phone')
-        .populate('linkedVenue', 'venueName venueAddress')
-        .select('-__v');
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: 'Package title is required' });
     }
 
-    if (!pkg) {
-      pkg = await Package.findOne({ packageId: id })
-        .populate('provider', 'name email phone')
-        .populate('linkedVenue', 'venueName venueAddress')
-        .select('-__v');
+    // Validate provided packageId or generate new one
+    let finalPackageId = packageId;
+    if (packageId) {
+      const existing = await Package.findOne({ packageId });
+      if (existing) {
+        return res
+          .status(400)
+          .json({ error: `Package with ID ${packageId} already exists` });
+      }
+    } else {
+      finalPackageId = `PKG-${uuidv4()}`;
     }
 
-    if (!pkg) {
-      return res.status(404).json({ success: false, message: 'Package not found' });
+    // Parse includes & price
+    const parsedIncludes = includes ? JSON.parse(includes) : [];
+    const parsedPrice = priceRange ? JSON.parse(priceRange) : { min: 0, max: 0 };
+
+    // ✅ Parse categories (stringified JSON or array)
+    let parsedCategories = [];
+    if (categories) {
+      if (Array.isArray(categories)) {
+        parsedCategories = categories;
+      } else {
+        try {
+          parsedCategories = JSON.parse(categories);
+        } catch {
+          parsedCategories = [categories];
+        }
+      }
     }
 
-    res.status(200).json({ success: true, data: pkg });
-  } catch (err) {
-    next(err);
-  }
-};
+    const packageData = {
+      packageId: finalPackageId,
+      module: module || null,
+      categories: parsedCategories,
+      title: title.trim(),
+      subtitle: subtitle || '',
+      description: description || '',
+      packageType: packageType || 'basic',
+      includes: parsedIncludes,
+      priceRange: parsedPrice,
+      images: req.files?.images
+        ? `uploads/packages/${req.files.images[0].filename}`
+        : null,
+      thumbnail: req.files?.thumbnail
+        ? `uploads/packages/${req.files.thumbnail[0].filename}`
+        : null,
+      createdBy: createdBy || null,
+    };
 
-// ================== UPDATE ==================
-exports.updatePackage = async (req, res, next) => {
-  try {
-    const pkg = await Package.findByIdAndUpdate(req.params.id, req.body, { new: true })
-      .populate('provider', 'name email phone')
-      .populate('linkedVenue', 'venueName venueAddress')
-      .select('-__v');
+    const newPackage = await Package.create(packageData);
+    const populated = await populatePackage(newPackage._id);
 
-    if (!pkg) return res.status(404).json({ success: false, message: 'Package not found' });
-
-    res.status(200).json({ success: true, data: pkg });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// ================== TOGGLE STATUS ==================
-exports.togglePackageStatus = async (req, res, next) => {
-  try {
-    const pkg = await Package.findById(req.params.id);
-    if (!pkg) return res.status(404).json({ success: false, message: 'Package not found' });
-
-    pkg.isActive = !pkg.isActive;
-    await pkg.save();
-
-    res.status(200).json({ success: true, data: pkg });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// ================== DELETE ==================
-exports.deletePackage = async (req, res, next) => {
-  try {
-    const pkg = await Package.findByIdAndDelete(req.params.id);
-    if (!pkg) return res.status(404).json({ success: false, message: 'Package not found' });
-
-    res.status(200).json({ success: true, message: 'Package deleted' });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// ================== MODULE BY ID ==================
-exports.getPackageByModuleId = async (req, res, next) => {
-  try {
-    const { moduleId } = req.params;
-
-    const pkg = await Package.findOne({ 'modules._id': moduleId })
-      .populate('provider', 'name email phone')
-      .populate('linkedVenue', 'venueName venueAddress')
-      .select('-__v');
-
-    if (!pkg) {
-      return res.status(404).json({ success: false, message: 'Package not found for this module' });
-    }
-
-    // Return only the matched module separately
-    const module = pkg.modules.id(moduleId);
-
-    res.status(200).json({ success: true, package: pkg, module });
-  } catch (err) {
-    next(err);
-  }
-};
-
-
-// ================== MODULE + PACKAGE DETAILS ==================
-exports.getPackageModuleDetails = async (req, res, next) => {
-  try {
-    const { moduleId, packageId } = req.params;
-
-    // Validate packageId
-    if (!mongoose.Types.ObjectId.isValid(packageId)) {
-      return res.status(400).json({ success: false, message: 'Invalid package ID' });
-    }
-
-    // Find the package by ID
-    const pkg = await Package.findById(packageId)
-      .populate('provider', 'name email phone')
-      .populate('linkedVenue', 'venueName venueAddress')
-      .select('-__v');
-
-    if (!pkg) {
-      return res.status(404).json({ success: false, message: 'Package not found' });
-    }
-
-    // Find the module inside this package
-    const module = pkg.modules.id(moduleId);
-    if (!module) {
-      return res.status(404).json({ success: false, message: 'Module not found in this package' });
-    }
-
-    res.status(200).json({
-      success: true,
-      package: pkg,
-      module
+    res.status(201).json({
+      message: 'Package created successfully',
+      package: populated,
     });
   } catch (err) {
-    next(err);
+    console.error('Create Package Error:', err);
+    if (err.code === 11000) {
+      return res
+        .status(400)
+        .json({ error: `Duplicate packageId: ${err.keyValue.packageId}` });
+    }
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Update Package
+exports.updatePackage = async (req, res) => {
+  try {
+    const {
+      module,
+      categories,
+      title,
+      subtitle,
+      description,
+      packageType,
+      includes,
+      priceRange,
+      updatedBy,
+      packageId,
+    } = req.body;
+
+    const pkg = await Package.findById(req.params.id);
+    if (!pkg) return res.status(404).json({ error: 'Package not found' });
+
+    // Validate packageId if provided and different
+    if (packageId && packageId !== pkg.packageId) {
+      const existing = await Package.findOne({ packageId });
+      if (existing) {
+        return res
+          .status(400)
+          .json({ error: `Package with ID ${packageId} already exists` });
+      }
+      pkg.packageId = packageId;
+    }
+
+    // ✅ Handle file updates (images + thumbnail)
+    if (req.files?.images) {
+      deleteFileIfExists(path.join(__dirname, `../../${pkg.images}`));
+      pkg.images = `uploads/packages/${req.files.images[0].filename}`;
+    }
+
+    if (req.files?.thumbnail) {
+      deleteFileIfExists(path.join(__dirname, `../../${pkg.thumbnail}`));
+      pkg.thumbnail = `uploads/packages/${req.files.thumbnail[0].filename}`;
+    }
+
+    // ✅ Parse & update categories
+    if (categories) {
+      if (Array.isArray(categories)) {
+        pkg.categories = categories;
+      } else {
+        try {
+          pkg.categories = JSON.parse(categories);
+        } catch {
+          pkg.categories = [categories];
+        }
+      }
+    }
+
+    // Update fields
+    if (module) pkg.module = module;
+    if (title) pkg.title = title.trim();
+    if (subtitle) pkg.subtitle = subtitle;
+    if (description) pkg.description = description;
+    if (packageType) pkg.packageType = packageType;
+    if (includes) pkg.includes = JSON.parse(includes);
+    if (priceRange) pkg.priceRange = JSON.parse(priceRange);
+    if (updatedBy) pkg.updatedBy = updatedBy;
+
+    await pkg.save();
+    const populated = await populatePackage(pkg._id);
+
+    res.json({ message: 'Package updated successfully', package: populated });
+  } catch (err) {
+    console.error('Update Package Error:', err);
+    if (err.code === 11000) {
+      return res
+        .status(400)
+        .json({ error: `Duplicate packageId: ${err.keyValue.packageId}` });
+    }
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Delete Package
+exports.deletePackage = async (req, res) => {
+  try {
+    const pkg = await Package.findById(req.params.id);
+    if (!pkg) return res.status(404).json({ error: 'Package not found' });
+
+    deleteFileIfExists(path.join(__dirname, `../../${pkg.images}`));
+    deleteFileIfExists(path.join(__dirname, `../../${pkg.thumbnail}`));
+
+    await pkg.deleteOne();
+    res.json({ message: 'Package deleted successfully' });
+  } catch (err) {
+    console.error('Delete Package Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Get all Packages
+exports.getPackages = async (req, res) => {
+  try {
+    const packages = await Package.find()
+      .populate('module', '-__v')
+      .populate('categories', '-__v');
+    res.json(packages);
+  } catch (err) {
+    console.error('Get Packages Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Get single Package
+exports.getPackage = async (req, res) => {
+  try {
+    const pkg = await Package.findById(req.params.id)
+      .populate('module', '-__v')
+      .populate('categories', '-__v');
+
+    if (!pkg) return res.status(404).json({ error: 'Package not found' });
+    res.json(pkg);
+  } catch (err) {
+    console.error('Get Package Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Get Packages by Module ID
+exports.getPackagesByModule = async (req, res) => {
+  try {
+    const { moduleId } = req.params;
+    if (!moduleId) return res.status(400).json({ error: 'Module ID is required' });
+
+    const packages = await Package.find({ module: moduleId })
+      .populate('module', 'title images isActive')
+      .populate('categories', 'title')
+      .sort({ createdAt: -1 });
+
+    if (!packages || packages.length === 0) {
+      return res.status(404).json({ message: 'No packages found for this module' });
+    }
+
+    res.json({ message: 'Packages fetched successfully', packages });
+  } catch (err) {
+    console.error('Get Packages by Module Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Block Package
+exports.blockPackage = async (req, res) => {
+  try {
+    const pkg = await Package.findByIdAndUpdate(
+      req.params.id,
+      { isActive: false, updatedBy: req.body.updatedBy || null },
+      { new: true }
+    )
+      .populate('module', '-__v')
+      .populate('categories', '-__v');
+
+    if (!pkg) return res.status(404).json({ error: 'Package not found' });
+    res.json({ message: 'Package blocked successfully', package: pkg });
+  } catch (err) {
+    console.error('Block Package Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Reactivate Package
+exports.reactivatePackage = async (req, res) => {
+  try {
+    const pkg = await Package.findByIdAndUpdate(
+      req.params.id,
+      { isActive: true, updatedBy: req.body.updatedBy || null },
+      { new: true }
+    )
+      .populate('module', '-__v')
+      .populate('categories', '-__v');
+
+    if (!pkg) return res.status(404).json({ error: 'Package not found' });
+    res.json({ message: 'Package reactivated successfully', package: pkg });
+  } catch (err) {
+    console.error('Reactivate Package Error:', err);
+    res.status(500).json({ error: err.message });
   }
 };
