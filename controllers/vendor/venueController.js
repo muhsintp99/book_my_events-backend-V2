@@ -19,7 +19,7 @@ const convertLegacyPricing = (oldPricing) => {
           startAmpm: slot.startAmpm,
           endTime: slot.endTime,
           endAmpm: slot.endAmpm,
-          perDay: slot.price || 0,
+          perDay: Number(slot.price) || 0,
           perHour: 0,
           perPerson: 0
         };
@@ -68,7 +68,7 @@ const normalizeFormData = (data) => {
       }
       if (typeof normalized[field] === 'string') {
         const num = parseFloat(normalized[field]);
-        normalized[field] = isNaN(num) ? undefined : num;
+        normalized[field] = isNaN(num) ? 0 : num;
       }
     }
   });
@@ -144,11 +144,11 @@ exports.filterVenues = async (req, res) => {
       radius = 10,
       
       // Category and Module
-      categoryId, // Now accepts comma-separated IDs or array
+      categoryId,
       moduleId,
       
       // Capacity filters
-      capacityRange, // '0-100', '100-300', '300-500', '500+'
+      capacityRange, // e.g., '100-500', '10000+'
       minCapacity,
       maxCapacity,
       
@@ -183,42 +183,114 @@ exports.filterVenues = async (req, res) => {
       limit = 50,
       
       // Sorting
-      sortBy = 'createdAt', // 'price', 'rating', 'capacity', 'distance', 'createdAt'
-      sortOrder = 'desc' // 'asc' or 'desc'
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
     } = req.query;
+
+    // Validate and parse capacityRange
+    let capacityFilter = null;
+    if (capacityRange && minCapacity === undefined && maxCapacity === undefined) {
+      const decodedCapacityRange = decodeURIComponent(capacityRange);
+      console.log(`Received capacityRange: ${decodedCapacityRange}`);
+
+      // Handle ranges like '100-500' or '10000+'
+      let min, max;
+      if (decodedCapacityRange.endsWith('+')) {
+        min = parseInt(decodedCapacityRange.replace('+', ''));
+        if (isNaN(min) || min < 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid capacityRange. Must be in format "min-max" or "min+" with valid non-negative numbers',
+          });
+        }
+      } else if (decodedCapacityRange.includes('-')) {
+        [min, max] = decodedCapacityRange.split('-').map(num => parseInt(num));
+        if (isNaN(min) || isNaN(max) || min < 0 || max < 0 || min > max) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid capacityRange. Must be in format "min-max" with valid non-negative numbers where min <= max',
+          });
+        }
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid capacityRange. Must be in format "min-max" or "min+"',
+        });
+      }
+
+      capacityFilter = { min, max };
+      console.log(`Parsed capacity filter: ${JSON.stringify(capacityFilter)}`);
+    }
 
     // Build base query
     const query = { isActive: true };
 
-    // Category filter (support multiple categories)
-   // Category filter (support multiple categories)
-if (categoryId) {
-  let categoryIds = categoryId;
-  if (typeof categoryId === 'string') {
-    categoryIds = categoryId.split(',').map(id => id.trim()).filter(id => mongoose.Types.ObjectId.isValid(id));
-  } else if (Array.isArray(categoryId)) {
-    categoryIds = categoryId.filter(id => mongoose.Types.ObjectId.isValid(id));
-  }
-  
-  if (categoryIds.length > 0) {
-    query.categories = { $in: categoryIds.map(id => new mongoose.Types.ObjectId(id)) };
-    // console.log('Applied category filter with IDs:', categoryIds);
-    
-    // Debug: Check how many venues exist for each category
-    for (const id of categoryIds) {
-      const count = await Venue.countDocuments({ 
-        categories: new mongoose.Types.ObjectId(id),
-        isActive: true 
+    // Apply capacity range filter
+    if (capacityFilter) {
+      query.$expr = query.$expr || {};
+      query.$expr.$and = query.$expr.$and || [];
+      query.$expr.$and.push({
+        $gte: [
+          { $add: [{ $ifNull: ['$maxGuestsSeated', 0] }, { $ifNull: ['$maxGuestsStanding', 0] }] },
+          capacityFilter.min
+        ]
       });
-      console.log(`Category ${id} has ${count} active venues`);
+      if (capacityFilter.max !== undefined) {
+        query.$expr.$and.push({
+          $lte: [
+            { $add: [{ $ifNull: ['$maxGuestsSeated', 0] }, { $ifNull: ['$maxGuestsStanding', 0] }] },
+            capacityFilter.max
+          ]
+        });
+      }
+      console.log(`Applying capacity filter: ${JSON.stringify(capacityFilter)}`);
     }
-  } else {
-    return res.status(400).json({
-      success: false,
-      message: 'Invalid category ID(s)',
-    });
-  }
-}
+
+    // Manual capacity filters (only if capacityRange is not provided)
+    if (minCapacity !== undefined && !capacityRange) {
+      const min = parseInt(minCapacity);
+      if (!isNaN(min)) {
+        query.$expr = query.$expr || {};
+        query.$expr.$and = query.$expr.$and || [];
+        query.$expr.$and.push({
+          $gte: [
+            { $add: [{ $ifNull: ['$maxGuestsSeated', 0] }, { $ifNull: ['$maxGuestsStanding', 0] }] },
+            min
+          ]
+        });
+      }
+    }
+    if (maxCapacity !== undefined && !capacityRange) {
+      const max = parseInt(maxCapacity);
+      if (!isNaN(max)) {
+        query.$expr = query.$expr || {};
+        query.$expr.$and = query.$expr.$and || [];
+        query.$expr.$and.push({
+          $lte: [
+            { $add: [{ $ifNull: ['$maxGuestsSeated', 0] }, { $ifNull: ['$maxGuestsStanding', 0] }] },
+            max
+          ]
+        });
+      }
+    }
+
+    // Category filter (support multiple categories)
+    if (categoryId) {
+      let categoryIds = categoryId;
+      if (typeof categoryId === 'string') {
+        categoryIds = categoryId.split(',').map(id => id.trim()).filter(id => mongoose.Types.ObjectId.isValid(id));
+      } else if (Array.isArray(categoryId)) {
+        categoryIds = categoryId.filter(id => mongoose.Types.ObjectId.isValid(id));
+      }
+      if (categoryIds.length > 0) {
+        query.categories = { $elemMatch: { $in: categoryIds.map(id => new mongoose.Types.ObjectId(id)) } };
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid category ID(s)',
+        });
+      }
+    }
 
     // Module filter
     if (moduleId) {
@@ -281,13 +353,13 @@ if (categoryId) {
 
     // Text-based filters (partial match)
     if (parkingCapacity) {
-      query.parkingCapacity = new Regexp(parkingCapacity, 'i');
+      query.parkingCapacity = new RegExp(parkingCapacity, 'i');
     }
     if (washroomsInfo) {
-      query.washroomsInfo = new Regexp(washroomsInfo, 'i');
+      query.washroomsInfo = new RegExp(washroomsInfo, 'i');
     }
     if (dressingRooms) {
-      query.dressingRooms = new Regexp(dressingRooms, 'i');
+      query.dressingRooms = new RegExp(dressingRooms, 'i');
     }
 
     // Location filter setup
@@ -350,8 +422,12 @@ if (categoryId) {
     // Add calculated fields for filtering and sorting
     venues = venues.map(venue => {
       const maxPrice = getMaxPrice(venue.pricingSchedule);
-      const totalCapacity = (venue.maxGuestsSeated || 0) + (venue.maxGuestsStanding || 0);
-      
+      const seated = Number(venue.maxGuestsSeated) || 0;
+      const standing = Number(venue.maxGuestsStanding) || 0;
+      const totalCapacity = seated + standing;
+      if (isNaN(totalCapacity)) {
+        console.log(`Invalid capacity for venue ${venue._id}: seated=${seated}, standing=${standing}`);
+      }
       return {
         ...venue,
         maxPrice,
@@ -359,49 +435,23 @@ if (categoryId) {
       };
     });
 
-    // Capacity range filter
-    if (capacityRange) {
-      const ranges = {
-        '0-100': { min: 0, max: 100 },
-        '100-300': { min: 100, max: 300 },
-        '300-500': { min: 300, max: 500 },
-        '500+': { min: 500, max: Number.MAX_SAFE_INTEGER }
-      };
-
-      const range = ranges[capacityRange];
-      if (range) {
-        venues = venues.filter(venue => 
-          venue.totalCapacity >= range.min && 
-          (range.max === Number.MAX_SAFE_INTEGER || venue.totalCapacity <= range.max)
-        );
-      }
-    }
-
-    // Manual capacity filters (override capacityRange)
-    if (minCapacity !== undefined) {
-      const min = parseInt(minCapacity);
-      if (!isNaN(min)) {
-        venues = venues.filter(venue => venue.totalCapacity >= min);
-      }
-    }
-    if (maxCapacity !== undefined) {
-      const max = parseInt(maxCapacity);
-      if (!isNaN(max)) {
-        venues = venues.filter(venue => venue.totalCapacity <= max);
-      }
-    }
-
     // Price range filter
     if (minPrice !== undefined) {
       const min = parseFloat(minPrice);
       if (!isNaN(min)) {
-        venues = venues.filter(venue => venue.maxPrice >= min);
+        venues = venues.filter(venue => {
+          const price = venue.maxPrice || 0;
+          return price >= min;
+        });
       }
     }
     if (maxPrice !== undefined) {
       const max = parseFloat(maxPrice);
       if (!isNaN(max)) {
-        venues = venues.filter(venue => venue.maxPrice <= max);
+        venues = venues.filter(venue => {
+          const price = venue.maxPrice || 0;
+          return price <= max;
+        });
       }
     }
 
@@ -452,6 +502,9 @@ if (categoryId) {
     const totalResults = venues.length;
     const totalPages = Math.ceil(totalResults / parseInt(limit));
 
+    // Log filtered results
+    console.log(`Filtered venues count: ${paginatedVenues.length}`);
+
     // Build response with applied filters summary
     const appliedFilters = {
       location: useLocationFilter ? { latitude: userLat, longitude: userLon, radius: searchRadius, unit: 'km' } : null,
@@ -483,7 +536,7 @@ if (categoryId) {
       },
       sorting: {
         sortBy: sortField,
-        sortOrder: sortOrder
+        sortOrder
       }
     };
 
@@ -745,7 +798,8 @@ exports.createVenue = async (req, res) => {
           faq.answer &&
           typeof faq.question === 'string' &&
           typeof faq.answer === 'string'
-        ).map(faq => ({
+        ).航空
+        data.faqs = faqs.map(faq => ({
           question: faq.question.trim(),
           answer: faq.answer.trim()
         }));
@@ -1110,7 +1164,7 @@ exports.updateVenue = async (req, res) => {
           typeof faq.question === 'string' &&
           typeof faq.answer === 'string'
         ).map(faq => ({
-          question: faq.question.trim(),
+         roles: faq.question.trim(),
           answer: faq.answer.trim()
         }));
       }
@@ -1196,7 +1250,7 @@ exports.getVenuesByCategory = async (req, res) => {
       success: true,
       count: venues.length,
       data: venues,
-      message: venues.length === 0 ? 'No venues found for this category' : 'Venues fetched successfully'
+      message: venues.length === 0 ? 'No venues found for this category' : 'Venues fetched Declarations successfully'
     });
   } catch (err) {
     console.error('Error fetching venues by category:', err);
@@ -1725,8 +1779,8 @@ exports.sortVenues = async (req, res) => {
 
     const venuesWithData = venues.map(venue => {
       const maxPrice = getMaxPrice(venue.pricingSchedule);
-      const rating = venue.rating || 0;
-      const capacity = (venue.maxGuestsSeated || 0) + (venue.maxGuestsStanding || 0);
+      const rating = Number(venue.rating) || 0;
+      const capacity = (Number(venue.maxGuestsSeated) || 0) + (Number(venue.maxGuestsStanding) || 0);
 
       return { ...venue, maxPrice, rating, capacity };
     });
@@ -1781,8 +1835,6 @@ exports.sortVenues = async (req, res) => {
     });
   }
 };
-
-// Ascended Master
 
 // Get Top Picks
 exports.getTopPicks = async (req, res) => {
