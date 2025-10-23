@@ -174,7 +174,7 @@ exports.createVenue = async (req, res) => {
       data.categories = [];
     }
 
-    // Parse packages
+    // Parse packages (support multiple package IDs)
     if (data.packages) {
       let packages = data.packages;
       
@@ -480,15 +480,22 @@ exports.filterVenues = async (req, res) => {
       query.module = new mongoose.Types.ObjectId(moduleId);
     }
 
-    // Package filter
+    // Package filter (support multiple package IDs)
     if (packageId) {
-      if (!mongoose.Types.ObjectId.isValid(packageId)) {
+      let packageIds = packageId;
+      if (typeof packageId === 'string') {
+        packageIds = packageId.split(',').map(id => id.trim()).filter(id => mongoose.Types.ObjectId.isValid(id));
+      } else if (Array.isArray(packageId)) {
+        packageIds = packageId.filter(id => mongoose.Types.ObjectId.isValid(id));
+      }
+      if (packageIds.length > 0) {
+        query.packages = { $in: packageIds.map(id => new mongoose.Types.ObjectId(id)) };
+      } else {
         return res.status(400).json({
           success: false,
-          message: 'Invalid package ID',
+          message: 'Invalid package ID(s)',
         });
       }
-      query.packages = new mongoose.Types.ObjectId(packageId);
     }
 
     // Rating filter
@@ -777,15 +784,22 @@ exports.searchVenues = async (req, res) => {
       ];
     }
 
-    // Package filter
+    // Package filter (support multiple package IDs)
     if (packageId) {
-      if (!mongoose.Types.ObjectId.isValid(packageId)) {
+      let packageIds = packageId;
+      if (typeof packageId === 'string') {
+        packageIds = packageId.split(',').map(id => id.trim()).filter(id => mongoose.Types.ObjectId.isValid(id));
+      } else if (Array.isArray(packageId)) {
+        packageIds = packageId.filter(id => mongoose.Types.ObjectId.isValid(id));
+      }
+      if (packageIds.length > 0) {
+        searchQuery.packages = { $in: packageIds.map(id => new mongoose.Types.ObjectId(id)) };
+      } else {
         return res.status(400).json({
           success: false,
-          message: 'Invalid package ID',
+          message: 'Invalid package ID(s)',
         });
       }
-      searchQuery.packages = new mongoose.Types.ObjectId(packageId);
     }
 
     // Location filter
@@ -1188,7 +1202,7 @@ exports.updateVenue = async (req, res) => {
       }
     }
 
-    // Parse packages
+    // Parse packages (support multiple package IDs)
     if (data.packages) {
       let packages = data.packages;
       
@@ -1219,9 +1233,9 @@ exports.updateVenue = async (req, res) => {
       if (typeof tags === 'string') {
         try {
           const parsed = JSON.parse(tags);
-          tags = Array.isArray(parsed) ? parsed.flat() : [tags];
+          tags = Array.isArray(parsed) ? parsed : [parsed];
         } catch {
-          tags = [tags];
+          tags = tags.split(',').map(t => t.trim()).filter(t => t);
         }
       }
       data.searchTags = Array.isArray(tags)
