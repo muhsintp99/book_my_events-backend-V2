@@ -66,10 +66,79 @@
 
 // module.exports = router;
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// const express = require('express');
+// const router = express.Router();
+// const createUpload = require('../../middlewares/upload');
+// const vehicleController = require('../../controllers/vendor/vehicleController'); // FIXED import
+// const { protect, authorizeRoles } = require('../../middlewares/authMiddleware');
+
+// const upload = createUpload('vehicles', { fileSizeMB: 20 });
+// const uploadFields = upload.fields([
+//   { name: 'images', maxCount: 10 },
+//   { name: 'thumbnail', maxCount: 1 },
+//   { name: 'documents', maxCount: 5 },
+// ]);
+
+// // Optional auth for GET routes
+// const optionalAuth = (req, res, next) => {
+//   if (req.headers.authorization) {
+//     return protect(req, res, next);
+//   }
+//   next();
+// };
+
+// // Public / optional authentication
+// router.get('/', optionalAuth, vehicleController.getVehicles);
+// router.get('/provider/:providerId', vehicleController.getVehiclesByProvider);
+// router.get('/:id', optionalAuth, vehicleController.getVehicle);
+
+// // Protected routes
+// router.post(
+//   '/',
+//   protect,
+//   authorizeRoles('vendor', 'admin'),
+//   uploadFields,
+//   vehicleController.createVehicle
+// );
+
+// router.put(
+//   '/:id',
+//   protect,
+//   authorizeRoles('vendor', 'admin'),
+//   uploadFields,
+//   vehicleController.updateVehicle
+// );
+
+// router.delete(
+//   '/:id',
+//   protect,
+//   authorizeRoles('vendor', 'admin'),
+//   vehicleController.deleteVehicle
+// );
+
+// module.exports = router;
+
+
 const express = require('express');
 const router = express.Router();
 const createUpload = require('../../middlewares/upload');
-const vehicleController = require('../../controllers/vendor/vehicleController'); // FIXED import
+const vehicleController = require('../../controllers/vendor/vehicleController');
 const { protect, authorizeRoles } = require('../../middlewares/authMiddleware');
 
 const upload = createUpload('vehicles', { fileSizeMB: 20 });
@@ -89,7 +158,13 @@ const optionalAuth = (req, res, next) => {
 
 // Public / optional authentication
 router.get('/', optionalAuth, vehicleController.getVehicles);
-router.get('/provider/:providerId', vehicleController.getVehiclesByProvider);
+router.get('/filter', optionalAuth, vehicleController.filterVehicles);
+router.get('/search', optionalAuth, vehicleController.searchVehicles);
+router.get('/sort', optionalAuth, vehicleController.sortVehicles);
+router.get('/location', optionalAuth, vehicleController.getVehiclesByLocation);
+router.get('/provider/:providerId', optionalAuth, vehicleController.getVehiclesByProvider);
+router.get('/category/:categoryId', optionalAuth, vehicleController.getVehiclesByCategory);
+router.get('/counts', protect, authorizeRoles('admin'), vehicleController.getVehicleCounts);
 router.get('/:id', optionalAuth, vehicleController.getVehicle);
 
 // Protected routes
@@ -114,6 +189,20 @@ router.delete(
   protect,
   authorizeRoles('vendor', 'admin'),
   vehicleController.deleteVehicle
+);
+
+router.put(
+  '/:id/block',
+  protect,
+  authorizeRoles('vendor', 'admin'),
+  vehicleController.blockVehicle
+);
+
+router.put(
+  '/:id/reactivate',
+  protect,
+  authorizeRoles('vendor', 'admin'),
+  vehicleController.reactivateVehicle
 );
 
 module.exports = router;

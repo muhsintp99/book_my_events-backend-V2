@@ -1065,11 +1065,11 @@ const populateProvider = {
   select: '-password -email -refreshToken -resetPasswordToken -resetPasswordExpire -firstName -lastName -vinNumber',
 };
 
-// Parse ObjectId arrays (for categories)
-const parseCategories = (categories) => {
-  if (!categories) return [];
+// Parse ObjectId arrays (for categories, brands)
+const parseObjectIdArray = (value) => {
+  if (!value) return [];
 
-  let parsed = categories;
+  let parsed = value;
 
   if (typeof parsed === 'string') {
     parsed = parsed.trim();
@@ -1097,14 +1097,13 @@ const parseCategories = (categories) => {
 
   return [];
 };
-
 // Parse string arrays (for connectivity, sensors, safety, etc.)
 const parseStringArray = (value) => {
   if (!value) return [];
 
   // If already an array, trim each item
   if (Array.isArray(value)) {
-    return value.map((item) => String(item).trim()).filter((item) => item);
+    return value.map((item) => String(item).trim().toLowerCase()).filter((item) => item);
   }
 
   // If string, try to parse as JSON first
@@ -1115,7 +1114,7 @@ const parseStringArray = (value) => {
     try {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) {
-        return parsed.map((item) => String(item).trim()).filter((item) => item);
+        return parsed.map((item) => String(item).trim().toLowerCase()).filter((item) => item);
       }
     } catch (e) {
       // Not valid JSON, continue to CSV parsing
@@ -1125,23 +1124,67 @@ const parseStringArray = (value) => {
     return trimmed
       .replace(/^\[|\]$/g, '') // Remove outer brackets if present
       .split(',')
-      .map((item) => item.trim().replace(/^["']|["']$/g, '')) // Remove quotes
+      .map((item) => item.trim().replace(/^["']|["']$/g, '').toLowerCase()) // Remove quotes
       .filter((item) => item);
   }
 
   return [];
 };
 
+
+
+const parseObjectId = (value) => {
+  if (!value) return null;
+
+  // If it's already an ObjectId, return it
+  if (mongoose.Types.ObjectId.isValid(value)) {
+    return new mongoose.Types.ObjectId(value);
+  }
+
+  // If it's a string, try to parse it
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    
+    // Try JSON parse first (in case it's wrapped in quotes)
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (mongoose.Types.ObjectId.isValid(parsed)) {
+        return new mongoose.Types.ObjectId(parsed);
+      }
+    } catch (e) {
+      // Not JSON, check if it's a valid ObjectId string
+      if (mongoose.Types.ObjectId.isValid(trimmed)) {
+        return new mongoose.Types.ObjectId(trimmed);
+      }
+    }
+  }
+
+  return null;
+};
+
 // Sanitize and parse request body
 const sanitizeVehicleData = (body) => {
   const sanitized = { ...body };
 
-  // Trim string fields
-  if (sanitized.brand) sanitized.brand = sanitized.brand.trim();
-  if (sanitized.type) sanitized.type = sanitized.type.trim().toLowerCase();
-  if (sanitized.fuelType) sanitized.fuelType = sanitized.fuelType.trim().toLowerCase();
-  if (sanitized.transmissionType)
-    sanitized.transmissionType = sanitized.transmissionType.trim().toLowerCase();
+  // FIX: Parse brand as single ObjectId, not array
+  if (sanitized.brand) sanitized.brand = parseObjectId(sanitized.brand);
+  
+  // FIX: Parse type, fuelType, transmissionType as single strings (not arrays)
+  if (sanitized.type) {
+    sanitized.type = typeof sanitized.type === 'string' 
+      ? sanitized.type.trim().toLowerCase() 
+      : sanitized.type;
+  }
+  if (sanitized.fuelType) {
+    sanitized.fuelType = typeof sanitized.fuelType === 'string' 
+      ? sanitized.fuelType.trim().toLowerCase() 
+      : sanitized.fuelType;
+  }
+  if (sanitized.transmissionType) {
+    sanitized.transmissionType = typeof sanitized.transmissionType === 'string' 
+      ? sanitized.transmissionType.trim().toLowerCase() 
+      : sanitized.transmissionType;
+  }
   if (sanitized.seatType) sanitized.seatType = sanitized.seatType.trim().toLowerCase();
   if (sanitized.camera) sanitized.camera = sanitized.camera.trim().toLowerCase();
   if (sanitized.model) sanitized.model = sanitized.model.trim();
@@ -1216,14 +1259,42 @@ const sanitizeVehicleData = (body) => {
 
   // Parse categories (ObjectId array)
   if (sanitized.categories) {
-    sanitized.category = parseCategories(sanitized.categories);
+    sanitized.category = parseObjectIdArray(sanitized.categories);
     delete sanitized.categories;
   } else if (sanitized.category) {
-    sanitized.category = parseCategories(sanitized.category);
+    sanitized.category = parseObjectIdArray(sanitized.category);
   }
 
   return sanitized;
 };
+
+// Helper function to calculate distance between two coordinates
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in kilometers
+};
+
+// Helper function to get effective price (min non-zero pricing)
+const getEffectivePrice = (pricing) => {
+  if (!pricing || typeof pricing !== 'object') return 0;
+  
+  const prices = [];
+  
+  if (pricing.hourly && pricing.hourly > 0) prices.push(pricing.hourly);
+  if (pricing.perDay && pricing.perDay > 0) prices.push(pricing.perDay);
+  if (pricing.distanceWise && pricing.distanceWise > 0) prices.push(pricing.distanceWise);
+  
+  // Return the minimum non-zero price, or 0 if no valid prices
+  return prices.length > 0 ? Math.min(...prices) : 0;
+};
+
 
 // ================= CREATE =================
 exports.createVehicle = async (req, res) => {
@@ -1267,17 +1338,19 @@ exports.createVehicle = async (req, res) => {
       }
     }
 
-    // Verify brand exists
-    if (body.brand && !mongoose.Types.ObjectId.isValid(body.brand)) {
-      return sendResponse(res, 400, false, 'Invalid brand ID');
-    }
+    // FIX: Verify brand exists - now checking for single ObjectId or null
     if (body.brand) {
+      if (!mongoose.Types.ObjectId.isValid(body.brand)) {
+        return sendResponse(res, 400, false, 'Invalid brand ID format');
+      }
+      
       const existingBrand = await mongoose
         .model('Brand')
         .findById(body.brand)
         .select('_id');
+        
       if (!existingBrand) {
-        return sendResponse(res, 400, false, 'Brand does not exist');
+        return sendResponse(res, 400, false, 'Brand does not exist in database');
       }
     }
 
@@ -1323,7 +1396,6 @@ exports.createVehicle = async (req, res) => {
     sendResponse(res, 400, false, error.message);
   }
 };
-
 // ================= GET ALL VEHICLES =================
 exports.getVehicles = async (req, res) => {
   try {
@@ -1347,11 +1419,11 @@ exports.getVehicles = async (req, res) => {
     const query = {};
 
     // Build filters
-    if (brand) query.brand = brand;
-    if (category) query.category = category;
-    if (type) query.type = type.toLowerCase();
-    if (fuelType) query.fuelType = fuelType.toLowerCase();
-    if (transmissionType) query.transmissionType = transmissionType.toLowerCase();
+    if (brand) query.brand = parseObjectIdArray(brand);
+    if (category) query.category = { $in: parseObjectIdArray(category) };
+    if (type) query.type = { $in: parseStringArray(type) };
+    if (fuelType) query.fuelType = { $in: parseStringArray(fuelType) };
+    if (transmissionType) query.transmissionType = { $in: parseStringArray(transmissionType) };
     if (seatType) query.seatType = seatType.toLowerCase();
     if (camera) query.camera = camera.toLowerCase();
     if (isActive !== undefined) query.isActive = isActive === 'true';
@@ -1365,27 +1437,30 @@ exports.getVehicles = async (req, res) => {
         { 'pricing.distanceWise': {} },
       ];
       if (minPrice) {
+        const min = Number(minPrice);
         query.$or.forEach((priceQuery) => {
           const key = Object.keys(priceQuery)[0];
-          priceQuery[key].$gte = Number(minPrice);
+          priceQuery[key].$gte = min;
         });
       }
       if (maxPrice) {
+        const max = Number(maxPrice);
         query.$or.forEach((priceQuery) => {
           const key = Object.keys(priceQuery)[0];
-          priceQuery[key].$lte = Number(maxPrice);
+          priceQuery[key].$lte = max;
         });
       }
     }
 
     // Search functionality
     if (search) {
+      const keywordRegex = new RegExp(search, 'i');
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { model: { $regex: search, $options: 'i' } },
-        { audioSystem: { $regex: search, $options: 'i' } },
-        { searchTags: { $in: [new RegExp(search, 'i')] } },
+        { name: keywordRegex },
+        { description: keywordRegex },
+        { model: keywordRegex },
+        { audioSystem: keywordRegex },
+        { searchTags: { $in: [keywordRegex] } },
       ];
     }
 
@@ -1695,5 +1770,698 @@ exports.reactivateVehicle = async (req, res) => {
   } catch (error) {
     console.error('Error reactivating vehicle:', error);
     sendResponse(res, 500, false, error.message);
+  }
+};
+
+// Advanced Filter Vehicles API
+// Fixed Advanced Filter Vehicles API
+exports.filterVehicles = async (req, res) => {
+  try {
+    const {
+      // Location filters
+      latitude,
+      longitude,
+      radius = 10,
+      
+      // Filters
+      brandId,
+      categoryId,
+      type,
+      fuelType,
+      transmissionType,
+      seatingCapacityRange,
+      minSeatingCapacity,
+      maxSeatingCapacity,
+      airCondition,
+      insuranceIncluded,
+      
+      // Price range
+      minPrice,
+      maxPrice,
+      
+      // Rating filter
+      minRating,
+      maxRating,
+      
+      // Pagination
+      page = 1,
+      limit = 50,
+      
+      // Sorting
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    console.log('=== FILTER REQUEST ===');
+    console.log('minPrice:', minPrice, typeof minPrice);
+    console.log('maxPrice:', maxPrice, typeof maxPrice);
+
+    // Validate and parse seatingCapacityRange
+    let capacityFilter = null;
+    if (seatingCapacityRange && minSeatingCapacity === undefined && maxSeatingCapacity === undefined) {
+      const decodedCapacityRange = decodeURIComponent(seatingCapacityRange);
+
+      let min, max;
+      if (decodedCapacityRange.endsWith('+')) {
+        min = parseInt(decodedCapacityRange.replace('+', ''));
+        if (isNaN(min) || min < 0) {
+          return sendResponse(res, 400, false, 'Invalid seatingCapacityRange');
+        }
+      } else if (decodedCapacityRange.includes('-')) {
+        [min, max] = decodedCapacityRange.split('-').map(num => parseInt(num));
+        if (isNaN(min) || isNaN(max) || min < 0 || max < 0 || min > max) {
+          return sendResponse(res, 400, false, 'Invalid seatingCapacityRange');
+        }
+      } else {
+        return sendResponse(res, 400, false, 'Invalid seatingCapacityRange format');
+      }
+
+      capacityFilter = { min, max };
+    }
+
+    // Build base query
+    const query = { isActive: true };
+
+    // Apply capacity range filter
+    if (capacityFilter) {
+      if (capacityFilter.min !== undefined) {
+        query.seatingCapacity = { ...query.seatingCapacity, $gte: capacityFilter.min };
+      }
+      if (capacityFilter.max !== undefined) {
+        query.seatingCapacity = { ...query.seatingCapacity, $lte: capacityFilter.max };
+      }
+    }
+
+    // Manual capacity filters
+    if (minSeatingCapacity !== undefined && !seatingCapacityRange) {
+      const min = parseInt(minSeatingCapacity);
+      if (!isNaN(min)) {
+        query.seatingCapacity = { ...query.seatingCapacity, $gte: min };
+      }
+    }
+    if (maxSeatingCapacity !== undefined && !seatingCapacityRange) {
+      const max = parseInt(maxSeatingCapacity);
+      if (!isNaN(max)) {
+        query.seatingCapacity = { ...query.seatingCapacity, $lte: max };
+      }
+    }
+
+    // Brand filter
+    if (brandId) {
+      let brandIds = parseObjectIdArray(brandId);
+      if (brandIds.length > 0) {
+        query.brand = { $in: brandIds };
+      }
+    }
+
+    // Category filter
+    if (categoryId) {
+      let categoryIds = parseObjectIdArray(categoryId);
+      if (categoryIds.length > 0) {
+        query.category = { $in: categoryIds };
+      }
+    }
+
+    // Type filter
+    if (type) {
+      query.type = { $in: parseStringArray(type).map(t => t.toLowerCase()) };
+    }
+
+    // Fuel type filter
+    if (fuelType) {
+      query.fuelType = { $in: parseStringArray(fuelType).map(f => f.toLowerCase()) };
+    }
+
+    // Transmission type filter
+    if (transmissionType) {
+      query.transmissionType = { $in: parseStringArray(transmissionType).map(t => t.toLowerCase()) };
+    }
+
+    // Air condition filter
+    if (airCondition !== undefined) {
+      const hasAC = airCondition === 'true' || airCondition === true;
+      query.airCondition = hasAC;
+    }
+
+    // Insurance included filter
+    if (insuranceIncluded !== undefined) {
+      const hasInsurance = insuranceIncluded === 'true' || insuranceIncluded === true;
+      query['insuranceIncluded.0'] = { $exists: hasInsurance };
+    }
+
+    // Rating filter
+    if (minRating !== undefined) {
+      const min = parseFloat(minRating);
+      if (!isNaN(min)) {
+        query.rating = { ...query.rating, $gte: min };
+      }
+    }
+    if (maxRating !== undefined) {
+      const max = parseFloat(maxRating);
+      if (!isNaN(max)) {
+        query.rating = { ...query.rating, $lte: max };
+      }
+    }
+
+    // Location filter setup
+    let useLocationFilter = false;
+    let userLat, userLon, searchRadius;
+
+    if (latitude && longitude) {
+      userLat = parseFloat(latitude);
+      userLon = parseFloat(longitude);
+      searchRadius = parseFloat(radius);
+
+      if (isNaN(userLat) || isNaN(userLon)) {
+        return sendResponse(res, 400, false, 'Invalid latitude or longitude values');
+      }
+
+      if (isNaN(searchRadius) || searchRadius <= 0) {
+        searchRadius = 10;
+      }
+
+      useLocationFilter = true;
+      query.latitude = { $exists: true, $ne: null };
+      query.longitude = { $exists: true, $ne: null };
+    }
+
+    console.log('MongoDB Query:', JSON.stringify(query, null, 2));
+
+    // Fetch vehicles
+    let vehicles = await Vehicle.find(query)
+      .populate('brand')
+      .populate({
+        path: 'category',
+        model: 'VehicleCategory',
+        select: 'title image vehicleCategoryId module isActive',
+      })
+      .populate(populateProvider)
+      .populate('zone')
+      .lean();
+
+    console.log(`Found ${vehicles.length} vehicles from database`);
+
+    // Calculate distance
+    if (useLocationFilter) {
+      vehicles = vehicles.map(vehicle => {
+        const distance = calculateDistance(
+          userLat,
+          userLon,
+          vehicle.latitude,
+          vehicle.longitude
+        );
+        return {
+          ...vehicle,
+          distance: parseFloat(distance.toFixed(2)),
+          distanceUnit: 'km'
+        };
+      }).filter(vehicle => vehicle.distance <= searchRadius);
+      
+      console.log(`${vehicles.length} vehicles after location filter`);
+    }
+
+    // Add calculated fields - IMPORTANT: Calculate effective price for ALL vehicles
+    vehicles = vehicles.map(vehicle => {
+      const effectivePrice = getEffectivePrice(vehicle.pricing);
+      const capacity = Number(vehicle.seatingCapacity) || 0;
+      
+      // Debug log for first few vehicles
+      if (vehicles.indexOf(vehicle) < 3) {
+        console.log(`Vehicle: ${vehicle.name}`);
+        console.log(`  Pricing:`, vehicle.pricing);
+        console.log(`  Effective Price:`, effectivePrice);
+      }
+      
+      return {
+        ...vehicle,
+        effectivePrice,
+        totalCapacity: capacity
+      };
+    });
+
+    // ===== CRITICAL: PRICE FILTER =====
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      const beforePriceFilter = vehicles.length;
+      
+      vehicles = vehicles.filter(vehicle => {
+        const price = vehicle.effectivePrice;
+        
+        // Log for debugging
+        console.log(`Checking vehicle: ${vehicle.name}, Price: ${price}`);
+        
+        // IMPORTANT: If price is 0 or null, exclude it
+        if (!price || price <= 0) {
+          console.log(`  ❌ Excluded (no valid price)`);
+          return false;
+        }
+        
+        let meetsMinPrice = true;
+        let meetsMaxPrice = true;
+        
+        if (minPrice !== undefined) {
+          const min = parseFloat(minPrice);
+          if (!isNaN(min)) {
+            meetsMinPrice = price >= min;
+            if (!meetsMinPrice) {
+              console.log(`  ❌ Below minPrice (${price} < ${min})`);
+            }
+          }
+        }
+        
+        if (maxPrice !== undefined) {
+          const max = parseFloat(maxPrice);
+          if (!isNaN(max)) {
+            meetsMaxPrice = price <= max;
+            if (!meetsMaxPrice) {
+              console.log(`  ❌ Above maxPrice (${price} > ${max})`);
+            }
+          }
+        }
+        
+        const result = meetsMinPrice && meetsMaxPrice;
+        if (result) {
+          console.log(`  ✅ Included (${price} in range)`);
+        }
+        
+        return result;
+      });
+      
+      console.log(`\n=== PRICE FILTER SUMMARY ===`);
+      console.log(`Before: ${beforePriceFilter} vehicles`);
+      console.log(`After: ${vehicles.length} vehicles`);
+      console.log(`Range: ${minPrice || 'any'} - ${maxPrice || 'any'}`);
+    }
+
+    // Sorting
+    const sortField = sortBy.toLowerCase();
+    const order = sortOrder.toLowerCase() === 'asc' ? 1 : -1;
+
+    vehicles.sort((a, b) => {
+      let aValue, bValue;
+
+      switch (sortField) {
+        case 'price':
+          aValue = a.effectivePrice || 0;
+          bValue = b.effectivePrice || 0;
+          break;
+        case 'rating':
+          aValue = a.rating || 0;
+          bValue = b.rating || 0;
+          break;
+        case 'capacity':
+          aValue = a.totalCapacity || 0;
+          bValue = b.totalCapacity || 0;
+          break;
+        case 'distance':
+          if (useLocationFilter) {
+            aValue = a.distance || 0;
+            bValue = b.distance || 0;
+          } else {
+            aValue = 0;
+            bValue = 0;
+          }
+          break;
+        case 'createdat':
+          aValue = new Date(a.createdAt).getTime();
+          bValue = new Date(b.createdAt).getTime();
+          break;
+        default:
+          aValue = new Date(a.createdAt).getTime();
+          bValue = new Date(b.createdAt).getTime();
+      }
+
+      return (aValue - bValue) * order;
+    });
+
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const paginatedVehicles = vehicles.slice(skip, skip + parseInt(limit));
+    const totalResults = vehicles.length;
+    const totalPages = Math.ceil(totalResults / parseInt(limit));
+
+    console.log(`\n=== FINAL RESULTS ===`);
+    console.log(`Total matching vehicles: ${totalResults}`);
+    console.log(`Returning page ${page}: ${paginatedVehicles.length} vehicles`);
+
+    // Build response with applied filters summary
+    const appliedFilters = {
+      location: useLocationFilter ? { latitude: userLat, longitude: userLon, radius: searchRadius, unit: 'km' } : null,
+      brandId: brandId || null,
+      categoryId: categoryId || null,
+      type: type || null,
+      fuelType: fuelType || null,
+      transmissionType: transmissionType || null,
+      seatingCapacityRange: seatingCapacityRange || null,
+      capacity: {
+        min: minSeatingCapacity || null,
+        max: maxSeatingCapacity || null
+      },
+      airCondition: airCondition !== undefined ? (airCondition === 'true' || airCondition === true) : null,
+      insuranceIncluded: insuranceIncluded || null,
+      price: {
+        min: minPrice || null,
+        max: maxPrice || null
+      },
+      rating: {
+        min: minRating || null,
+        max: maxRating || null
+      },
+      sorting: {
+        sortBy: sortField,
+        sortOrder
+      }
+    };
+
+    sendResponse(res, 200, true, paginatedVehicles.length === 0 ? 'No vehicles found matching your filter criteria' : 'Vehicles filtered successfully', paginatedVehicles, {
+      count: paginatedVehicles.length,
+      totalResults,
+      page: parseInt(page),
+      totalPages,
+      appliedFilters
+    });
+  } catch (err) {
+    console.error('❌ Error in filterVehicles:', err);
+    console.error('Stack:', err.stack);
+    sendResponse(res, 500, false, `Failed to filter vehicles: ${err.message}`);
+  }
+};
+
+
+// Advanced Vehicle Search API
+exports.searchVehicles = async (req, res) => {
+  try {
+    const { keyword, latitude, longitude, radius = 10, limit = 50, page = 1, categoryId } = req.query;
+
+    // Build search query
+    const searchQuery = { isActive: true };
+
+    // Keyword search (searches in multiple fields)
+    if (keyword && keyword.trim()) {
+      const keywordRegex = new RegExp(keyword.trim(), 'i');
+      searchQuery.$or = [
+        { name: keywordRegex },
+        { description: keywordRegex },
+        { model: keywordRegex },
+        { searchTags: { $in: [keywordRegex] } },
+        { audioSystem: keywordRegex }
+      ];
+    }
+
+    // Category filter
+    if (categoryId) {
+      let categoryIds = parseObjectIdArray(categoryId);
+      if (categoryIds.length > 0) {
+        searchQuery.category = { $in: categoryIds };
+      } else {
+        return sendResponse(res, 400, false, 'Invalid category ID');
+      }
+    }
+
+    // Location filter
+    let useLocationFilter = false;
+    let userLat, userLon, searchRadius;
+
+    if (latitude && longitude) {
+      userLat = parseFloat(latitude);
+      userLon = parseFloat(longitude);
+      searchRadius = parseFloat(radius);
+
+      if (isNaN(userLat) || isNaN(userLon)) {
+        return sendResponse(res, 400, false, 'Invalid latitude or longitude values');
+      }
+
+      if (isNaN(searchRadius) || searchRadius <= 0) {
+        searchRadius = 10; // Default 10km
+      }
+
+      useLocationFilter = true;
+      searchQuery.latitude = { $exists: true, $ne: null };
+      searchQuery.longitude = { $exists: true, $ne: null };
+    }
+
+    // Fetch vehicles
+    let vehicles = await Vehicle.find(searchQuery)
+      .populate('brand')
+      .populate({
+        path: 'category',
+        model: 'VehicleCategory',
+        select: 'title image vehicleCategoryId module isActive',
+      })
+      .populate(populateProvider)
+      .populate('zone')
+      .lean();
+
+    // Apply location filtering and calculate distances
+    if (useLocationFilter) {
+      vehicles = vehicles.map(vehicle => {
+        const distance = calculateDistance(
+          userLat,
+          userLon,
+          vehicle.latitude,
+          vehicle.longitude
+        );
+        return {
+          ...vehicle,
+          distance: parseFloat(distance.toFixed(2)),
+          distanceUnit: 'km'
+        };
+      }).filter(vehicle => vehicle.distance <= searchRadius);
+
+      // Sort by distance
+      vehicles.sort((a, b) => a.distance - b.distance);
+    }
+
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const paginatedVehicles = vehicles.slice(skip, skip + parseInt(limit));
+    const totalResults = vehicles.length;
+    const totalPages = Math.ceil(totalResults / parseInt(limit));
+
+    const response = {
+      success: true,
+      count: paginatedVehicles.length,
+      totalResults,
+      page: parseInt(page),
+      totalPages,
+      searchParams: {
+        keyword: keyword || null,
+        latitude: useLocationFilter ? userLat : null,
+        longitude: useLocationFilter ? userLon : null,
+        radius: useLocationFilter ? searchRadius : null,
+        categoryId: categoryId || null
+      },
+      data: paginatedVehicles,
+      message: paginatedVehicles.length === 0 
+        ? 'No vehicles found matching your search criteria' 
+        : 'Vehicles fetched successfully'
+    };
+
+    res.status(200).json(response);
+
+  } catch (err) {
+    console.error('Error in searchVehicles:', err);
+    sendResponse(res, 500, false, 'Failed to search vehicles');
+  }
+};
+
+// Get vehicles by location
+exports.getVehiclesByLocation = async (req, res) => {
+  try {
+    const { lat, lng } = req.query;
+
+    if (!lat || !lng) {
+      return sendResponse(res, 400, false, 'Latitude (lat) and Longitude (lng) are required');
+    }
+
+    const latitude = parseFloat(lat);
+    const longitude = parseFloat(lng);
+
+    if (isNaN(latitude) || isNaN(longitude)) {
+      return sendResponse(res, 400, false, 'Invalid latitude or longitude values');
+    }
+
+    const zoneRadiusKm = 10;
+
+    const vehicles = await Vehicle.find({
+      latitude: { $exists: true, $ne: null },
+      longitude: { $exists: true, $ne: null },
+      isActive: true
+    })
+      .populate('brand')
+      .populate({
+        path: 'category',
+        model: 'VehicleCategory',
+        select: 'title image vehicleCategoryId module isActive',
+      })
+      .populate(populateProvider)
+      .populate('zone')
+      .lean();
+
+    const vehiclesInZone = [];
+    
+    vehicles.forEach(vehicle => {
+      const distance = calculateDistance(latitude, longitude, vehicle.latitude, vehicle.longitude);
+
+      if (distance <= zoneRadiusKm) {
+        vehiclesInZone.push({
+          ...vehicle,
+          distance: parseFloat(distance.toFixed(2)),
+          distanceUnit: 'km'
+        });
+      }
+    });
+
+    vehiclesInZone.sort((a, b) => a.distance - b.distance);
+
+    sendResponse(res, 200, true, vehiclesInZone.length === 0 ? `No vehicles found within ${zoneRadiusKm}km zone` : 'Vehicles in zone fetched successfully', vehiclesInZone, {
+      count: vehiclesInZone.length,
+      searchParams: {
+        latitude,
+        longitude,
+        zoneRadius: zoneRadiusKm,
+        unit: 'km'
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching vehicles by location:', err);
+    sendResponse(res, 500, false, 'Failed to fetch vehicles by location');
+  }
+};
+
+// Get vehicles by category
+exports.getVehiclesByCategory = async (req, res) => {
+  try {
+    const { categoryId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+      return sendResponse(res, 400, false, 'Invalid category ID');
+    }
+
+    const vehicles = await Vehicle.find({ 
+      category: categoryId,
+      isActive: true 
+    })
+      .populate('brand')
+      .populate({
+        path: 'category',
+        model: 'VehicleCategory',
+        select: 'title image vehicleCategoryId module isActive',
+      })
+      .populate(populateProvider)
+      .populate('zone')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    sendResponse(res, 200, true, vehicles.length === 0 ? 'No vehicles found for this category' : 'Vehicles fetched successfully', vehicles, { count: vehicles.length });
+  } catch (err) {
+    console.error('Error fetching vehicles by category:', err);
+    sendResponse(res, 500, false, 'Failed to fetch vehicles by category');
+  }
+};
+
+// Sort Vehicles
+exports.sortVehicles = async (req, res) => {
+  try {
+    const { sortBy, latitude, longitude } = req.query;
+    const validSortOptions = ['highPrice', 'lowPrice', 'topRated', 'lowRated', 'highCapacity', 'lowCapacity', 'mostBooked', 'newest'];
+
+    if (!sortBy || !validSortOptions.includes(sortBy)) {
+      return sendResponse(res, 400, false, 'Invalid or missing sortBy parameter. Use: highPrice, lowPrice, topRated, lowRated, highCapacity, lowCapacity, mostBooked, newest');
+    }
+
+    let vehicles = await Vehicle.find({ isActive: true })
+      .populate('brand')
+      .populate({
+        path: 'category',
+        model: 'VehicleCategory',
+        select: 'title image vehicleCategoryId module isActive',
+      })
+      .populate(populateProvider)
+      .populate('zone')
+      .lean();
+
+    let useLocationFilter = false;
+    let userLat, userLon, searchRadius = 10;
+
+    if (latitude && longitude) {
+      userLat = parseFloat(latitude);
+      userLon = parseFloat(longitude);
+
+      if (isNaN(userLat) || isNaN(userLon)) {
+        return sendResponse(res, 400, false, 'Invalid latitude or longitude values');
+      }
+
+      useLocationFilter = true;
+      vehicles = vehicles.map(vehicle => {
+        const distance = calculateDistance(userLat, userLon, vehicle.latitude, vehicle.longitude);
+        return {
+          ...vehicle,
+          distance: parseFloat(distance.toFixed(2)),
+          distanceUnit: 'km'
+        };
+      }).filter(vehicle => vehicle.distance <= searchRadius);
+    }
+
+    const vehiclesWithData = vehicles.map(vehicle => {
+      const effectivePrice = getEffectivePrice(vehicle.pricing);
+      const rating = Number(vehicle.rating) || 0;
+      const capacity = Number(vehicle.seatingCapacity) || 0;
+      const popularity = Number(vehicle.totalTrips) || 0;
+
+      return { ...vehicle, effectivePrice, rating, capacity, popularity };
+    });
+
+    let sortedVehicles;
+    switch (sortBy) {
+      case 'highPrice':
+        sortedVehicles = [...vehiclesWithData].sort((a, b) => b.effectivePrice - a.effectivePrice);
+        break;
+      case 'lowPrice':
+        sortedVehicles = [...vehiclesWithData].sort((a, b) => a.effectivePrice - b.effectivePrice);
+        break;
+      case 'topRated':
+        sortedVehicles = [...vehiclesWithData].sort((a, b) => b.rating - a.rating);
+        break;
+      case 'lowRated':
+        sortedVehicles = [...vehiclesWithData].sort((a, b) => a.rating - b.rating);
+        break;
+      case 'highCapacity':
+        sortedVehicles = [...vehiclesWithData].sort((a, b) => b.capacity - a.capacity);
+        break;
+      case 'lowCapacity':
+        sortedVehicles = [...vehiclesWithData].sort((a, b) => a.capacity - b.capacity);
+        break;
+      case 'mostBooked':
+        sortedVehicles = [...vehiclesWithData].sort((a, b) => b.popularity - a.popularity);
+        break;
+      case 'newest':
+        sortedVehicles = [...vehiclesWithData].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        break;
+      default:
+        sortedVehicles = vehiclesWithData;
+    }
+
+    sendResponse(res, 200, true, 'Vehicles sorted successfully', sortedVehicles, {
+      count: sortedVehicles.length,
+      sortBy: sortBy,
+      searchParams: useLocationFilter ? { latitude: userLat, longitude: userLon, radius: searchRadius, unit: 'km' } : null
+    });
+  } catch (err) {
+    console.error('Error in sortVehicles:', err);
+    sendResponse(res, 500, false, 'Failed to sort vehicles');
+  }
+};
+
+// Vehicle Counts
+exports.getVehicleCounts = async (req, res) => {
+  try {
+    const total = await Vehicle.countDocuments();
+    const active = await Vehicle.countDocuments({ isActive: true });
+    const inactive = await Vehicle.countDocuments({ isActive: false });
+    
+    sendResponse(res, 200, true, 'Vehicle counts fetched successfully', { total, active, inactive });
+  } catch (err) {
+    console.error('Error in getVehicleCounts:', err);
+    sendResponse(res, 500, false, 'Failed to fetch vehicle counts');
   }
 };
