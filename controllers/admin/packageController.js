@@ -18,12 +18,12 @@ const populatePackage = async (packageId) => {
     .populate('categories', '-__v');
 };
 
-// ✅ Create Package
+// ✅ Create Single Package (Original functionality)
 exports.createPackage = async (req, res) => {
   try {
     const {
       module,
-      categories, // Multiple categories supported
+      categories,
       title,
       subtitle,
       description,
@@ -50,6 +50,7 @@ exports.createPackage = async (req, res) => {
     } else {
       finalPackageId = `PKG-${uuidv4()}`;
     }
+
     // Parse includes & price
     const parsedIncludes = includes ? JSON.parse(includes) : [];
     const parsedPrice = priceRange ? JSON.parse(priceRange) : { min: 0, max: 0 };
@@ -101,6 +102,135 @@ exports.createPackage = async (req, res) => {
         .status(400)
         .json({ error: `Duplicate packageId: ${err.keyValue.packageId}` });
     }
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ NEW: Bulk Create Packages
+exports.createBulkPackages = async (req, res) => {
+  try {
+    const { packages } = req.body;
+
+    // Validate input
+    if (!packages || !Array.isArray(packages) || packages.length === 0) {
+      return res.status(400).json({ 
+        error: 'Request body must contain a "packages" array with at least one package' 
+      });
+    }
+
+    const results = {
+      success: [],
+      failed: [],
+      total: packages.length
+    };
+
+    // Process each package
+    for (let i = 0; i < packages.length; i++) {
+      const packageInput = packages[i];
+      
+      try {
+        // Validate title
+        if (!packageInput.title || !packageInput.title.trim()) {
+          results.failed.push({
+            index: i,
+            data: packageInput,
+            error: 'Package title is required'
+          });
+          continue;
+        }
+
+        // Generate or validate packageId
+        let finalPackageId = packageInput.packageId;
+        if (finalPackageId) {
+          const existing = await Package.findOne({ packageId: finalPackageId });
+          if (existing) {
+            results.failed.push({
+              index: i,
+              data: packageInput,
+              error: `Package with ID ${finalPackageId} already exists`
+            });
+            continue;
+          }
+        } else {
+          finalPackageId = `PKG-${uuidv4()}`;
+        }
+
+        // Parse includes & price
+        const parsedIncludes = typeof packageInput.includes === 'string' 
+          ? JSON.parse(packageInput.includes) 
+          : (packageInput.includes || []);
+        const parsedPrice = typeof packageInput.priceRange === 'string' 
+          ? JSON.parse(packageInput.priceRange) 
+          : (packageInput.priceRange || { min: 0, max: 0 });
+
+        // Parse categories
+        let parsedCategories = [];
+        if (packageInput.categories) {
+          if (Array.isArray(packageInput.categories)) {
+            parsedCategories = packageInput.categories;
+          } else {
+            try {
+              parsedCategories = JSON.parse(packageInput.categories);
+            } catch {
+              parsedCategories = [packageInput.categories];
+            }
+          }
+        }
+
+        // Prepare package data
+        const packageData = {
+          packageId: finalPackageId,
+          module: packageInput.module || null,
+          categories: parsedCategories,
+          title: packageInput.title.trim(),
+          subtitle: packageInput.subtitle || '',
+          description: packageInput.description || '',
+          packageType: packageInput.packageType || 'basic',
+          includes: parsedIncludes,
+          priceRange: parsedPrice,
+          images: packageInput.images || null,
+          thumbnail: packageInput.thumbnail || null,
+          createdBy: packageInput.createdBy || null,
+        };
+
+        // Create package
+        const newPackage = await Package.create(packageData);
+        const populated = await populatePackage(newPackage._id);
+
+        results.success.push({
+          index: i,
+          packageId: newPackage.packageId,
+          _id: newPackage._id,
+          package: populated
+        });
+
+      } catch (err) {
+        console.error(`Error creating package at index ${i}:`, err);
+        results.failed.push({
+          index: i,
+          data: packageInput,
+          error: err.message
+        });
+      }
+    }
+
+    // Determine response status
+    const statusCode = results.failed.length === 0 ? 201 : 
+                      results.success.length === 0 ? 400 : 207; // 207 = Multi-Status
+
+    res.status(statusCode).json({
+      message: `Bulk package creation completed. Success: ${results.success.length}, Failed: ${results.failed.length}`,
+      results: {
+        total: results.total,
+        successCount: results.success.length,
+        failedCount: results.failed.length,
+        createdPackages: results.success,
+        failedPackages: results.failed
+      }
+    });
+
+  } catch (err) {
+    console.error('Bulk Create Packages Error:', err);
     res.status(500).json({ error: err.message });
   }
 };

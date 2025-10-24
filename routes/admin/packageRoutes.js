@@ -5,7 +5,7 @@ const packageController = require('../../controllers/admin/packageController');
 
 // ✅ Create upload middleware for "packages"
 const upload = createUpload('packages', {
-  fileSizeMB: 5, // You can adjust this if needed
+  fileSizeMB: 5,
   allowedTypes: ['image/png', 'image/jpeg', 'image/webp']
 });
 
@@ -13,7 +13,10 @@ const upload = createUpload('packages', {
 // 📦 Package Routes
 // ============================
 
-// Create Package (uploads icon + thumbnail)
+// ✅ NEW: Bulk Create Packages (accepts array of packages)
+router.post('/bulk', packageController.createBulkPackages);
+
+// Create Single Package (uploads images + thumbnail)
 router.post(
   '/',
   upload.fields([
@@ -23,11 +26,11 @@ router.post(
   packageController.createPackage
 );
 
-// Update Package (uploads icon + thumbnail)
+// Update Package (uploads images + thumbnail)
 router.put(
   '/:id',
   upload.fields([
-    { name: 'icon', maxCount: 1 },
+    { name: 'images', maxCount: 1 },
     { name: 'thumbnail', maxCount: 1 }
   ]),
   packageController.updatePackage
