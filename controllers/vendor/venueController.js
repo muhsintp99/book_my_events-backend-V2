@@ -1509,6 +1509,7 @@ exports.updateVenue = async (req, res) => {
 };
 
 // Get venues by category
+// Get venues by category - FIXED VERSION
 exports.getVenuesByCategory = async (req, res) => {
   try {
     const { categoryId } = req.params;
@@ -1532,12 +1533,9 @@ exports.getVenuesByCategory = async (req, res) => {
         path: "module",
         select: "title moduleId icon isActive",
       })
-      .populate({
-        path: "packages",
-        select: "title subtitle description packageType priceRange isActive",
-      })
-      .populate("createdBy", "name email")
-      .populate("provider", "name email")
+      .populate("packages") // FIXED - Removed select to return ALL package fields
+      .populate("createdBy", "name email phone")
+      .populate("provider", "name email phone")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -1559,7 +1557,6 @@ exports.getVenuesByCategory = async (req, res) => {
     });
   }
 };
-
 // Get venues by module
 exports.getVenuesByModule = async (req, res) => {
   try {

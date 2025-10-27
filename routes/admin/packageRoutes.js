@@ -13,7 +13,6 @@ const upload = createUpload('packages', {
 // 📦 Package Routes
 // ============================
 
-// ❌ Removed /bulk route
 
 // Create Single Package
 router.post(
@@ -40,6 +39,8 @@ router.get('/module/:moduleId', packageController.getPackagesByModule);
 
 // Delete Package
 router.delete('/:id', packageController.deletePackage);
+
+router.get('/provider/:providerId', packageController.getPackagesByProvider);
 
 // Get all Packages
 router.get('/', packageController.getPackages);

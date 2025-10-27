@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const Package = require('../../models/admin/Package');
+const Venue = require('../../models/vendor/Venue'); // ✅ ADD THIS LINE
+
 
 // 🧰 Delete file if exists
 const deleteFileIfExists = (filePath) => {
@@ -205,6 +207,71 @@ exports.getPackages = async (req, res) => {
       .populate('categories', '-__v');
     res.json(packages);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Get Packages by Provider ID
+exports.getPackagesByProvider = async (req, res) => {
+  try {
+    const { providerId } = req.params;
+
+    if (!providerId) {
+      return res.status(400).json({ error: 'Provider ID is required' });
+    }
+
+    // Try direct query first
+    let packages = await Package.find({ createdBy: providerId })
+      .populate('module', 'title images isActive')
+      .populate('categories', 'title')
+      .sort({ createdAt: -1 });
+
+    // If no packages found, try through venues
+    if (!packages.length) {
+      console.log('No direct packages found, trying through venues...');
+      
+      const venues = await Venue.find({ 
+        $or: [
+          { provider: providerId },
+          { createdBy: providerId }
+        ]
+      }).populate({
+        path: 'packages',
+        populate: [
+          { path: 'module', select: 'title images isActive' },
+          { path: 'categories', select: 'title' }
+        ]
+      });
+
+      // Extract unique packages
+      const packageMap = new Map();
+      venues.forEach(venue => {
+        if (venue.packages) {
+          venue.packages.forEach(pkg => {
+            if (pkg && pkg._id) {
+              packageMap.set(pkg._id.toString(), pkg);
+            }
+          });
+        }
+      });
+
+      packages = Array.from(packageMap.values());
+    }
+
+    if (!packages.length) {
+      return res.status(404).json({ 
+        message: 'No packages found for this provider',
+        providerId: providerId
+      });
+    }
+
+    res.json({ 
+      message: 'Packages fetched successfully', 
+      count: packages.length,
+      packages 
+    });
+  } catch (err) {
+    console.error('Get Packages by Provider Error:', err);
     res.status(500).json({ error: err.message });
   }
 };
