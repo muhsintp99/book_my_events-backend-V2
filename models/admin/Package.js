@@ -31,7 +31,7 @@ const PackageSchema = new mongoose.Schema({
   }],
 
   price: { type: Number, required: true, min: 0 },
-  images: { type: String, default: null },
+  images: [{ type: String }],
   thumbnail: { type: String, default: null },
 
   // ✅ FIXED: Changed ref from 'Provider' to 'User'

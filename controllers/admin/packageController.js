@@ -2,8 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const Package = require('../../models/admin/Package');
-const Venue = require('../../models/vendor/Venue'); // ✅ ADD THIS LINE
-
+const Venue = require('../../models/vendor/Venue');
 
 // 🧰 Delete file if exists
 const deleteFileIfExists = (filePath) => {
@@ -46,15 +45,13 @@ exports.createPackage = async (req, res) => {
     if (packageId) {
       const existing = await Package.findOne({ packageId });
       if (existing) {
-        return res
-          .status(400)
-          .json({ error: `Package with ID ${packageId} already exists` });
+        return res.status(400).json({ error: `Package with ID ${packageId} already exists` });
       }
     } else {
       finalPackageId = `PKG-${uuidv4()}`;
     }
 
-    // ✅ Parse includes (array of objects)
+    // ✅ Parse includes
     let parsedIncludes = [];
     if (includes) {
       try {
@@ -74,6 +71,16 @@ exports.createPackage = async (req, res) => {
       }
     }
 
+    // ✅ Handle multiple images
+    const images = req.files?.images
+      ? req.files.images.map((file) => `uploads/packages/${file.filename}`)
+      : [];
+
+    // ✅ Handle thumbnail
+    const thumbnail = req.files?.thumbnail
+      ? `uploads/packages/${req.files.thumbnail[0].filename}`
+      : null;
+
     const packageData = {
       packageId: finalPackageId,
       module: module || null,
@@ -84,12 +91,8 @@ exports.createPackage = async (req, res) => {
       packageType: packageType || 'basic',
       includes: parsedIncludes,
       price: parseFloat(price),
-      images: req.files?.images
-        ? `uploads/packages/${req.files.images[0].filename}`
-        : null,
-      thumbnail: req.files?.thumbnail
-        ? `uploads/packages/${req.files.thumbnail[0].filename}`
-        : null,
+      images,
+      thumbnail,
       createdBy: createdBy || null,
     };
 
@@ -128,25 +131,26 @@ exports.updatePackage = async (req, res) => {
     if (packageId && packageId !== pkg.packageId) {
       const existing = await Package.findOne({ packageId });
       if (existing) {
-        return res
-          .status(400)
-          .json({ error: `Package with ID ${packageId} already exists` });
+        return res.status(400).json({ error: `Package with ID ${packageId} already exists` });
       }
       pkg.packageId = packageId;
     }
 
-    // ✅ File updates
+    // ✅ Update multiple images
     if (req.files?.images) {
-      deleteFileIfExists(path.join(__dirname, `../../${pkg.images}`));
-      pkg.images = `uploads/packages/${req.files.images[0].filename}`;
+      if (pkg.images && pkg.images.length) {
+        pkg.images.forEach((imgPath) => deleteFileIfExists(path.join(__dirname, `../../${imgPath}`)));
+      }
+      pkg.images = req.files.images.map((file) => `uploads/packages/${file.filename}`);
     }
 
+    // ✅ Update thumbnail
     if (req.files?.thumbnail) {
       deleteFileIfExists(path.join(__dirname, `../../${pkg.thumbnail}`));
       pkg.thumbnail = `uploads/packages/${req.files.thumbnail[0].filename}`;
     }
 
-    // ✅ Categories
+    // ✅ Parse categories
     if (categories) {
       try {
         pkg.categories = JSON.parse(categories);
@@ -155,7 +159,7 @@ exports.updatePackage = async (req, res) => {
       }
     }
 
-    // ✅ Includes
+    // ✅ Parse includes
     if (includes) {
       try {
         pkg.includes = JSON.parse(includes);
@@ -188,7 +192,10 @@ exports.deletePackage = async (req, res) => {
     const pkg = await Package.findById(req.params.id);
     if (!pkg) return res.status(404).json({ error: 'Package not found' });
 
-    deleteFileIfExists(path.join(__dirname, `../../${pkg.images}`));
+    if (pkg.images && pkg.images.length) {
+      pkg.images.forEach((imgPath) => deleteFileIfExists(path.join(__dirname, `../../${imgPath}`)));
+    }
+
     deleteFileIfExists(path.join(__dirname, `../../${pkg.thumbnail}`));
 
     await pkg.deleteOne();
@@ -220,21 +227,14 @@ exports.getPackagesByProvider = async (req, res) => {
       return res.status(400).json({ error: 'Provider ID is required' });
     }
 
-    // Try direct query first
     let packages = await Package.find({ createdBy: providerId })
       .populate('module', 'title images isActive')
       .populate('categories', 'title')
       .sort({ createdAt: -1 });
 
-    // If no packages found, try through venues
     if (!packages.length) {
-      console.log('No direct packages found, trying through venues...');
-      
-      const venues = await Venue.find({ 
-        $or: [
-          { provider: providerId },
-          { createdBy: providerId }
-        ]
+      const venues = await Venue.find({
+        $or: [{ provider: providerId }, { createdBy: providerId }]
       }).populate({
         path: 'packages',
         populate: [
@@ -243,14 +243,11 @@ exports.getPackagesByProvider = async (req, res) => {
         ]
       });
 
-      // Extract unique packages
       const packageMap = new Map();
       venues.forEach(venue => {
         if (venue.packages) {
           venue.packages.forEach(pkg => {
-            if (pkg && pkg._id) {
-              packageMap.set(pkg._id.toString(), pkg);
-            }
+            if (pkg && pkg._id) packageMap.set(pkg._id.toString(), pkg);
           });
         }
       });
@@ -259,16 +256,13 @@ exports.getPackagesByProvider = async (req, res) => {
     }
 
     if (!packages.length) {
-      return res.status(404).json({ 
-        message: 'No packages found for this provider',
-        providerId: providerId
-      });
+      return res.status(404).json({ message: 'No packages found for this provider', providerId });
     }
 
-    res.json({ 
-      message: 'Packages fetched successfully', 
+    res.json({
+      message: 'Packages fetched successfully',
       count: packages.length,
-      packages 
+      packages
     });
   } catch (err) {
     console.error('Get Packages by Provider Error:', err);
@@ -282,7 +276,6 @@ exports.getPackage = async (req, res) => {
     const pkg = await Package.findById(req.params.id)
       .populate('module', '-__v')
       .populate('categories', '-__v');
-
     if (!pkg) return res.status(404).json({ error: 'Package not found' });
     res.json(pkg);
   } catch (err) {
@@ -311,7 +304,7 @@ exports.getPackagesByModule = async (req, res) => {
   }
 };
 
-// ✅ Block & Reactivate
+// ✅ Block / Reactivate
 exports.blockPackage = async (req, res) => {
   try {
     const pkg = await Package.findByIdAndUpdate(

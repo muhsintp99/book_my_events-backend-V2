@@ -13,22 +13,21 @@ const upload = createUpload('packages', {
 // 📦 Package Routes
 // ============================
 
-
-// Create Single Package
+// ✅ Create Package (supports multiple images + 1 thumbnail)
 router.post(
   '/',
   upload.fields([
-    { name: 'images', maxCount: 1 },
-    { name: 'thumbnail', maxCount: 1 }
+    { name: 'images', maxCount: 10 }, // ⬅️ multiple images supported
+    { name: 'thumbnail', maxCount: 1 } // single thumbnail
   ]),
   packageController.createPackage
 );
 
-// Update Package
+// ✅ Update Package (supports replacing multiple images + thumbnail)
 router.put(
   '/:id',
   upload.fields([
-    { name: 'images', maxCount: 1 },
+    { name: 'images', maxCount: 10 }, // ⬅️ multiple images supported
     { name: 'thumbnail', maxCount: 1 }
   ]),
   packageController.updatePackage
@@ -37,21 +36,22 @@ router.put(
 // ✅ Get all packages for a specific module
 router.get('/module/:moduleId', packageController.getPackagesByModule);
 
-// Delete Package
-router.delete('/:id', packageController.deletePackage);
-
+// ✅ Get packages by provider ID
 router.get('/provider/:providerId', packageController.getPackagesByProvider);
 
-// Get all Packages
+// ✅ Get all packages
 router.get('/', packageController.getPackages);
 
-// Get single Package
+// ✅ Get single package by ID
 router.get('/:id', packageController.getPackage);
 
-// Block Package
+// ✅ Delete Package
+router.delete('/:id', packageController.deletePackage);
+
+// ✅ Block Package
 router.patch('/:id/block', packageController.blockPackage);
 
-// Reactivate Package
+// ✅ Reactivate Package
 router.patch('/:id/reactivate', packageController.reactivatePackage);
 
 module.exports = router;
