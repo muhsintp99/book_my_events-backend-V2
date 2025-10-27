@@ -2,23 +2,20 @@ const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const Package = require('../../models/admin/Package');
-const Module = require('../../models/admin/module');
 
-// 🧰 Helper: Delete file if exists
+// 🧰 Delete file if exists
 const deleteFileIfExists = (filePath) => {
-  if (filePath && fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
-  }
+  if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
 };
 
-// 🧰 Helper: Populate package → module & categories
+// 🧰 Populate helper
 const populatePackage = async (packageId) => {
   return await Package.findById(packageId)
     .populate('module', '-__v')
     .populate('categories', '-__v');
 };
 
-// ✅ Create Single Package (Original functionality)
+// ✅ Create Package
 exports.createPackage = async (req, res) => {
   try {
     const {
@@ -29,7 +26,7 @@ exports.createPackage = async (req, res) => {
       description,
       packageType,
       includes,
-      priceRange,
+      price,
       createdBy,
       packageId,
     } = req.body;
@@ -38,7 +35,11 @@ exports.createPackage = async (req, res) => {
       return res.status(400).json({ error: 'Package title is required' });
     }
 
-    // Validate provided packageId or generate new one
+    if (price === undefined || isNaN(price)) {
+      return res.status(400).json({ error: 'Valid price is required' });
+    }
+
+    // Validate packageId or generate one
     let finalPackageId = packageId;
     if (packageId) {
       const existing = await Package.findOne({ packageId });
@@ -51,21 +52,23 @@ exports.createPackage = async (req, res) => {
       finalPackageId = `PKG-${uuidv4()}`;
     }
 
-    // Parse includes & price
-    const parsedIncludes = includes ? JSON.parse(includes) : [];
-    const parsedPrice = priceRange ? JSON.parse(priceRange) : { min: 0, max: 0 };
+    // ✅ Parse includes (array of objects)
+    let parsedIncludes = [];
+    if (includes) {
+      try {
+        parsedIncludes = JSON.parse(includes);
+      } catch {
+        parsedIncludes = includes;
+      }
+    }
 
-    // ✅ Parse categories (stringified JSON or array)
+    // ✅ Parse categories
     let parsedCategories = [];
     if (categories) {
-      if (Array.isArray(categories)) {
-        parsedCategories = categories;
-      } else {
-        try {
-          parsedCategories = JSON.parse(categories);
-        } catch {
-          parsedCategories = [categories];
-        }
+      try {
+        parsedCategories = JSON.parse(categories);
+      } catch {
+        parsedCategories = [categories];
       }
     }
 
@@ -78,7 +81,7 @@ exports.createPackage = async (req, res) => {
       description: description || '',
       packageType: packageType || 'basic',
       includes: parsedIncludes,
-      priceRange: parsedPrice,
+      price: parseFloat(price),
       images: req.files?.images
         ? `uploads/packages/${req.files.images[0].filename}`
         : null,
@@ -97,140 +100,6 @@ exports.createPackage = async (req, res) => {
     });
   } catch (err) {
     console.error('Create Package Error:', err);
-    if (err.code === 11000) {
-      return res
-        .status(400)
-        .json({ error: `Duplicate packageId: ${err.keyValue.packageId}` });
-    }
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// ✅ NEW: Bulk Create Packages
-exports.createBulkPackages = async (req, res) => {
-  try {
-    const { packages } = req.body;
-
-    // Validate input
-    if (!packages || !Array.isArray(packages) || packages.length === 0) {
-      return res.status(400).json({ 
-        error: 'Request body must contain a "packages" array with at least one package' 
-      });
-    }
-
-    const results = {
-      success: [],
-      failed: [],
-      total: packages.length
-    };
-
-    // Process each package
-    for (let i = 0; i < packages.length; i++) {
-      const packageInput = packages[i];
-      
-      try {
-        // Validate title
-        if (!packageInput.title || !packageInput.title.trim()) {
-          results.failed.push({
-            index: i,
-            data: packageInput,
-            error: 'Package title is required'
-          });
-          continue;
-        }
-
-        // Generate or validate packageId
-        let finalPackageId = packageInput.packageId;
-        if (finalPackageId) {
-          const existing = await Package.findOne({ packageId: finalPackageId });
-          if (existing) {
-            results.failed.push({
-              index: i,
-              data: packageInput,
-              error: `Package with ID ${finalPackageId} already exists`
-            });
-            continue;
-          }
-        } else {
-          finalPackageId = `PKG-${uuidv4()}`;
-        }
-
-        // Parse includes & price
-        const parsedIncludes = typeof packageInput.includes === 'string' 
-          ? JSON.parse(packageInput.includes) 
-          : (packageInput.includes || []);
-        const parsedPrice = typeof packageInput.priceRange === 'string' 
-          ? JSON.parse(packageInput.priceRange) 
-          : (packageInput.priceRange || { min: 0, max: 0 });
-
-        // Parse categories
-        let parsedCategories = [];
-        if (packageInput.categories) {
-          if (Array.isArray(packageInput.categories)) {
-            parsedCategories = packageInput.categories;
-          } else {
-            try {
-              parsedCategories = JSON.parse(packageInput.categories);
-            } catch {
-              parsedCategories = [packageInput.categories];
-            }
-          }
-        }
-
-        // Prepare package data
-        const packageData = {
-          packageId: finalPackageId,
-          module: packageInput.module || null,
-          categories: parsedCategories,
-          title: packageInput.title.trim(),
-          subtitle: packageInput.subtitle || '',
-          description: packageInput.description || '',
-          packageType: packageInput.packageType || 'basic',
-          includes: parsedIncludes,
-          priceRange: parsedPrice,
-          images: packageInput.images || null,
-          thumbnail: packageInput.thumbnail || null,
-          createdBy: packageInput.createdBy || null,
-        };
-
-        // Create package
-        const newPackage = await Package.create(packageData);
-        const populated = await populatePackage(newPackage._id);
-
-        results.success.push({
-          index: i,
-          packageId: newPackage.packageId,
-          _id: newPackage._id,
-          package: populated
-        });
-
-      } catch (err) {
-        console.error(`Error creating package at index ${i}:`, err);
-        results.failed.push({
-          index: i,
-          data: packageInput,
-          error: err.message
-        });
-      }
-    }
-
-    // Determine response status
-    const statusCode = results.failed.length === 0 ? 201 : 
-                      results.success.length === 0 ? 400 : 207; // 207 = Multi-Status
-
-    res.status(statusCode).json({
-      message: `Bulk package creation completed. Success: ${results.success.length}, Failed: ${results.failed.length}`,
-      results: {
-        total: results.total,
-        successCount: results.success.length,
-        failedCount: results.failed.length,
-        createdPackages: results.success,
-        failedPackages: results.failed
-      }
-    });
-
-  } catch (err) {
-    console.error('Bulk Create Packages Error:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -246,7 +115,7 @@ exports.updatePackage = async (req, res) => {
       description,
       packageType,
       includes,
-      priceRange,
+      price,
       updatedBy,
       packageId,
     } = req.body;
@@ -254,7 +123,6 @@ exports.updatePackage = async (req, res) => {
     const pkg = await Package.findById(req.params.id);
     if (!pkg) return res.status(404).json({ error: 'Package not found' });
 
-    // Validate packageId if provided and different
     if (packageId && packageId !== pkg.packageId) {
       const existing = await Package.findOne({ packageId });
       if (existing) {
@@ -265,7 +133,7 @@ exports.updatePackage = async (req, res) => {
       pkg.packageId = packageId;
     }
 
-    // ✅ Handle file updates (images + thumbnail)
+    // ✅ File updates
     if (req.files?.images) {
       deleteFileIfExists(path.join(__dirname, `../../${pkg.images}`));
       pkg.images = `uploads/packages/${req.files.images[0].filename}`;
@@ -276,27 +144,30 @@ exports.updatePackage = async (req, res) => {
       pkg.thumbnail = `uploads/packages/${req.files.thumbnail[0].filename}`;
     }
 
-    // ✅ Parse & update categories
+    // ✅ Categories
     if (categories) {
-      if (Array.isArray(categories)) {
-        pkg.categories = categories;
-      } else {
-        try {
-          pkg.categories = JSON.parse(categories);
-        } catch {
-          pkg.categories = [categories];
-        }
+      try {
+        pkg.categories = JSON.parse(categories);
+      } catch {
+        pkg.categories = [categories];
       }
     }
 
-    // Update fields
+    // ✅ Includes
+    if (includes) {
+      try {
+        pkg.includes = JSON.parse(includes);
+      } catch {
+        pkg.includes = includes;
+      }
+    }
+
     if (module) pkg.module = module;
     if (title) pkg.title = title.trim();
     if (subtitle) pkg.subtitle = subtitle;
     if (description) pkg.description = description;
     if (packageType) pkg.packageType = packageType;
-    if (includes) pkg.includes = JSON.parse(includes);
-    if (priceRange) pkg.priceRange = JSON.parse(priceRange);
+    if (price !== undefined && !isNaN(price)) pkg.price = parseFloat(price);
     if (updatedBy) pkg.updatedBy = updatedBy;
 
     await pkg.save();
@@ -305,11 +176,6 @@ exports.updatePackage = async (req, res) => {
     res.json({ message: 'Package updated successfully', package: populated });
   } catch (err) {
     console.error('Update Package Error:', err);
-    if (err.code === 11000) {
-      return res
-        .status(400)
-        .json({ error: `Duplicate packageId: ${err.keyValue.packageId}` });
-    }
     res.status(500).json({ error: err.message });
   }
 };
@@ -331,7 +197,7 @@ exports.deletePackage = async (req, res) => {
   }
 };
 
-// ✅ Get all Packages
+// ✅ Get All Packages
 exports.getPackages = async (req, res) => {
   try {
     const packages = await Package.find()
@@ -339,12 +205,11 @@ exports.getPackages = async (req, res) => {
       .populate('categories', '-__v');
     res.json(packages);
   } catch (err) {
-    console.error('Get Packages Error:', err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// ✅ Get single Package
+// ✅ Get Single Package
 exports.getPackage = async (req, res) => {
   try {
     const pkg = await Package.findById(req.params.id)
@@ -354,7 +219,6 @@ exports.getPackage = async (req, res) => {
     if (!pkg) return res.status(404).json({ error: 'Package not found' });
     res.json(pkg);
   } catch (err) {
-    console.error('Get Package Error:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -363,58 +227,48 @@ exports.getPackage = async (req, res) => {
 exports.getPackagesByModule = async (req, res) => {
   try {
     const { moduleId } = req.params;
-    if (!moduleId) return res.status(400).json({ error: 'Module ID is required' });
+    if (!moduleId)
+      return res.status(400).json({ error: 'Module ID is required' });
 
     const packages = await Package.find({ module: moduleId })
       .populate('module', 'title images isActive')
       .populate('categories', 'title')
       .sort({ createdAt: -1 });
 
-    if (!packages || packages.length === 0) {
+    if (!packages.length)
       return res.status(404).json({ message: 'No packages found for this module' });
-    }
 
     res.json({ message: 'Packages fetched successfully', packages });
   } catch (err) {
-    console.error('Get Packages by Module Error:', err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// ✅ Block Package
+// ✅ Block & Reactivate
 exports.blockPackage = async (req, res) => {
   try {
     const pkg = await Package.findByIdAndUpdate(
       req.params.id,
       { isActive: false, updatedBy: req.body.updatedBy || null },
       { new: true }
-    )
-      .populate('module', '-__v')
-      .populate('categories', '-__v');
-
+    );
     if (!pkg) return res.status(404).json({ error: 'Package not found' });
     res.json({ message: 'Package blocked successfully', package: pkg });
   } catch (err) {
-    console.error('Block Package Error:', err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// ✅ Reactivate Package
 exports.reactivatePackage = async (req, res) => {
   try {
     const pkg = await Package.findByIdAndUpdate(
       req.params.id,
       { isActive: true, updatedBy: req.body.updatedBy || null },
       { new: true }
-    )
-      .populate('module', '-__v')
-      .populate('categories', '-__v');
-
+    );
     if (!pkg) return res.status(404).json({ error: 'Package not found' });
     res.json({ message: 'Package reactivated successfully', package: pkg });
   } catch (err) {
-    console.error('Reactivate Package Error:', err);
     res.status(500).json({ error: err.message });
   }
 };

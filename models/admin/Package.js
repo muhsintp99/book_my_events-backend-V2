@@ -1,10 +1,5 @@
 const mongoose = require('mongoose');
 
-const PriceRangeSchema = new mongoose.Schema({
-  min: { type: Number, required: true, min: 0 },
-  max: { type: Number, required: true, min: 0 }
-}, { _id: false });
-
 const PackageSchema = new mongoose.Schema({
   module: { 
     type: mongoose.Schema.Types.ObjectId, 
@@ -13,7 +8,6 @@ const PackageSchema = new mongoose.Schema({
     required: false
   },
 
-  // ✅ Changed to multiple categories
   categories: [
     {
       type: mongoose.Schema.Types.ObjectId,
@@ -25,14 +19,18 @@ const PackageSchema = new mongoose.Schema({
   subtitle: { type: String, trim: true },
   description: { type: String, trim: true },
 
-  packageType: {
-    type: String,
-    enum: ['basic', 'standard', 'premium', 'deluxe', 'royal'],
-    default: 'basic'
-  },
+  // ✅ Flexible package type
+  packageType: { type: String, default: 'basic' },
 
-  includes: { type: [String], default: [] },
-  priceRange: { type: PriceRangeSchema, required: true },
+  // ✅ Includes: array of objects
+  includes: [
+    {
+      title: { type: String, required: true, trim: true },
+      items: [{ type: String, required: true }]
+    }
+  ],
+
+  price: { type: Number, required: true, min: 0 },
 
   images: { type: String, default: null },
   thumbnail: { type: String, default: null },
@@ -48,3 +46,4 @@ PackageSchema.pre('save', function (next) {
 });
 
 module.exports = mongoose.model('Package', PackageSchema);
+

@@ -13,10 +13,9 @@ const upload = createUpload('packages', {
 // 📦 Package Routes
 // ============================
 
-// ✅ NEW: Bulk Create Packages (accepts array of packages)
-router.post('/bulk', packageController.createBulkPackages);
+// ❌ Removed /bulk route
 
-// Create Single Package (uploads images + thumbnail)
+// Create Single Package
 router.post(
   '/',
   upload.fields([
@@ -26,7 +25,7 @@ router.post(
   packageController.createPackage
 );
 
-// Update Package (uploads images + thumbnail)
+// Update Package
 router.put(
   '/:id',
   upload.fields([
