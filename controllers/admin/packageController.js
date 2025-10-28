@@ -227,6 +227,7 @@ exports.getPackages = async (req, res) => {
 };
 
 // ✅ Get Packages by Provider ID
+// ✅ Get Packages by Provider ID
 exports.getPackagesByProvider = async (req, res) => {
   try {
     const { providerId } = req.params;
@@ -235,7 +236,13 @@ exports.getPackagesByProvider = async (req, res) => {
       return res.status(400).json({ error: 'Provider ID is required' });
     }
 
-    let packages = await Package.find({ createdBy: providerId })
+    // ✅ FIXED: Query by 'provider' instead of 'createdBy'
+    let packages = await Package.find({ 
+      $or: [
+        { provider: providerId },
+        { createdBy: providerId }
+      ]
+    })
       .populate('module', 'title images isActive')
       .populate('categories', 'title')
       .sort({ createdAt: -1 });
@@ -277,7 +284,6 @@ exports.getPackagesByProvider = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
 // ✅ Get Single Package
 exports.getPackage = async (req, res) => {
   try {
