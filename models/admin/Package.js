@@ -34,6 +34,13 @@ const PackageSchema = new mongoose.Schema({
   images: [{ type: String }],
   thumbnail: { type: String, default: null },
 
+
+    provider: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false,
+    index: true
+  }, 
   // ✅ FIXED: Changed ref from 'Provider' to 'User'
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,

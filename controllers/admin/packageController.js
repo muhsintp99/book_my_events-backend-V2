@@ -30,6 +30,7 @@ exports.createPackage = async (req, res) => {
       price,
       createdBy,
       packageId,
+      providerId, // ✅ NEW FIELD
     } = req.body;
 
     if (!title || !title.trim()) {
@@ -40,7 +41,12 @@ exports.createPackage = async (req, res) => {
       return res.status(400).json({ error: 'Valid price is required' });
     }
 
-    // Validate packageId or generate one
+    // ✅ Validate providerId
+    if (!providerId) {
+      return res.status(400).json({ error: 'Provider ID is required' });
+    }
+
+    // Validate or generate Package ID
     let finalPackageId = packageId;
     if (packageId) {
       const existing = await Package.findOne({ packageId });
@@ -81,6 +87,7 @@ exports.createPackage = async (req, res) => {
       ? `uploads/packages/${req.files.thumbnail[0].filename}`
       : null;
 
+    // ✅ Create Package Data
     const packageData = {
       packageId: finalPackageId,
       module: module || null,
@@ -94,6 +101,7 @@ exports.createPackage = async (req, res) => {
       images,
       thumbnail,
       createdBy: createdBy || null,
+      provider: providerId, // ✅ Added here
     };
 
     const newPackage = await Package.create(packageData);
