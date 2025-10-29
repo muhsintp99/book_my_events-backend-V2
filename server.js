@@ -70,6 +70,9 @@ app.use("/api/renters", require("./routes/vendor/renterRoutes"));
 app.use("/api/vehicles", require("./routes/vendor/vehicleRouter"));
 app.use("/api/venuecoupons", require("./routes/vendor/venueCouponRoutes"));
 
+app.use("/api/profile", require("./routes/vendor/profileRoutes"));
+
+
 // Server listen
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));

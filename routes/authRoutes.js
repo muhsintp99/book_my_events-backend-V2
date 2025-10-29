@@ -67,6 +67,8 @@ router.post(
   authController.register
 );
 
+
+router.get('/providers', authController.listProviders);
 // ---------------- LOGIN/LOGOUT ----------------
 router.post('/login', authController.login);
 router.post('/logout', protect, authController.logout);

@@ -363,8 +363,14 @@ exports.createVenue = async (req, res) => {
       { path: "module", select: "title moduleId icon isActive" },
       { path: "packages" }, // Removed select to include all package fields
       { path: "createdBy", select: "name email phone" },
-      { path: "provider", select: "name email phone" },
-    ]);
+{
+  path: 'provider',
+  select: 'userId firstName lastName email phone',
+  populate: {
+    path: 'profile',
+    select: 'mobileNumber socialLinks profilePhoto'
+  }
+}    ]);
 
     res.status(201).json({
       success: true,
@@ -724,7 +730,14 @@ exports.filterVenues = async (req, res) => {
       })
        .populate('packages') // FIXED - Returns ALL package fields
       .populate('createdBy', 'name email phone')
-      .populate('provider', 'name email phone')
+.populate({
+  path: 'provider',
+  select: 'userId firstName lastName email phone',
+  populate: {
+    path: 'profile',
+    select: 'mobileNumber socialLinks profilePhoto'
+  }
+})
       .lean();
 
     // Calculate distance and add metadata
@@ -996,8 +1009,14 @@ exports.searchVenues = async (req, res) => {
         select: "title subtitle description packageType priceRange isActive",
       })
       .populate("createdBy", "name email phone")
-      .populate("provider", "name email phone")
-      .lean();
+.populate({
+  path: 'provider',
+  select: 'userId firstName lastName email phone',
+  populate: {
+    path: 'profile',
+    select: 'mobileNumber socialLinks profilePhoto'
+  }
+})      .lean();
 
     // Apply location filtering and calculate distances
     if (useLocationFilter) {
@@ -1100,8 +1119,14 @@ exports.getVenues = async (req, res) => {
       })
       .populate("packages") // FIXED - No select restriction
       .populate("createdBy", "name email phone")
-      .populate("provider", "name email phone")
-      .lean();
+.populate({
+  path: 'provider',
+  select: 'userId firstName lastName email phone',
+  populate: {
+    path: 'profile',
+    select: 'mobileNumber socialLinks profilePhoto'
+  }
+})      .lean();
 
     if (!venues || venues.length === 0) {
       return res.status(404).json({
@@ -1169,8 +1194,14 @@ exports.getVenuesByLocation = async (req, res) => {
       })
        .populate('packages') // FIXED
       .populate('createdBy', 'name email phone')
-      .populate('provider', 'name email phone')
-      .lean();
+.populate({
+  path: 'provider',
+  select: 'userId firstName lastName email phone',
+  populate: {
+    path: 'profile',
+    select: 'mobileNumber socialLinks profilePhoto'
+  }
+})      .lean();
     const venuesInZone = [];
 
     venues.forEach((venue) => {
@@ -1247,8 +1278,14 @@ exports.getVenuesByProvider = async (req, res) => {
       })
        .populate('packages') // FIXED
       .populate('createdBy', 'name email')
-      .populate('provider', 'name email')
-      .sort({ createdAt: -1 })
+.populate({
+  path: 'provider',
+  select: 'userId firstName lastName email phone',
+  populate: {
+    path: 'profile',
+    select: 'mobileNumber socialLinks profilePhoto'
+  }
+})      .sort({ createdAt: -1 })
       .lean();
 
     res.status(200).json({
@@ -1302,9 +1339,13 @@ exports.getVenue = async (req, res) => {
         select: "name email phone",
       })
       .populate({
-        path: "provider",
-        select: "name email phone",
-      })
+  path: 'provider',
+  select: 'userId firstName lastName email phone',
+  populate: {
+    path: 'profile',
+    select: 'mobileNumber socialLinks profilePhoto'
+  }
+})
       .lean();
 
     if (!venue) {
@@ -1481,10 +1522,14 @@ exports.updateVenue = async (req, res) => {
         path: "createdBy",
         select: "name email phone",
       })
-      .populate({
-        path: "provider",
-        select: "name email phone",
-      });
+     .populate({
+  path: 'provider',
+  select: 'userId firstName lastName email phone',
+  populate: {
+    path: 'profile',
+    select: 'mobileNumber socialLinks profilePhoto'
+  }
+})
 
     if (!venue) {
       return res.status(404).json({
@@ -1535,8 +1580,14 @@ exports.getVenuesByCategory = async (req, res) => {
       })
       .populate("packages") // FIXED - Removed select to return ALL package fields
       .populate("createdBy", "name email phone")
-      .populate("provider", "name email phone")
-      .sort({ createdAt: -1 })
+.populate({
+  path: 'provider',
+  select: 'userId firstName lastName email phone',
+  populate: {
+    path: 'profile',
+    select: 'mobileNumber socialLinks profilePhoto'
+  }
+})      .sort({ createdAt: -1 })
       .lean();
 
     res.status(200).json({
@@ -1586,8 +1637,14 @@ exports.getVenuesByModule = async (req, res) => {
         select: "title subtitle description packageType priceRange isActive",
       })
       .populate("createdBy", "name email")
-      .populate("provider", "name email")
-      .sort({ createdAt: -1 })
+.populate({
+  path: 'provider',
+  select: 'userId firstName lastName email phone',
+  populate: {
+    path: 'profile',
+    select: 'mobileNumber socialLinks profilePhoto'
+  }
+})      .sort({ createdAt: -1 })
       .lean();
 
     res.status(200).json({
@@ -2068,8 +2125,14 @@ exports.sortVenues = async (req, res) => {
         select: "title subtitle description packageType priceRange isActive",
       })
       .populate("createdBy", "name email phone")
-      .populate("provider", "name email phone")
-      .lean();
+.populate({
+  path: 'provider',
+  select: 'userId firstName lastName email phone',
+  populate: {
+    path: 'profile',
+    select: 'mobileNumber socialLinks profilePhoto'
+  }
+})      .lean();
 
     let useLocationFilter = false;
     let userLat,
@@ -2227,8 +2290,14 @@ exports.getTopPicks = async (req, res) => {
         select: "title subtitle description packageType priceRange isActive",
       })
       .populate("createdBy", "name email phone")
-      .populate("provider", "name email phone")
-      .lean();
+.populate({
+  path: 'provider',
+  select: 'userId firstName lastName email phone',
+  populate: {
+    path: 'profile',
+    select: 'mobileNumber socialLinks profilePhoto'
+  }
+})      .lean();
 
     if (useLocationFilter) {
       venues = venues
