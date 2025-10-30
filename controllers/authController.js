@@ -832,9 +832,9 @@ exports.resetPassword = async (req, res) => {
     const { password, confirmPassword } = req.body;
 
     if (!password || !confirmPassword) {
-      return res
-        .status(400)
-        .json({ message: "Password and confirm password are required" });
+      return res.status(400).json({ 
+        message: "Password and confirm password are required" 
+      });
     }
 
     if (password !== confirmPassword) {
@@ -842,12 +842,12 @@ exports.resetPassword = async (req, res) => {
     }
 
     if (password.length < 6) {
-      return res
-        .status(400)
-        .json({ message: "Password must be at least 6 characters long" });
+      return res.status(400).json({ 
+        message: "Password must be at least 6 characters long" 
+      });
     }
 
-    // ✅ Update password
+    // Update password
     user.password = password;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
@@ -856,8 +856,9 @@ exports.resetPassword = async (req, res) => {
     res.json({ success: true, message: "Password reset successful" });
   } catch (err) {
     console.error("Reset Password Error:", err);
-    res
-      .status(500)
-      .json({ message: "Reset password failed", error: err.message });
+    res.status(500).json({ 
+      message: "Reset password failed", 
+      error: err.message 
+    });
   }
 };
