@@ -5,9 +5,9 @@ const socialLinksSchema = new mongoose.Schema({
   facebook: { type: String, trim: true, default: '' },
   instagram: { type: String, trim: true, default: '' },
   twitter: { type: String, trim: true, default: '' },
-  linkedin: { type: String, trim: true, default: '' },
+  // linkedin: { type: String, trim: true, default: '' },
   youtube: { type: String, trim: true, default: '' },
-  github: { type: String, trim: true, default: '' },
+  // github: { type: String, trim: true, default: '' },
   whatsapp: { type: String, trim: true, default: '' },
   website: { type: String, trim: true, default: '' },
   other: { type: String, trim: true, default: '' }

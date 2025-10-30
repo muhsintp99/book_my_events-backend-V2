@@ -69,6 +69,8 @@ app.use("/api/packages", require("./routes/admin/packageRoutes"));
 app.use("/api/renters", require("./routes/vendor/renterRoutes"));
 app.use("/api/vehicles", require("./routes/vendor/vehicleRouter"));
 app.use("/api/venuecoupons", require("./routes/vendor/venueCouponRoutes"));
+app.use("/api/catering", require("./routes/vendor/cateringRoutes")); // ✅ Added this line
+
 
 app.use("/api/profile", require("./routes/vendor/profileRoutes"));
 
