@@ -4,7 +4,7 @@ const bannerController = require("../../controllers/admin/bannerController");
 
 // Routes
 // IMPORTANT: Specific routes must come before parameterized routes
-router.get("/module/:moduleId", bannerController.getBannersByModule);
+// router.get("/module/:moduleId", bannerController.getBannersByModule);
 
 router.get("/vendor/:vendorId", bannerController.getBannersByVendor);
 
