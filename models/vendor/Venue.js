@@ -331,8 +331,8 @@ const pricingScheduleSchema = new mongoose.Schema({
 
 // NEW: Discount Schema - only packageDiscount and nonAc
 const discountSchema = new mongoose.Schema({
-  packageDiscount: { type: Number, min: 0, max: 100, default: 0 },
-  nonAc: { type: Number, min: 0, max: 100, default: 0 },
+  packageDiscount: { type: Number, default: 0 },
+  nonAc: { type: Number, default: 0 },
 }, { _id: false });
 
 // FAQ Schema

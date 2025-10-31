@@ -91,11 +91,11 @@ const normalizeFormData = (data) => {
     }
   });
 
-   if (normalized.discount) {
+  if (normalized.discount) {
     let discountData = normalized.discount;
-    
+
     // If discount is a string, try to parse it
-    if (typeof discountData === 'string') {
+    if (typeof discountData === "string") {
       try {
         discountData = JSON.parse(discountData);
       } catch (e) {
@@ -104,42 +104,38 @@ const normalizeFormData = (data) => {
         if (!isNaN(num)) {
           discountData = {
             packageDiscount: num,
-            nonAc: 0
+            nonAc: 0,
           };
         } else {
           discountData = {
             packageDiscount: 0,
-            nonAc: 0
+            nonAc: 0,
           };
         }
       }
     }
+    if (typeof discountData === "object" && discountData !== null) {
+      const packageDiscount = parseFloat(discountData.packageDiscount) || 0;
+      const nonAc = parseFloat(discountData.nonAc) || 0;
 
-      if (typeof discountData === 'number') {
-      discountData = {
-        packageDiscount: discountData,
-        nonAc: 0
-      };
-    }
-    
-    // Ensure discount object has correct structure
-    if (typeof discountData === 'object' && discountData !== null) {
+      // Validate discount values
+      // packageDiscount must be between 0-100 (percentage)
+      // nonAc can be any positive number (could be a flat amount, not percentage)
+      if (packageDiscount < 0 || packageDiscount > 100) {
+        throw new Error("Package discount must be between 0 and 100");
+      }
+      if (nonAc < 0) {
+        throw new Error("Non-AC discount must be a positive number");
+      }
+
       normalized.discount = {
-        packageDiscount: parseFloat(discountData.packageDiscount) || 0,
-        nonAc: parseFloat(discountData.nonAc) || 0
+        packageDiscount: packageDiscount,
+        nonAc: nonAc,
       };
-      
-      // Validate discount values (0-100)
-      if (normalized.discount.packageDiscount < 0 || normalized.discount.packageDiscount > 100) {
-        normalized.discount.packageDiscount = 0;
-      }
-      if (normalized.discount.nonAc < 0 || normalized.discount.nonAc > 100) {
-        normalized.discount.nonAc = 0;
-      }
     } else {
       normalized.discount = {
         packageDiscount: 0,
-        nonAc: 0
+        nonAc: 0,
       };
     }
   }
@@ -172,8 +168,7 @@ const normalizeFormData = (data) => {
     "acType",
   ];
 
-
-  exports.updateDiscount = async (req, res) => {
+ exports.updateDiscount = async (req, res) => {
   try {
     const venueId = req.params.id;
 
@@ -192,6 +187,7 @@ const normalizeFormData = (data) => {
       nonAc: parseFloat(nonAc) || 0
     };
 
+    // packageDiscount is a percentage (0-100)
     if (discountData.packageDiscount < 0 || discountData.packageDiscount > 100) {
       return res.status(400).json({
         success: false,
@@ -199,10 +195,11 @@ const normalizeFormData = (data) => {
       });
     }
 
-    if (discountData.nonAc < 0 || discountData.nonAc > 100) {
+    // nonAc can be any positive number (no upper limit)
+    if (discountData.nonAc < 0) {
       return res.status(400).json({
         success: false,
-        message: "Non-AC discount must be between 0 and 100",
+        message: "Non-AC discount must be a positive number",
       });
     }
 
@@ -245,7 +242,6 @@ const normalizeFormData = (data) => {
     });
   }
 };
-
   stringFields.forEach((field) => {
     if (Array.isArray(normalized[field])) {
       normalized[field] = normalized[field][0];
@@ -489,14 +485,15 @@ exports.createVenue = async (req, res) => {
       { path: "module", select: "title moduleId icon isActive" },
       { path: "packages" }, // Removed select to include all package fields
       { path: "createdBy", select: "name email phone" },
-{
-  path: 'provider',
-  select: 'userId firstName lastName email phone',
-  populate: {
-    path: 'profile',
-    select: 'mobileNumber socialLinks profilePhoto'
-  }
-}    ]);
+      {
+        path: "provider",
+        select: "userId firstName lastName email phone",
+        populate: {
+          path: "profile",
+          select: "mobileNumber socialLinks profilePhoto",
+        },
+      },
+    ]);
 
     res.status(201).json({
       success: true,
@@ -841,29 +838,29 @@ exports.filterVenues = async (req, res) => {
 
     // Fetch venues with populated fields
     let venues = await Venue.find(query)
-       .populate({
-        path: 'categories',
-        select: 'title image categoryId module isActive',
-        populate: { path: 'module', select: 'title moduleId' }
+      .populate({
+        path: "categories",
+        select: "title image categoryId module isActive",
+        populate: { path: "module", select: "title moduleId" },
       })
       .populate({
         path: "module",
         select: "title moduleId icon isActive",
       })
-       .populate({
-        path: 'module',
-        select: 'title moduleId icon isActive'
+      .populate({
+        path: "module",
+        select: "title moduleId icon isActive",
       })
-       .populate('packages') // FIXED - Returns ALL package fields
-      .populate('createdBy', 'name email phone')
-.populate({
-  path: 'provider',
-  select: 'userId firstName lastName email phone',
-  populate: {
-    path: 'profile',
-    select: 'mobileNumber socialLinks profilePhoto'
-  }
-})
+      .populate("packages") // FIXED - Returns ALL package fields
+      .populate("createdBy", "name email phone")
+      .populate({
+        path: "provider",
+        select: "userId firstName lastName email phone",
+        populate: {
+          path: "profile",
+          select: "mobileNumber socialLinks profilePhoto",
+        },
+      })
       .lean();
 
     // Calculate distance and add metadata
@@ -1135,14 +1132,15 @@ exports.searchVenues = async (req, res) => {
         select: "title subtitle description packageType priceRange isActive",
       })
       .populate("createdBy", "name email phone")
-.populate({
-  path: 'provider',
-  select: 'userId firstName lastName email phone',
-  populate: {
-    path: 'profile',
-    select: 'mobileNumber socialLinks profilePhoto'
-  }
-})      .lean();
+      .populate({
+        path: "provider",
+        select: "userId firstName lastName email phone",
+        populate: {
+          path: "profile",
+          select: "mobileNumber socialLinks profilePhoto",
+        },
+      })
+      .lean();
 
     // Apply location filtering and calculate distances
     if (useLocationFilter) {
@@ -1245,14 +1243,15 @@ exports.getVenues = async (req, res) => {
       })
       .populate("packages") // FIXED - No select restriction
       .populate("createdBy", "name email phone")
-.populate({
-  path: 'provider',
-  select: 'userId firstName lastName email phone',
-  populate: {
-    path: 'profile',
-    select: 'mobileNumber socialLinks profilePhoto'
-  }
-})      .lean();
+      .populate({
+        path: "provider",
+        select: "userId firstName lastName email phone",
+        populate: {
+          path: "profile",
+          select: "mobileNumber socialLinks profilePhoto",
+        },
+      })
+      .lean();
 
     if (!venues || venues.length === 0) {
       return res.status(404).json({
@@ -1318,16 +1317,17 @@ exports.getVenuesByLocation = async (req, res) => {
         path: "packages",
         select: "title subtitle description packageType priceRange isActive",
       })
-       .populate('packages') // FIXED
-      .populate('createdBy', 'name email phone')
-.populate({
-  path: 'provider',
-  select: 'userId firstName lastName email phone',
-  populate: {
-    path: 'profile',
-    select: 'mobileNumber socialLinks profilePhoto'
-  }
-})      .lean();
+      .populate("packages") // FIXED
+      .populate("createdBy", "name email phone")
+      .populate({
+        path: "provider",
+        select: "userId firstName lastName email phone",
+        populate: {
+          path: "profile",
+          select: "mobileNumber socialLinks profilePhoto",
+        },
+      })
+      .lean();
     const venuesInZone = [];
 
     venues.forEach((venue) => {
@@ -1402,16 +1402,17 @@ exports.getVenuesByProvider = async (req, res) => {
         path: "packages",
         select: "title subtitle description packageType priceRange isActive",
       })
-       .populate('packages') // FIXED
-      .populate('createdBy', 'name email')
-.populate({
-  path: 'provider',
-  select: 'userId firstName lastName email phone',
-  populate: {
-    path: 'profile',
-    select: 'mobileNumber socialLinks profilePhoto'
-  }
-})      .sort({ createdAt: -1 })
+      .populate("packages") // FIXED
+      .populate("createdBy", "name email")
+      .populate({
+        path: "provider",
+        select: "userId firstName lastName email phone",
+        populate: {
+          path: "profile",
+          select: "mobileNumber socialLinks profilePhoto",
+        },
+      })
+      .sort({ createdAt: -1 })
       .lean();
 
     res.status(200).json({
@@ -1425,13 +1426,11 @@ exports.getVenuesByProvider = async (req, res) => {
     });
   } catch (err) {
     console.error("Error fetching venues by provider:", err);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to fetch venues by provider",
-        error: err.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch venues by provider",
+      error: err.message,
+    });
   }
 };
 
@@ -1465,13 +1464,13 @@ exports.getVenue = async (req, res) => {
         select: "name email phone",
       })
       .populate({
-  path: 'provider',
-  select: 'userId firstName lastName email phone',
-  populate: {
-    path: 'profile',
-    select: 'mobileNumber socialLinks profilePhoto'
-  }
-})
+        path: "provider",
+        select: "userId firstName lastName email phone",
+        populate: {
+          path: "profile",
+          select: "mobileNumber socialLinks profilePhoto",
+        },
+      })
       .lean();
 
     if (!venue) {
@@ -1648,14 +1647,14 @@ exports.updateVenue = async (req, res) => {
         path: "createdBy",
         select: "name email phone",
       })
-     .populate({
-  path: 'provider',
-  select: 'userId firstName lastName email phone',
-  populate: {
-    path: 'profile',
-    select: 'mobileNumber socialLinks profilePhoto'
-  }
-})
+      .populate({
+        path: "provider",
+        select: "userId firstName lastName email phone",
+        populate: {
+          path: "profile",
+          select: "mobileNumber socialLinks profilePhoto",
+        },
+      });
 
     if (!venue) {
       return res.status(404).json({
@@ -1706,14 +1705,15 @@ exports.getVenuesByCategory = async (req, res) => {
       })
       .populate("packages") // FIXED - Removed select to return ALL package fields
       .populate("createdBy", "name email phone")
-.populate({
-  path: 'provider',
-  select: 'userId firstName lastName email phone',
-  populate: {
-    path: 'profile',
-    select: 'mobileNumber socialLinks profilePhoto'
-  }
-})      .sort({ createdAt: -1 })
+      .populate({
+        path: "provider",
+        select: "userId firstName lastName email phone",
+        populate: {
+          path: "profile",
+          select: "mobileNumber socialLinks profilePhoto",
+        },
+      })
+      .sort({ createdAt: -1 })
       .lean();
 
     res.status(200).json({
@@ -1763,14 +1763,15 @@ exports.getVenuesByModule = async (req, res) => {
         select: "title subtitle description packageType priceRange isActive",
       })
       .populate("createdBy", "name email")
-.populate({
-  path: 'provider',
-  select: 'userId firstName lastName email phone',
-  populate: {
-    path: 'profile',
-    select: 'mobileNumber socialLinks profilePhoto'
-  }
-})      .sort({ createdAt: -1 })
+      .populate({
+        path: "provider",
+        select: "userId firstName lastName email phone",
+        populate: {
+          path: "profile",
+          select: "mobileNumber socialLinks profilePhoto",
+        },
+      })
+      .sort({ createdAt: -1 })
       .lean();
 
     res.status(200).json({
@@ -2251,14 +2252,15 @@ exports.sortVenues = async (req, res) => {
         select: "title subtitle description packageType priceRange isActive",
       })
       .populate("createdBy", "name email phone")
-.populate({
-  path: 'provider',
-  select: 'userId firstName lastName email phone',
-  populate: {
-    path: 'profile',
-    select: 'mobileNumber socialLinks profilePhoto'
-  }
-})      .lean();
+      .populate({
+        path: "provider",
+        select: "userId firstName lastName email phone",
+        populate: {
+          path: "profile",
+          select: "mobileNumber socialLinks profilePhoto",
+        },
+      })
+      .lean();
 
     let useLocationFilter = false;
     let userLat,
@@ -2416,14 +2418,15 @@ exports.getTopPicks = async (req, res) => {
         select: "title subtitle description packageType priceRange isActive",
       })
       .populate("createdBy", "name email phone")
-.populate({
-  path: 'provider',
-  select: 'userId firstName lastName email phone',
-  populate: {
-    path: 'profile',
-    select: 'mobileNumber socialLinks profilePhoto'
-  }
-})      .lean();
+      .populate({
+        path: "provider",
+        select: "userId firstName lastName email phone",
+        populate: {
+          path: "profile",
+          select: "mobileNumber socialLinks profilePhoto",
+        },
+      })
+      .lean();
 
     if (useLocationFilter) {
       venues = venues
