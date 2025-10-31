@@ -59,7 +59,6 @@ const normalizeFormData = (data) => {
   const numberFields = [
     "latitude",
     "longitude",
-    "discount",
     "advanceDeposit",
     "maxGuestsSeated",
     "maxGuestsStanding",
@@ -92,6 +91,59 @@ const normalizeFormData = (data) => {
     }
   });
 
+   if (normalized.discount) {
+    let discountData = normalized.discount;
+    
+    // If discount is a string, try to parse it
+    if (typeof discountData === 'string') {
+      try {
+        discountData = JSON.parse(discountData);
+      } catch (e) {
+        // If it's just a number string, treat it as old format (general discount)
+        const num = parseFloat(discountData);
+        if (!isNaN(num)) {
+          discountData = {
+            packageDiscount: num,
+            nonAc: 0
+          };
+        } else {
+          discountData = {
+            packageDiscount: 0,
+            nonAc: 0
+          };
+        }
+      }
+    }
+
+      if (typeof discountData === 'number') {
+      discountData = {
+        packageDiscount: discountData,
+        nonAc: 0
+      };
+    }
+    
+    // Ensure discount object has correct structure
+    if (typeof discountData === 'object' && discountData !== null) {
+      normalized.discount = {
+        packageDiscount: parseFloat(discountData.packageDiscount) || 0,
+        nonAc: parseFloat(discountData.nonAc) || 0
+      };
+      
+      // Validate discount values (0-100)
+      if (normalized.discount.packageDiscount < 0 || normalized.discount.packageDiscount > 100) {
+        normalized.discount.packageDiscount = 0;
+      }
+      if (normalized.discount.nonAc < 0 || normalized.discount.nonAc > 100) {
+        normalized.discount.nonAc = 0;
+      }
+    } else {
+      normalized.discount = {
+        packageDiscount: 0,
+        nonAc: 0
+      };
+    }
+  }
+
   // Normalize string fields
   const stringFields = [
     "venueName",
@@ -119,6 +171,80 @@ const normalizeFormData = (data) => {
     "module",
     "acType",
   ];
+
+
+  exports.updateDiscount = async (req, res) => {
+  try {
+    const venueId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(venueId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid venue ID",
+      });
+    }
+
+    const { packageDiscount, nonAc } = req.body;
+
+    // Validate discount values
+    const discountData = {
+      packageDiscount: parseFloat(packageDiscount) || 0,
+      nonAc: parseFloat(nonAc) || 0
+    };
+
+    if (discountData.packageDiscount < 0 || discountData.packageDiscount > 100) {
+      return res.status(400).json({
+        success: false,
+        message: "Package discount must be between 0 and 100",
+      });
+    }
+
+    if (discountData.nonAc < 0 || discountData.nonAc > 100) {
+      return res.status(400).json({
+        success: false,
+        message: "Non-AC discount must be between 0 and 100",
+      });
+    }
+
+    const venue = await Venue.findByIdAndUpdate(
+      venueId,
+      { discount: discountData },
+      { new: true, runValidators: true }
+    )
+      .populate('categories', 'title image categoryId module isActive')
+      .populate('module', 'title moduleId icon isActive')
+      .populate('packages')
+      .populate('createdBy', 'name email phone')
+      .populate({
+        path: 'provider',
+        select: 'userId firstName lastName email phone',
+        populate: {
+          path: 'profile',
+          select: 'mobileNumber socialLinks profilePhoto'
+        }
+      });
+
+    if (!venue) {
+      return res.status(404).json({
+        success: false,
+        message: "Venue not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: venue,
+      message: "Discount updated successfully",
+    });
+  } catch (err) {
+    console.error("Error in updateDiscount:", err.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update discount",
+      error: err.message,
+    });
+  }
+};
 
   stringFields.forEach((field) => {
     if (Array.isArray(normalized[field])) {

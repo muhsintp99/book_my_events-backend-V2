@@ -329,6 +329,12 @@ const pricingScheduleSchema = new mongoose.Schema({
   sunday: { type: dailyScheduleSchema, default: {} },
 }, { _id: false });
 
+// NEW: Discount Schema - only packageDiscount and nonAc
+const discountSchema = new mongoose.Schema({
+  packageDiscount: { type: Number, min: 0, max: 100, default: 0 },
+  nonAc: { type: Number, min: 0, max: 100, default: 0 },
+}, { _id: false });
+
 // FAQ Schema
 const faqSchema = new mongoose.Schema({
   question: { type: String, required: true, trim: true },
@@ -342,26 +348,26 @@ const venueSchema = new mongoose.Schema(
       type: String, 
       required: true, 
       trim: true,
-      index: true // Index for search performance
+      index: true
     },
     shortDescription: { 
       type: String, 
       trim: true,
-      index: 'text' // Text index for search
+      index: 'text'
     },
     venueAddress: { 
       type: String, 
       required: true, 
       trim: true,
-      index: 'text' // Text index for search
+      index: 'text'
     },
     latitude: { 
       type: Number,
-      index: true // Index for location-based queries
+      index: true
     },
     longitude: { 
       type: Number,
-      index: true // Index for location-based queries
+      index: true
     },
     language: { type: String, default: 'EN' },
     
@@ -369,19 +375,19 @@ const venueSchema = new mongoose.Schema(
     categories: [{ 
       type: mongoose.Schema.Types.ObjectId, 
       ref: 'Category',
-      index: true // Index for category filtering
+      index: true
     }],
     module: { 
       type: mongoose.Schema.Types.ObjectId, 
       ref: 'Module',
-      index: true // Index for module filtering
+      index: true
     },
     
     // Packages
     packages: [{ 
       type: mongoose.Schema.Types.ObjectId, 
       ref: 'Package',
-      index: true // Index for package filtering
+      index: true
     }],
     
     // Contact Information
@@ -422,7 +428,14 @@ const venueSchema = new mongoose.Schema(
     },
     
     // Pricing & Packages
-    discount: { type: Number, min: 0, max: 100 },
+    // UPDATED: Changed from simple Number to Object with packageDiscount and nonAc
+    discount: { 
+      type: discountSchema, 
+      default: () => ({
+        packageDiscount: 0,
+        nonAc: 0
+      })
+    },
     customPackages: { type: String },
     dynamicPricing: { type: Boolean, default: false, index: true },
     advanceDeposit: { type: Number, min: 0 },
@@ -445,7 +458,7 @@ const venueSchema = new mongoose.Schema(
       type: String, 
       trim: true,
       lowercase: true,
-      index: true // Index for tag-based search
+      index: true
     }],
     
     // FAQ Section
@@ -460,13 +473,13 @@ const venueSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId, 
       ref: 'User', 
       required: false,
-      index: true // Index for provider queries
+      index: true
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true // Index for creator queries
+      index: true
     },
     
     // Reviews & Ratings
@@ -475,7 +488,7 @@ const venueSchema = new mongoose.Schema(
       default: 0, 
       min: 0, 
       max: 5,
-      index: true // Index for rating-based sorting
+      index: true
     },
     reviewCount: { 
       type: Number, 
@@ -487,9 +500,8 @@ const venueSchema = new mongoose.Schema(
     isActive: { 
       type: Boolean, 
       default: true,
-      index: true // Important index for filtering active venues
+      index: true
     },
-    // NEW: Top Pick Status
     isTopPick: {
       type: Boolean,
       default: false,
@@ -498,43 +510,23 @@ const venueSchema = new mongoose.Schema(
   },
   { 
     timestamps: true,
-    // Add compound indexes at schema level
     indexes: [
-      // Compound index for location-based searches
       { key: { latitude: 1, longitude: 1, isActive: 1 } },
-      
-      // Compound index for category + active status
       { key: { categories: 1, isActive: 1 } },
-      
-      // Compound index for module + active status
       { key: { module: 1, isActive: 1 } },
-      
-      // Compound index for package + active status
       { key: { packages: 1, isActive: 1 } },
-      
-      // Compound index for provider queries
       { key: { provider: 1, isActive: 1 } },
       { key: { createdBy: 1, isActive: 1 } },
-      
-      // Compound index for feature-based filtering
       { key: { isActive: 1, acAvailable: 1, parkingAvailability: 1 } },
-      
-      // Compound index for capacity-based searches
       { key: { isActive: 1, maxGuestsSeated: 1 } },
-      
-      // Compound index for rating sorting
       { key: { isActive: 1, rating: -1 } },
-      
-      // Compound index for top picks
       { key: { isActive: 1, isTopPick: 1 } },
-      
-      // Text index for full-text search
       { key: { venueName: 'text', shortDescription: 'text', venueAddress: 'text', searchTags: 'text' } }
     ]
   }
 );
 
-// Virtual for full address (if needed)
+// Virtual for full address
 venueSchema.virtual('fullContactInfo').get(function() {
   return {
     phone: this.contactPhone,
@@ -543,7 +535,7 @@ venueSchema.virtual('fullContactInfo').get(function() {
   };
 });
 
-// Instance method to check if venue is available on a specific day
+// Instance methods remain the same
 venueSchema.methods.isAvailableOnDay = function(dayOfWeek) {
   const day = dayOfWeek.toLowerCase();
   const daySchedule = this.pricingSchedule?.[day];
@@ -554,7 +546,6 @@ venueSchema.methods.isAvailableOnDay = function(dayOfWeek) {
          (daySchedule.evening && Object.keys(daySchedule.evening).length > 0);
 };
 
-// Instance method to get pricing for specific day and slot
 venueSchema.methods.getPricingForSlot = function(dayOfWeek, slotType) {
   const day = dayOfWeek.toLowerCase();
   const slot = slotType.toLowerCase();
@@ -562,11 +553,10 @@ venueSchema.methods.getPricingForSlot = function(dayOfWeek, slotType) {
   return this.pricingSchedule?.[day]?.[slot] || null;
 };
 
-// Instance method to calculate distance from given coordinates
 venueSchema.methods.calculateDistance = function(latitude, longitude) {
   if (!this.latitude || !this.longitude) return null;
   
-  const R = 6371; // Earth's radius in kilometers
+  const R = 6371;
   const dLat = (this.latitude - latitude) * Math.PI / 180;
   const dLon = (this.longitude - longitude) * Math.PI / 180;
   
@@ -581,7 +571,7 @@ venueSchema.methods.calculateDistance = function(latitude, longitude) {
   return parseFloat(distance.toFixed(2));
 };
 
-// Static method to find venues within radius
+// Static methods remain the same
 venueSchema.statics.findWithinRadius = async function(latitude, longitude, radiusKm = 10) {
   const venues = await this.find({
     latitude: { $exists: true, $ne: null },
@@ -599,11 +589,9 @@ venueSchema.statics.findWithinRadius = async function(latitude, longitude, radiu
   })).sort((a, b) => a.distance - b.distance);
 };
 
-// Static method for advanced search
 venueSchema.statics.advancedSearch = async function(filters) {
   const query = { isActive: true };
   
-  // Keyword search
   if (filters.keyword) {
     const keywordRegex = new RegExp(filters.keyword, 'i');
     query.$or = [
@@ -614,22 +602,18 @@ venueSchema.statics.advancedSearch = async function(filters) {
     ];
   }
   
-  // Category filter
   if (filters.categoryId) {
     query.categories = filters.categoryId;
   }
   
-  // Module filter
   if (filters.moduleId) {
     query.module = filters.moduleId;
   }
   
-  // Package filter
   if (filters.packageId) {
     query.packages = filters.packageId;
   }
   
-  // Amenity filters
   if (filters.acAvailable !== undefined) {
     query.acAvailable = filters.acAvailable;
   }
@@ -640,12 +624,10 @@ venueSchema.statics.advancedSearch = async function(filters) {
     query.foodCateringAvailability = filters.foodCateringAvailability;
   }
   
-  // Capacity filters
   if (filters.minCapacity) {
     query.maxGuestsSeated = { $gte: filters.minCapacity };
   }
   
-  // Location filter
   if (filters.latitude && filters.longitude) {
     query.latitude = { $exists: true, $ne: null };
     query.longitude = { $exists: true, $ne: null };
@@ -654,26 +636,23 @@ venueSchema.statics.advancedSearch = async function(filters) {
   return this.find(query)
     .populate('categories', 'title image categoryId module isActive')
     .populate('module', 'title moduleId icon isActive')
-    .populate('packages') // Removed select to include all package fields
+    .populate('packages')
     .populate('createdBy', 'name email phone')
     .populate('provider', 'name email phone')
     .lean();
 };
 
-// Pre-save middleware to update searchTags
+// Pre-save middleware
 venueSchema.pre('save', function(next) {
-  // Initialize searchTags if not present
   if (!this.searchTags) {
     this.searchTags = [];
   }
 
-  // Parse searchTags if provided as a stringified array
   if (this.isModified('searchTags') && this.searchTags.length > 0) {
     const parsedTags = [];
     this.searchTags.forEach(tag => {
       if (typeof tag === 'string') {
         try {
-          // Attempt to parse if it's a stringified JSON array
           const parsed = JSON.parse(tag);
           if (Array.isArray(parsed)) {
             parsedTags.push(...parsed.map(t => t.trim().toLowerCase()));
@@ -681,21 +660,17 @@ venueSchema.pre('save', function(next) {
             parsedTags.push(tag.trim().toLowerCase());
           }
         } catch {
-          // If not a JSON string, treat as a regular tag
           parsedTags.push(tag.trim().toLowerCase());
         }
       }
     });
-    // Remove duplicates and empty tags
     this.searchTags = [...new Set(parsedTags.filter(tag => tag))];
   }
 
-  // Automatically add venue name to search tags if not present
   if (this.venueName && !this.searchTags.includes(this.venueName.toLowerCase())) {
     this.searchTags.push(this.venueName.toLowerCase());
   }
   
-  // Add location-based tags
   if (this.venueAddress) {
     const addressParts = this.venueAddress.split(',').map(part => part.trim().toLowerCase());
     addressParts.forEach(part => {
@@ -713,7 +688,6 @@ venueSchema.pre('findOneAndUpdate', function(next) {
   this.options.runValidators = true;
   this.options.new = true;
 
-  // Handle searchTags in updates
   const update = this.getUpdate();
   if (update.searchTags) {
     let parsedTags = [];
@@ -729,7 +703,6 @@ venueSchema.pre('findOneAndUpdate', function(next) {
     } else if (Array.isArray(update.searchTags)) {
       parsedTags = update.searchTags;
     }
-    // Flatten and clean tags
     update.searchTags = [...new Set(parsedTags
       .flat()
       .map(tag => tag.trim().toLowerCase())
@@ -739,7 +712,7 @@ venueSchema.pre('findOneAndUpdate', function(next) {
   next();
 });
 
-// Post-save middleware for logging
+// Post-save middleware
 venueSchema.post('save', function(doc) {
   console.log(`Venue ${doc.venueName} has been saved with ID: ${doc._id}`);
 });
