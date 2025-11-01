@@ -6,6 +6,14 @@ exports.welcomeEmail = (user) => `
     <p><strong>User ID:</strong> ${user.userId}</p>
     <p>You can login using your registered email: <strong>${user.email}</strong>.</p>
     <br/>
+    <p>
+      <a href="https://vendor.bookmyevent.ae/" 
+         style="display:inline-block;background-color:#007bff;color:#fff;
+                padding:10px 20px;text-decoration:none;border-radius:5px;">
+         Click here to login
+      </a>
+    </p>
+    <br/>
     <p>Regards,<br/>BookMyEvent Team</p>
   </div>
 `;
@@ -20,9 +28,18 @@ exports.vendorEmail = (user, password) => `
     <p><strong>Password:</strong> ${password}</p>
     <p style="color:red;">⚠️ Please change your password after your first login.</p>
     <br/>
+    <p>
+      <a href="https://vendor.bookmyevent.ae/" 
+         style="display:inline-block;background-color:#007bff;color:#fff;
+                padding:10px 20px;text-decoration:none;border-radius:5px;">
+         Click here to login
+      </a>
+    </p>
+    <br/>
     <p>Regards,<br/>BookMyEvent Team</p>
   </div>
 `;
+
 
 exports.otpEmail = (otp) => `
   <div style="font-family:Arial,sans-serif;line-height:1.6">
