@@ -46,6 +46,21 @@ exports.getProfileById = async (req, res) => {
   }
 };
 
+// ✅ Get profile by Provider (userId)
+exports.getProfileByProviderId = async (req, res) => {
+  try {
+    const { providerId } = req.params;
+    const profile = await Profile.findOne({ userId: providerId }).populate("userId", "name email");
+    if (!profile)
+      return res.status(404).json({ success: false, message: "Profile not found for this provider" });
+
+    res.status(200).json({ success: true, data: profile });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
 // Update profile
 exports.updateProfile = async (req, res) => {
   try {

@@ -17,6 +17,9 @@ router.get("/", profileController.getProfiles);
 // Get single profile
 router.get("/:id", profileController.getProfileById);
 
+// ✅ Get profile by Provider ID (userId)
+router.get("/provider/:providerId", profileController.getProfileByProviderId);
+
 // Update profile
 router.put("/:id", upload.single("profilePhoto"), profileController.updateProfile);
 
