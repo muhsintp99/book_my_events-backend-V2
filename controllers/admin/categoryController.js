@@ -207,7 +207,7 @@ exports.createCategory = async (req, res) => {
       metaTitle: metaTitle ? metaTitle.trim() : "",
       metaDescription: metaDescription ? metaDescription.trim() : "",
       brands: brands ? JSON.parse(brands) : [],
-      module,
+  module: mongoose.Types.ObjectId(module),
       createdBy: createdBy || null,
       image: req.file ? `/uploads/categories/${req.file.filename}` : null,
     };       
@@ -339,6 +339,8 @@ exports.deleteCategory = async (req, res) => {
   }
 };
 
+
+
 // ✅ Get all Categories (populate brands + module)
 exports.getCategories = async (req, res) => {
   try {
@@ -403,11 +405,48 @@ exports.getCategory = async (req, res) => {
 };
 
 // ✅ Get all Categories by ModuleId
+// exports.getCategoriesByModule = async (req, res) => {
+//   try {
+//     const { moduleId } = req.params;
+
+//     console.log("Fetching categories for moduleId:", moduleId); // Debug log
+
+//     if (!moduleId || !/^[0-9a-fA-F]{24}$/.test(moduleId)) {
+//       return res.status(400).json({
+//         success: false,
+//         error: "Valid Module ID is required",
+//       });
+//     }
+
+//     const categories = await Category.find({
+//       module: moduleId,
+//       isActive: true,
+//     })
+//       .populate("brands", "-__v")
+//       .populate("module", "-__v")
+//       .sort({ createdAt: -1 })
+//       .lean();
+
+//     console.log("Found categories:", categories.length); // Debug log
+
+//     res.json({
+//       success: true,
+//       data: categories,
+//     });
+//   } catch (err) {
+//     console.error("Error fetching categories by module:", err);
+//     res.status(500).json({
+//       success: false,
+//       error: err.message,
+//     });
+//   }
+// };
+
 exports.getCategoriesByModule = async (req, res) => {
   try {
     const { moduleId } = req.params;
 
-    console.log("Fetching categories for moduleId:", moduleId); // Debug log
+    console.log("Fetching categories for moduleId:", moduleId);
 
     if (!moduleId || !/^[0-9a-fA-F]{24}$/.test(moduleId)) {
       return res.status(400).json({
@@ -418,14 +457,14 @@ exports.getCategoriesByModule = async (req, res) => {
 
     const categories = await Category.find({
       module: moduleId,
-      isActive: true,
+      // Removed isActive filter to show all categories
     })
       .populate("brands", "-__v")
       .populate("module", "-__v")
       .sort({ createdAt: -1 })
       .lean();
 
-    console.log("Found categories:", categories.length); // Debug log
+    console.log("Found categories:", categories.length);
 
     res.json({
       success: true,
