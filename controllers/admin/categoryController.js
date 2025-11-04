@@ -154,6 +154,7 @@
 const fs = require("fs");
 const path = require("path");
 const Category = require("../../models/admin/category");
+const mongoose = require("mongoose");
 const Brand = require("../../models/admin/brand");
 
 // Utility to delete image file
@@ -207,7 +208,7 @@ exports.createCategory = async (req, res) => {
       metaTitle: metaTitle ? metaTitle.trim() : "",
       metaDescription: metaDescription ? metaDescription.trim() : "",
       brands: brands ? JSON.parse(brands) : [],
-  module: mongoose.Types.ObjectId(module),
+  module,
       createdBy: createdBy || null,
       image: req.file ? `/uploads/categories/${req.file.filename}` : null,
     };       
