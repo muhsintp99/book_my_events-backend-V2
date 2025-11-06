@@ -9,6 +9,7 @@ const upload = createUpload('catering', {
   allowedTypes: ['image/png', 'image/jpeg', 'image/webp']
 });
 
+
 // ============================
 // 🍽 Catering Routes
 // ============================
