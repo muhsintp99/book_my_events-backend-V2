@@ -99,19 +99,17 @@ const allowedOrigins = [
   "http://localhost:5173", 
   "https://dashboard.bookmyevent.ae",
   "https://vendor.bookmyevent.ae",
-  "https://api.bookmyevent.ae", // ✅ Add your API domain
+  "https://api.bookmyevent.ae",
 ];
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      // ✅ Allow requests with no origin (e.g., same-origin requests, Postman)
       if (!origin) return callback(null, true);
       
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        // ✅ Log the blocked origin for debugging
         console.log("❌ CORS blocked origin:", origin);
         callback(new Error("CORS not allowed from this origin: " + origin));
       }
@@ -122,15 +120,16 @@ app.use(
   })
 );
 
-// ✅ Add this BEFORE your routes - handles CORS preflight requests
 app.options("*", cors());
 
 // Middleware
 app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // ✅ This is already here - good!
+app.use(express.urlencoded({ extended: true }));
 
-// Static uploads
-app.use('/Uploads', express.static(path.join(__dirname, 'Uploads')));
+// ✅ CRITICAL FIX: Serve static files for BOTH /Uploads and /uploads
+const uploadsPath = path.join(__dirname, 'Uploads');
+app.use('/Uploads', express.static(uploadsPath));
+app.use('/uploads', express.static(uploadsPath)); // Lowercase fallback
 
 // Routes
 app.get("/", (req, res) => res.send("BookMyEvent API Running 🚀"));
@@ -161,7 +160,7 @@ app.use("/api/venuecoupons", require("./routes/vendor/venueCouponRoutes"));
 app.use("/api/catering", require("./routes/vendor/cateringRoutes"));
 app.use("/api/profile", require("./routes/vendor/profileRoutes"));
 
-// ✅ Global Error Handler (add this at the end)
+// Global Error Handler
 app.use((err, req, res, next) => {
   console.error("❌ Error:", err.message);
   res.status(err.status || 500).json({
@@ -172,4 +171,7 @@ app.use((err, req, res, next) => {
 
 // Server listen
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`📁 Static files: ${uploadsPath}`);
+});
