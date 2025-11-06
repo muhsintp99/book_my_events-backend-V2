@@ -63,13 +63,13 @@ exports.createCatering = async (req, res) => {
       }
     }
 
-    // Handle uploaded files
+    // ✅ FIX: Handle uploaded files with correct path (capital U to match server.js)
     const images = req.files?.images
-      ? req.files.images.map((file) => `uploads/catering/${file.filename}`)
+      ? req.files.images.map((file) => `Uploads/catering/${file.filename}`)
       : [];
 
     const thumbnail = req.files?.thumbnail
-      ? `uploads/catering/${req.files.thumbnail[0].filename}`
+      ? `Uploads/catering/${req.files.thumbnail[0].filename}`
       : null;
 
     const cateringData = {
@@ -128,16 +128,16 @@ exports.updateCatering = async (req, res) => {
       catering.cateringId = cateringId;
     }
 
-    // Handle new images
+    // ✅ FIX: Handle new images with correct path
     if (req.files?.images) {
       catering.images.forEach((imgPath) => deleteFileIfExists(path.join(__dirname, `../../${imgPath}`)));
-      catering.images = req.files.images.map((file) => `uploads/catering/${file.filename}`);
+      catering.images = req.files.images.map((file) => `Uploads/catering/${file.filename}`);
     }
 
-    // Handle new thumbnail
+    // ✅ FIX: Handle new thumbnail with correct path
     if (req.files?.thumbnail) {
       deleteFileIfExists(path.join(__dirname, `../../${catering.thumbnail}`));
-      catering.thumbnail = `uploads/catering/${req.files.thumbnail[0].filename}`;
+      catering.thumbnail = `Uploads/catering/${req.files.thumbnail[0].filename}`;
     }
 
     // Parse categories & includes
