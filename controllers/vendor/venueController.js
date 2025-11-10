@@ -2114,48 +2114,10 @@ exports.deleteVenue = async (req, res) => {
 };
 
 // Toggle Active Status
-exports.toggleActiveStatus = async (req, res) => {
-  try {
-    const venueId = req.params.id;
-    if (!mongoose.Types.ObjectId.isValid(venueId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid venue ID",
-      });
-    }
-
-    const venue = await Venue.findById(venueId);
-    if (!venue) {
-      return res.status(404).json({
-        success: false,
-        message: "Venue not found",
-      });
-    }
-
-    venue.isActive = !venue.isActive;
-    await venue.save();
-
-    res.status(200).json({
-      success: true,
-      data: venue,
-      message: `Venue ${
-        venue.isActive ? "activated" : "deactivated"
-      } successfully`,
-    });
-  } catch (err) {
-    console.error("Error in toggleActiveStatus:", err.message);
-    res.status(500).json({
-      success: false,
-      message: "Failed to toggle venue active status",
-      error: err.message,
-    });
-  }
-};
-
-// Toggle Top Pick Status
 exports.toggleTopPickStatus = async (req, res) => {
   try {
     const venueId = req.params.id;
+    
     if (!mongoose.Types.ObjectId.isValid(venueId)) {
       return res.status(400).json({
         success: false,
@@ -2163,7 +2125,11 @@ exports.toggleTopPickStatus = async (req, res) => {
       });
     }
 
-    const venue = await Venue.findById(venueId);
+    // Get current venue status - use collection.findOne to get raw document
+    const venue = await Venue.collection.findOne({ 
+      _id: new mongoose.Types.ObjectId(venueId) 
+    });
+    
     if (!venue) {
       return res.status(404).json({
         success: false,
@@ -2171,18 +2137,47 @@ exports.toggleTopPickStatus = async (req, res) => {
       });
     }
 
-    venue.isTopPick = !venue.isTopPick;
-    await venue.save();
+    const newStatus = !venue.isTopPick;
+
+    // ✅ Prepare update object
+    const updateData = { isTopPick: newStatus };
+    
+    // Fix discount if it's corrupted (not a proper object)
+    if (!venue.discount || 
+        typeof venue.discount !== 'object' || 
+        venue.discount === null ||
+        !venue.discount.packageDiscount === undefined) {
+      updateData.discount = { packageDiscount: 0, nonAc: 0 };
+    }
+
+    // ✅ Use direct MongoDB update to bypass ALL validation
+    await Venue.collection.updateOne(
+      { _id: new mongoose.Types.ObjectId(venueId) },
+      { $set: updateData }
+    );
+
+    // Fetch updated venue for response
+    const updatedVenue = await Venue.findById(venueId)
+      .populate('categories', 'title image categoryId module isActive')
+      .populate('module', 'title moduleId icon isActive')
+      .populate('packages')
+      .populate('createdBy', 'name email phone')
+      .populate({
+        path: 'provider',
+        select: 'userId firstName lastName email phone',
+        populate: {
+          path: 'profile',
+          select: 'mobileNumber socialLinks profilePhoto'
+        }
+      });
 
     res.status(200).json({
       success: true,
-      data: venue,
-      message: `Venue top pick status ${
-        venue.isTopPick ? "enabled" : "disabled"
-      } successfully`,
+      data: updatedVenue,
+      message: `Venue top pick status ${newStatus ? "enabled" : "disabled"} successfully`,
     });
   } catch (err) {
-    console.error("Error in toggleTopPickStatus:", err.message);
+    console.error("Error in toggleTopPickStatus:", err);
     res.status(500).json({
       success: false,
       message: "Failed to toggle venue top pick status",
@@ -2191,6 +2186,78 @@ exports.toggleTopPickStatus = async (req, res) => {
   }
 };
 
+// ✅ FIXED: Toggle Active Status
+exports.toggleActiveStatus = async (req, res) => {
+  try {
+    const venueId = req.params.id;
+    
+    if (!mongoose.Types.ObjectId.isValid(venueId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid venue ID",
+      });
+    }
+
+    // Get current venue status - use collection.findOne to get raw document
+    const venue = await Venue.collection.findOne({ 
+      _id: new mongoose.Types.ObjectId(venueId) 
+    });
+    
+    if (!venue) {
+      return res.status(404).json({
+        success: false,
+        message: "Venue not found",
+      });
+    }
+
+    const newStatus = !venue.isActive;
+
+    // ✅ Prepare update object
+    const updateData = { isActive: newStatus };
+    
+    // Fix discount if it's corrupted (not a proper object)
+    if (!venue.discount || 
+        typeof venue.discount !== 'object' || 
+        venue.discount === null ||
+        venue.discount.packageDiscount === undefined) {
+      updateData.discount = { packageDiscount: 0, nonAc: 0 };
+    }
+
+    // ✅ Use direct MongoDB update to bypass ALL validation
+    await Venue.collection.updateOne(
+      { _id: new mongoose.Types.ObjectId(venueId) },
+      { $set: updateData }
+    );
+
+    // Fetch updated venue for response
+    const updatedVenue = await Venue.findById(venueId)
+      .populate('categories', 'title image categoryId module isActive')
+      .populate('module', 'title moduleId icon isActive')
+      .populate('packages')
+      .populate('createdBy', 'name email phone')
+      .populate({
+        path: 'provider',
+        select: 'userId firstName lastName email phone',
+        populate: {
+          path: 'profile',
+          select: 'mobileNumber socialLinks profilePhoto'
+        }
+      });
+
+    res.status(200).json({
+      success: true,
+      data: updatedVenue,
+      message: `Venue ${newStatus ? "activated" : "deactivated"} successfully`,
+    });
+  } catch (err) {
+    console.error("Error in toggleActiveStatus:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to toggle venue active status",
+      error: err.message,
+    });
+  }
+};
 // Venue Counts
 exports.getVenueCounts = async (req, res) => {
   try {
