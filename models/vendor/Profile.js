@@ -19,13 +19,24 @@ const profileSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      unique: true, // Ensure one profile per user
-      index: true // Add index for faster lookups
+      unique: true,
+      index: true
+    },
+    name: {
+      type: String,
+      trim: true,
+      required: false,
+      default: ""
+    },
+    address: {
+      type: String,
+      trim: true,
+      required: false,
+      default: ""
     },
     profilePhoto: {
       type: String,
-      required: false,
-      default: ''
+      default: ""
     },
     mobileNumber: {
       type: String,
@@ -37,13 +48,8 @@ const profileSchema = new mongoose.Schema(
       default: () => ({})
     },
   },
-  { 
-    timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true }
-  }
+  { timestamps: true }
 );
-
 // Index for faster user lookups
 profileSchema.index({ userId: 1 });
 
