@@ -66,6 +66,13 @@ const UserSchema = new mongoose.Schema({
   phone: { type: String, trim: true },
   
   // Additional fields for direct storage (optional - can be used as fallback)
+
+   profilePhoto: { 
+    type: String, 
+    trim: true, 
+    default: "" // e.g. /Uploads/profiles/xyz.jpg
+  },
+  
   mobile: { 
     type: String, 
     trim: true,

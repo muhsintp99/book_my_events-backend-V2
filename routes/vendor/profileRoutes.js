@@ -14,6 +14,9 @@ router.post("/", upload.single("profilePhoto"), profileController.createProfile)
 // Get all profiles
 router.get("/", profileController.getProfiles);
 
+router.put("/:id", upload.single("profilePhoto"), profileController.updateProfile);
+
+
 // Get single profile
 router.get("/:id", profileController.getProfileById);
 

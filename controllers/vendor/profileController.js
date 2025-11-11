@@ -1,5 +1,5 @@
 const Profile = require("../../models/vendor/Profile");
-
+const User = require("../../models/User");
 // Create a new profile
 exports.createProfile = async (req, res) => {
   try {
@@ -63,49 +63,84 @@ exports.getProfileByProviderId = async (req, res) => {
 // Update profile
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, address, mobileNumber, socialLinks } = req.body;
-    const updatedData = {
-      name,
-      address,
-      mobileNumber,
-      socialLinks: socialLinks ? JSON.parse(socialLinks) : {},
-    };
+    const { role, name, firstName, lastName, address, mobileNumber, socialLinks } = req.body;
+    const userId = req.params.id;
 
+    let updatedData = {};
+
+    // Parse social links safely
+    if (socialLinks) {
+      try {
+        updatedData.socialLinks = JSON.parse(socialLinks);
+      } catch (err) {
+        return res.status(400).json({ success: false, message: "Invalid socialLinks format" });
+      }
+    }
+
+    // Handle profile photo upload (from form-data)
     if (req.file) {
       updatedData.profilePhoto = `/Uploads/profiles/${req.file.filename}`;
     }
 
-    // Update and populate userId to fetch email
-    const profile = await Profile.findByIdAndUpdate(req.params.id, updatedData, { new: true })
-      .populate("userId", "email");
+    // ✅ Case 1: Vendor update
+    if (role === "vendor") {
+      updatedData.name = name;
+      updatedData.address = address;
+      updatedData.mobileNumber = mobileNumber;
 
-    if (!profile)
-      return res.status(404).json({ success: false, message: "Profile not found" });
+      const profile = await Profile.findOneAndUpdate(
+        { userId },
+        updatedData,
+        { new: true, upsert: true }
+      ).populate("userId", "email role");
 
-    // Reorder fields manually for response
-    const formattedProfile = {
-      name: profile.name,
-      address: profile.address,
-      email: profile.userId?.email || "",
-      _id: profile._id,
-      userId: profile.userId?._id || profile.userId,
-      profilePhoto: profile.profilePhoto,
-      mobileNumber: profile.mobileNumber,
-      socialLinks: profile.socialLinks,
-      createdAt: profile.createdAt,
-      updatedAt: profile.updatedAt,
-      __v: profile.__v,
-    };
+      if (!profile)
+        return res.status(404).json({ success: false, message: "Vendor profile not found" });
 
-    res.status(200).json({
-      success: true,
-      message: "Profile updated successfully",
-      data: formattedProfile,
+      return res.status(200).json({
+        success: true,
+        message: "Vendor profile updated successfully",
+        data: profile,
+      });
+    }
+
+    // ✅ Case 2: User update
+    if (role === "user") {
+      const updateFields = {
+        firstName: firstName || name,
+        lastName: lastName || "",
+        address: address || "",
+        phone: mobileNumber || "",
+        socialMedia: updatedData.socialLinks || {},
+      };
+
+      // Attach profile photo if uploaded
+      if (updatedData.profilePhoto) {
+        updateFields.profilePhoto = updatedData.profilePhoto;
+      }
+
+      const user = await User.findByIdAndUpdate(userId, updateFields, { new: true });
+
+      if (!user)
+        return res.status(404).json({ success: false, message: "User not found" });
+
+      return res.status(200).json({
+        success: true,
+        message: "User profile updated successfully",
+        data: user,
+      });
+    }
+
+    return res.status(400).json({
+      success: false,
+      message: "Invalid role. Please provide role as 'vendor' or 'user'.",
     });
   } catch (error) {
+    console.error("Update Profile Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 // Delete profile
 exports.deleteProfile = async (req, res) => {
   try {
