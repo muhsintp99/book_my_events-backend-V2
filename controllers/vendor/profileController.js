@@ -4,7 +4,7 @@ const User = require("../../models/User");
 exports.createProfile = async (req, res) => {
   try {
     const { userId, name, address, mobileNumber, socialLinks } = req.body;
-    const profilePhoto = req.file ? `/Uploads/profiles/${req.file.filename}` : "";
+    const profilePhoto = req.file ? `/uploads/profiles/${req.file.filename}` : "";
 
     const profile = await Profile.create({
       userId,
@@ -79,7 +79,7 @@ exports.updateProfile = async (req, res) => {
 
     // Handle profile photo upload (from form-data)
     if (req.file) {
-      updatedData.profilePhoto = `/Uploads/profiles/${req.file.filename}`;
+      updatedData.profilePhoto = `/uploads/profiles/${req.file.filename}`;
     }
 
     // ✅ Case 1: Vendor update

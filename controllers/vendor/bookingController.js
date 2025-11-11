@@ -3,6 +3,7 @@ const Booking = require("../../models/vendor/Booking");
 const User = require("../../models/User");
 const Venue = require("../../models/vendor/Venue");
 const Package = require("../../models/admin/Package");
+const Profile = require("../../models/vendor/Profile");
 
 const AUTH_API_URL = "https://api.bookmyevent.ae/api/auth/login";
 
@@ -25,13 +26,10 @@ exports.createBooking = async (req, res) => {
       userId, // optional for Indirect
     } = req.body;
 
-    // ✅ Validate required fields
+    // ✅ Validate required fields (Direct only)
     if (
       !venueId ||
       !packageId ||
-      !fullName ||
-      !contactNumber ||
-      !address ||
       !numberOfGuests ||
       !bookingDate ||
       !timeSlot ||
@@ -45,16 +43,17 @@ exports.createBooking = async (req, res) => {
     if (!venue) return res.status(404).json({ message: "Venue not found" });
 
     const providerId = venue.provider?._id || venue.providerId || null;
-
     let user = null;
     let token = null;
+    let bookingUserDetails = {};
 
     // 🟢 DIRECT BOOKING — Auto create user + token
     if (bookingType === "Direct") {
-      if (!emailAddress)
-        return res
-          .status(400)
-          .json({ message: "Email address is required for Direct booking" });
+      if (!emailAddress || !fullName || !contactNumber || !address) {
+        return res.status(400).json({
+          message: "Full name, contact number, email, and address are required for Direct booking",
+        });
+      }
 
       // ✅ Split fullName into first/last names
       const nameParts = fullName.trim().split(" ");
@@ -80,36 +79,68 @@ exports.createBooking = async (req, res) => {
         password: "123456",
       });
       token = data?.token || null;
+
+      bookingUserDetails = {
+        fullName,
+        contactNumber,
+        emailAddress,
+        address,
+      };
     }
 
     // 🔵 INDIRECT BOOKING — Vendor/Admin passes userId
     if (bookingType === "Indirect") {
       if (!userId)
-        return res
-          .status(400)
-          .json({ message: "userId is required for Indirect booking" });
+        return res.status(400).json({ message: "userId is required for Indirect booking" });
 
       user = await User.findById(userId);
       if (!user)
         return res.status(404).json({ message: "User not found with given userId" });
+
+      // ✅ Get profile details
+      const profile = await Profile.findOne({ userId: user._id });
+
+      bookingUserDetails = {
+        fullName: `${user.firstName}${user.lastName ? " " + user.lastName : ""}`.trim(),
+        contactNumber: profile?.mobileNumber || "",
+        emailAddress: user.email,
+        address: profile?.address || "",
+      };
     }
 
     // ✅ Create booking record
-    const bookingData = {
-      providerId,
-      userId: user?._id || null,
-      venueId,
-      packageId,
-      fullName,
-      contactNumber,
-      emailAddress: emailAddress || null,
-      address,
-      numberOfGuests,
-      bookingDate,
-      timeSlot,
-      bookingType,
-      status: "Pending",
-    };
+  // ✅ Prepare booking data
+let bookingData = {
+  providerId,
+  userId: user?._id || null,
+  venueId,
+  packageId,
+  numberOfGuests,
+  bookingDate,
+  timeSlot,
+  bookingType,
+  status: "Pending",
+};
+
+// 🟦 Add user details differently based on booking type
+if (bookingType === "Direct") {
+  bookingData = {
+    ...bookingData,
+    fullName: bookingUserDetails.fullName,
+    contactNumber: bookingUserDetails.contactNumber,
+    emailAddress: bookingUserDetails.emailAddress,
+    address: bookingUserDetails.address,
+  };
+} else if (bookingType === "Indirect") {
+  bookingData = {
+    ...bookingData,
+    fullName: bookingUserDetails.fullName || "N/A",
+    contactNumber: bookingUserDetails.contactNumber || "N/A",
+    emailAddress: bookingUserDetails.emailAddress || "N/A",
+    address: bookingUserDetails.address || "N/A",
+  };
+}
+
 
     const booking = await Booking.create(bookingData);
 
@@ -133,7 +164,7 @@ exports.createBooking = async (req, res) => {
       })
       .populate("userId", "firstName lastName email userId");
 
-    // ✅ Format user object: combine first + last name, remove lastName
+    // ✅ Format user object
     if (populatedBooking.userId) {
       const u = populatedBooking.userId;
       populatedBooking = populatedBooking.toObject();
@@ -157,7 +188,6 @@ exports.createBooking = async (req, res) => {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
-
 // ========================================================
 // 🔹 GET BOOKING BY ID
 // ========================================================
