@@ -13,7 +13,7 @@
 //   "http://localhost:5001",
 //   "http://localhost:5002",
 //   "http://localhost:5000",
-//   "http://localhost:5173", 
+//   "http://localhost:5173",
 //   "https://dashboard.bookmyevent.ae",
 //   "https://vendor.bookmyevent.ae",
 // ];
@@ -41,7 +41,6 @@
 // // Static uploads
 // // app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // app.use('/Uploads', express.static(path.join(__dirname, 'Uploads')));
-
 
 // // Routes
 // app.get("/", (req, res) => res.send("BookMyEvent API Running 🚀"));
@@ -71,15 +70,11 @@
 // app.use("/api/venuecoupons", require("./routes/vendor/venueCouponRoutes"));
 // app.use("/api/catering", require("./routes/vendor/cateringRoutes")); // ✅ Added this line
 
-
 // app.use("/api/profile", require("./routes/vendor/profileRoutes"));
-
 
 // // Server listen
 // const PORT = process.env.PORT || 5000;
 // app.listen(PORT, () => console   .log(`✅ Server running on port ${PORT}`));
-
-
 
 const express = require("express");
 const cors = require("cors");
@@ -96,7 +91,7 @@ const allowedOrigins = [
   "http://localhost:5001",
   "http://localhost:5002",
   "http://localhost:5000",
-  "http://localhost:5173", 
+  "http://localhost:5173",
   "https://dashboard.bookmyevent.ae",
   "https://vendor.bookmyevent.ae",
   "https://api.bookmyevent.ae", // ✅ Add your API domain
@@ -107,7 +102,7 @@ app.use(
     origin: function (origin, callback) {
       // ✅ Allow requests with no origin (e.g., same-origin requests, Postman)
       if (!origin) return callback(null, true);
-      
+
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
@@ -130,7 +125,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // ✅ This is already here - good!
 
 // Static uploads
-app.use('/Uploads', express.static(path.join(__dirname, 'Uploads')));
+app.use("/Uploads", express.static(path.join(__dirname, "Uploads")));
 
 // Routes
 app.get("/", (req, res) => res.send("BookMyEvent API Running 🚀"));
@@ -138,12 +133,19 @@ app.get("/", (req, res) => res.send("BookMyEvent API Running 🚀"));
 // Public Routes
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
+app.use("/api/delete-user", require("./routes/userDeleteRoutes"));
 
 // Admin Routes
 app.use("/api/modules", require("./routes/admin/moduleRoutes"));
-app.use("/api/secondary-modules", require("./routes/admin/secondaryModuleRoutes"));
+app.use(
+  "/api/secondary-modules",
+  require("./routes/admin/secondaryModuleRoutes")
+);
 app.use("/api/categories", require("./routes/admin/categoryRoutes"));
-app.use("/api/vehicle-categories", require("./routes/admin/vehiclecategoryRoutes"));
+app.use(
+  "/api/vehicle-categories",
+  require("./routes/admin/vehiclecategoryRoutes")
+);
 app.use("/api/brands", require("./routes/admin/brandRoutes"));
 app.use("/api/coupons", require("./routes/admin/couponsRouters"));
 app.use("/api/banners", require("./routes/admin/bannerRoutes"));
@@ -162,13 +164,12 @@ app.use("/api/catering", require("./routes/vendor/cateringRoutes"));
 app.use("/api/profile", require("./routes/vendor/profileRoutes"));
 app.use("/api/bookings", require("./routes/vendor/bookingRoutes"));
 
-
 // ✅ Global Error Handler (add this at the end)
 app.use((err, req, res, next) => {
   console.error("❌ Error:", err.message);
   res.status(err.status || 500).json({
     message: err.message || "Internal Server Error",
-    error: process.env.NODE_ENV === "development" ? err : {}
+    error: process.env.NODE_ENV === "development" ? err : {},
   });
 });
 
