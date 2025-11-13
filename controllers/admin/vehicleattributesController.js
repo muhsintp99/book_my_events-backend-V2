@@ -1,6 +1,14 @@
 const VehicleAttribute = require("../../models/admin/VehicleAttribute");
 
 // =============================
+// Generate full icon URL
+// =============================
+const getIconUrl = (req, filename) => {
+  if (!filename) return null;
+  return `${req.protocol}://${req.get("host")}/Uploads/attributes/${filename}`;
+};
+
+// =============================
 //  CREATE ATTRIBUTE
 // =============================
 exports.createAttribute = async (req, res) => {
@@ -23,6 +31,9 @@ exports.createAttribute = async (req, res) => {
       values: []
     });
 
+    // Attach full URL
+    newAttribute.icon = getIconUrl(req, newAttribute.icon);
+
     res.status(201).json({
       success: true,
       message: "Attribute created successfully",
@@ -34,14 +45,13 @@ exports.createAttribute = async (req, res) => {
   }
 };
 
-
 // =============================
 //  ADD VALUES (diesel, hybrid, electric)
 // =============================
 exports.addValues = async (req, res) => {
   try {
     const { id } = req.params;
-    const { values } = req.body; // Array: ["diesel","hybrid","electric"]
+    const { values } = req.body;
 
     if (!values || !Array.isArray(values)) {
       return res.status(400).json({
@@ -59,10 +69,12 @@ exports.addValues = async (req, res) => {
     }
 
     // Avoid duplicate values
-    const uniqueValues = values.filter((v) => !attribute.values.includes(v));
+    const uniqueValues = values.filter(v => !attribute.values.includes(v));
 
     attribute.values.push(...uniqueValues);
     await attribute.save();
+
+    attribute.icon = getIconUrl(req, attribute.icon);
 
     res.status(200).json({
       success: true,
@@ -75,7 +87,6 @@ exports.addValues = async (req, res) => {
   }
 };
 
-
 // =============================
 //  GET ALL ATTRIBUTES
 // =============================
@@ -83,16 +94,20 @@ exports.getAllAttributes = async (req, res) => {
   try {
     const data = await VehicleAttribute.find().sort({ createdAt: -1 });
 
+    const formatted = data.map(item => ({
+      ...item._doc,
+      icon: getIconUrl(req, item.icon)
+    }));
+
     res.status(200).json({
       success: true,
-      data
+      data: formatted
     });
 
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 
 // =============================
 //  GET SINGLE ATTRIBUTE
@@ -108,6 +123,8 @@ exports.getAttributeById = async (req, res) => {
       });
     }
 
+    data.icon = getIconUrl(req, data.icon);
+
     res.status(200).json({
       success: true,
       data
@@ -117,7 +134,6 @@ exports.getAttributeById = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 
 // =============================
 //  UPDATE ATTRIBUTE
@@ -139,8 +155,13 @@ exports.updateAttribute = async (req, res) => {
     );
 
     if (!updated) {
-      return res.status(404).json({ success: false, message: "Not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Attribute not found"
+      });
     }
+
+    updated.icon = getIconUrl(req, updated.icon);
 
     res.status(200).json({
       success: true,
@@ -152,7 +173,6 @@ exports.updateAttribute = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 
 // =============================
 //  DELETE ATTRIBUTE
@@ -178,7 +198,6 @@ exports.deleteAttribute = async (req, res) => {
   }
 };
 
-
 // =============================
 //  TOGGLE ACTIVE / INACTIVE
 // =============================
@@ -195,6 +214,8 @@ exports.toggleStatus = async (req, res) => {
 
     attribute.status = !attribute.status;
     await attribute.save();
+
+    attribute.icon = getIconUrl(req, attribute.icon);
 
     res.json({
       success: true,
