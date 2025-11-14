@@ -63,7 +63,7 @@ exports.createMakeupPackage = async (req, res) => {
 
     // Gallery upload
     const gallery = req.files?.gallery
-      ? req.files.gallery.map((file) => `Uploads/makeup/${file.filename}`)
+      ? req.files.gallery.map((file) => `uploads/makeup/${file.filename}`)
       : [];
 
     const finalPrice =
@@ -144,7 +144,7 @@ exports.updateMakeupPackage = async (req, res) => {
       );
 
       makeup.gallery = req.files.gallery.map(
-        (file) => `Uploads/makeup/${file.filename}`
+        (file) => `uploads/makeup/${file.filename}`
       );
     }
 

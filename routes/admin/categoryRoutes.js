@@ -59,6 +59,8 @@ router.post('/', handleUpload, categoryController.createCategory);
 // Get categories by module - FIXED ROUTE
 router.get('/modules/:moduleId', categoryController.getCategoriesByModule);
 
+router.get("/parent/:parentId", categoryController.getSubCategories);
+
 // Get all categories
 router.get('/', categoryController.getCategories);
 
