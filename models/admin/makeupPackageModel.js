@@ -20,7 +20,6 @@ const MakeupSchema = new mongoose.Schema(
       required: false
     },
 
-    // MULTIPLE CATEGORIES
     categories: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -29,7 +28,6 @@ const MakeupSchema = new mongoose.Schema(
     ],
 
     packageTitle: { type: String, required: true, trim: true },
-    duration: { type: String, required: true },
     description: { type: String, required: true },
 
     makeupType: {
@@ -41,7 +39,6 @@ const MakeupSchema = new mongoose.Schema(
     includedServices: [includedServiceSchema],
 
     basePrice: { type: Number, required: true },
-    taxPercentage: { type: Number, default: 0 },
     offerPrice: { type: Number, default: 0 },
     finalPrice: { type: Number, required: true },
 
@@ -69,7 +66,6 @@ const MakeupSchema = new mongoose.Schema(
       ref: "User"
     },
 
-    // NEW FIELDS LIKE CATERING
     isTopPick: { type: Boolean, default: false, index: true },
     isActive: { type: Boolean, default: true, index: true }
   },
