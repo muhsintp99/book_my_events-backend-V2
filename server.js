@@ -165,6 +165,8 @@ app.use("/api/profile", require("./routes/vendor/profileRoutes"));
 app.use("/api/bookings", require("./routes/vendor/bookingRoutes"));
 app.use("/api/payment", require("./routes/payment.routes"));
 app.use("/api/vehicle-attributes", require("./routes/admin/vehicleAttributeRoutes"));
+app.use("/api/makeup-packages", require("./routes/admin/makeupPackageRoutes"));
+app.use("/api/portfolio", require("./routes/vendor/portfolioRoutes"));
 
 
 // ✅ Global Error Handler (add this at the end)

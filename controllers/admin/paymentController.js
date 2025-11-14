@@ -4,6 +4,50 @@ const { APIError } = require("expresscheckout-nodejs");
 
 
 
+exports.createJuspayOrder = async (req, res) => {
+  try {
+    const orderId = "order_" + Date.now();
+    const amount = req.body.amount || 100;
+
+    // STEP 1 — Create Order
+    const order = await juspay.post("/orders", {
+      order_id: orderId,
+      amount: amount,
+      currency: "INR"
+    });
+
+    // STEP 2 — Create Session
+    const session = await juspay.post("/payment/session", {
+      order_id: orderId,
+      amount: amount,
+      currency: "INR",
+      action: "paymentPage",
+      payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
+      return_url: "https://dashboard.bookmyevent.ae/payment-status",
+      customer_id: "customer_" + Date.now(),
+      customer_email: req.body.email || "test@mail.com",
+      customer_phone: req.body.phone || "9876543210",
+      first_name: req.body.firstName || "John",
+      last_name: req.body.lastName || "Wick",
+      description: "Complete your payment",
+      "options.getUpiDeepLinks": true
+    });
+
+    return res.json({
+      success: true,
+      order: order.data,
+      session: session.data
+    });
+
+  } catch (error) {
+    console.log("Juspay Error:", error.response?.data || error.message);
+    return res.status(500).json({
+      success: false,
+      error: error.response?.data || error.message
+    });
+  }
+};
+
 exports.createPaymentSession = async (req, res) => {
   try {
     const orderId = `order_${Date.now()}`;
@@ -22,7 +66,7 @@ exports.createPaymentSession = async (req, res) => {
       amount: amount,
       action: "paymentPage",
       payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
-      return_url: "https://yourwebsite.com/payment-status",
+      return_url: "https://dashboard.bookmyevent.ae/payment-status",
       currency: "INR",
 
       customer_id: "testing-customer-one",
