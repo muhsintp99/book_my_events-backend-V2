@@ -51,7 +51,7 @@ exports.createPortfolio = async (req, res) => {
     const parsedTags = parseTags(tags);
 
     const media = (req.files || []).map((file) => ({
-      url: `Uploads/portfolio/${file.filename}`,
+      url: `uploads/portfolio/${file.filename}`,
       type: file.mimetype.startsWith("video") ? "video" : "image",
       isFeatured: false,
     }));
