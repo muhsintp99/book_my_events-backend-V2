@@ -170,6 +170,7 @@ app.use(
 );
 app.use("/api/makeup-packages", require("./routes/admin/makeupPackageRoutes"));
 app.use("/api/portfolio", require("./routes/vendor/portfolioRoutes"));
+app.use("/api/photography-packages", require("./routes/vendor/photographyPackageRoutes"));
 
 // ✅ Global Error Handler (add this at the end)
 app.use((err, req, res, next) => {

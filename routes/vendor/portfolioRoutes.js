@@ -4,9 +4,8 @@ const router = express.Router();
 const createUpload = require("../../middlewares/upload");
 const portfolioController = require("../../controllers/vendor/portfolioController");
 
-// ✔ Upload middleware for portfolio (supports multiple images/videos)
 const upload = createUpload("portfolio", {
-  fileSizeMB: 200, // larger limit for videos
+  fileSizeMB: 200,
   allowedTypes: [
     "image/jpeg",
     "image/png",
@@ -18,53 +17,45 @@ const upload = createUpload("portfolio", {
   ]
 });
 
-// ------------------------------------------------------
-// ⭐ CREATE PORTFOLIO WORK (supports multiple files)
-// ------------------------------------------------------
+// CREATE
 router.post(
   "/",
-  upload.array("media", 10),      // IMPORTANT: must match Postman key "media"
-  (req, res, next) => {
-    console.log("🔥 POST /api/portfolio - Multer received files:", req.files);
-    next();
-  },
+  upload.array("media", 10),
   portfolioController.createPortfolio
 );
 
-// ------------------------------------------------------
-// ⭐ GET ALL PORTFOLIO WORKS FOR PROVIDER
-// ------------------------------------------------------
+// ⭐ SEPARATE ROUTE → GET PORTFOLIO BY MODULE
+router.get(
+  "/module/:moduleId",
+  portfolioController.getPortfolioByModule
+);
+
+// ⭐ GET PORTFOLIO BY PROVIDER
 router.get(
   "/provider/:providerId",
   portfolioController.getPortfolioByProvider
 );
 
-// ------------------------------------------------------
-// ⭐ GET SINGLE PORTFOLIO ITEM
-// ------------------------------------------------------
+// OPTIONAL: GET BY PROVIDER + MODULE
+// router.get(
+//   "/provider/:providerId/module/:moduleId",
+//   portfolioController.getPortfolioByProviderAndModule
+// );
+
+// GET ONE
 router.get("/:id", portfolioController.getPortfolioById);
 
-// ------------------------------------------------------
-// ⭐ UPDATE PORTFOLIO WORK (replace media or keep old)
-// ------------------------------------------------------
+// UPDATE
 router.put(
   "/:id",
-  upload.array("media", 10),     // allows uploading multiple files on update
-  (req, res, next) => {
-    console.log("🔥 PUT /api/portfolio/:id - Multer received files:", req.files);
-    next();
-  },
+  upload.array("media", 10),
   portfolioController.updatePortfolio
 );
 
-// ------------------------------------------------------
-// ⭐ DELETE PORTFOLIO WORK
-// ------------------------------------------------------
+// DELETE
 router.delete("/:id", portfolioController.deletePortfolio);
 
-// ------------------------------------------------------
-// ⭐ TOGGLE FEATURED MEDIA (single media item)
-// ------------------------------------------------------
+// FEATURED MEDIA
 router.patch(
   "/:workId/featured/:mediaIndex",
   portfolioController.toggleFeaturedMedia

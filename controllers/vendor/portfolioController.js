@@ -32,44 +32,47 @@ const parseTags = (tags) => {
 // ========================================================
 exports.createPortfolio = async (req, res) => {
   try {
-    console.log("🔥 Files received:", req.files);
-
-    const { providerId, workTitle, description, tags } = req.body;
+    const { providerId, workTitle, description, tags, moduleId } = req.body;
 
     if (!providerId) {
       return res.status(400).json({
         success: false,
-        message: "Provider ID is required"
+        message: "Provider ID is required",
       });
     }
 
-    const parsedTags = Array.isArray(tags)
-      ? tags
-      : (() => { try { return JSON.parse(tags); } catch { return [tags]; }})();
+    if (!moduleId) {
+      return res.status(400).json({
+        success: false,
+        message: "Module ID is required",
+      });
+    }
 
-    // Convert multiple uploaded files
+    const parsedTags = parseTags(tags);
+
     const media = (req.files || []).map((file) => ({
       url: `Uploads/portfolio/${file.filename}`,
       type: file.mimetype.startsWith("video") ? "video" : "image",
-      isFeatured: false
+      isFeatured: false,
     }));
-
-    console.log("🔥 Final media array:", media);
 
     const newPortfolio = await Portfolio.create({
       provider: providerId,
+      module: moduleId,
       workTitle: workTitle || "",
       description: description || "",
       tags: parsedTags,
-      media
+      media,
     });
+
+    const populated = await Portfolio.findById(newPortfolio._id)
+      .populate("module", "title"); // ⭐ Only show title
 
     res.status(201).json({
       success: true,
       message: "Portfolio work added successfully",
-      data: newPortfolio
+      data: populated,
     });
-
   } catch (err) {
     console.error("❌ Create Portfolio Error:", err);
     res.status(500).json({ success: false, message: err.message });
@@ -83,9 +86,9 @@ exports.getPortfolioByProvider = async (req, res) => {
   try {
     const { providerId } = req.params;
 
-    const portfolio = await Portfolio.find({ provider: providerId }).sort({
-      createdAt: -1,
-    });
+    const portfolio = await Portfolio.find({ provider: providerId })
+      .sort({ createdAt: -1 })
+      .populate("module", "title"); // ⭐ Only title
 
     res.json({
       success: true,
@@ -99,11 +102,59 @@ exports.getPortfolioByProvider = async (req, res) => {
 };
 
 // ========================================================
+// ⭐ GET PORTFOLIO BY PROVIDER + MODULE
+// ========================================================
+exports.getPortfolioByProviderAndModule = async (req, res) => {
+  try {
+    const { providerId, moduleId } = req.params;
+
+    const portfolio = await Portfolio.find({
+      provider: providerId,
+      module: moduleId,
+    })
+      .sort({ createdAt: -1 })
+      .populate("module", "title"); // ⭐ Only title
+
+    res.json({
+      success: true,
+      count: portfolio.length,
+      data: portfolio,
+    });
+  } catch (err) {
+    console.error("❌ Get Portfolio By Provider & Module Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ========================================================
+// ⭐ GET PORTFOLIO BY MODULE (SEPARATE ROUTE)
+// ========================================================
+exports.getPortfolioByModule = async (req, res) => {
+  try {
+    const { moduleId } = req.params;
+
+    const portfolio = await Portfolio.find({ module: moduleId })
+      .sort({ createdAt: -1 })
+      .populate("module", "title"); // ⭐ Only title
+
+    res.json({
+      success: true,
+      count: portfolio.length,
+      data: portfolio,
+    });
+  } catch (err) {
+    console.error("❌ Get Portfolio By Module Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ========================================================
 // ⭐ GET SINGLE PORTFOLIO
 // ========================================================
 exports.getPortfolioById = async (req, res) => {
   try {
-    const item = await Portfolio.findById(req.params.id);
+    const item = await Portfolio.findById(req.params.id)
+      .populate("module", "title"); // ⭐ Only title
 
     if (!item) {
       return res.status(404).json({
@@ -146,7 +197,7 @@ exports.updatePortfolio = async (req, res) => {
       );
 
       work.media = req.files.map((file) => ({
-        url: `Uploads/portfolio/${file.filename}`,
+        url: `uploads/portfolio/${file.filename}`,
         type: file.mimetype.startsWith("video") ? "video" : "image",
         isFeatured: false,
       }));
@@ -154,10 +205,13 @@ exports.updatePortfolio = async (req, res) => {
 
     await work.save();
 
+    const updated = await Portfolio.findById(work._id)
+      .populate("module", "title"); // ⭐ Only title
+
     res.json({
       success: true,
       message: "Portfolio updated successfully",
-      data: work,
+      data: updated,
     });
   } catch (err) {
     console.error("❌ Update Portfolio Error:", err);
@@ -202,7 +256,8 @@ exports.toggleFeaturedMedia = async (req, res) => {
   try {
     const { workId, mediaIndex } = req.params;
 
-    const work = await Portfolio.findById(workId);
+    const work = await Portfolio.findById(workId).populate("module", "title");
+
     if (!work) {
       return res.status(404).json({
         success: false,
@@ -222,10 +277,13 @@ exports.toggleFeaturedMedia = async (req, res) => {
 
     await work.save();
 
+    const updated = await Portfolio.findById(work._id)
+      .populate("module", "title");
+
     res.json({
       success: true,
       message: "Featured status toggled",
-      data: work,
+      data: updated,
     });
   } catch (err) {
     console.error("❌ Toggle Featured Error:", err);

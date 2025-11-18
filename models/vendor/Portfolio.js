@@ -8,6 +8,13 @@ const PortfolioSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    module: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Module",
+  required: true,
+  index: true
+},
+
 
     workTitle: { type: String, default: "" },
     description: { type: String, default: "" },
