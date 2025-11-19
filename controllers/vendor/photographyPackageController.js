@@ -40,8 +40,7 @@ exports.createPhotographyPackage = async (req, res) => {
       description,
       photographyType,
       includedServices,
-      basePrice,
-      offerPrice,
+      price,   // <-- updated
       travelToVenue,
       advanceBookingAmount,
       cancellationPolicy,
@@ -55,6 +54,9 @@ exports.createPhotographyPackage = async (req, res) => {
     if (!providerId)
       return res.status(400).json({ success: false, message: "Provider ID is required" });
 
+    if (!price)
+      return res.status(400).json({ success: false, message: "Price is required" });
+
     const photographyId = `PHP-${uuidv4()}`;
 
     const parsedCategories = parseField(categories);
@@ -64,8 +66,6 @@ exports.createPhotographyPackage = async (req, res) => {
       ? req.files.gallery.map((file) => `uploads/photography/${file.filename}`)
       : [];
 
-    const finalPrice = Number(basePrice || 0) - Number(offerPrice || 0);
-
     const pkg = await Photography.create({
       photographyId,
       module,
@@ -74,9 +74,7 @@ exports.createPhotographyPackage = async (req, res) => {
       description,
       photographyType,
       includedServices: parsedIncludes,
-      basePrice,
-      offerPrice,
-      finalPrice,
+      price,
       travelToVenue,
       advanceBookingAmount,
       cancellationPolicy,
@@ -114,8 +112,7 @@ exports.updatePhotographyPackage = async (req, res) => {
       description,
       photographyType,
       includedServices,
-      basePrice,
-      offerPrice,
+      price,
       travelToVenue,
       advanceBookingAmount,
       cancellationPolicy,
@@ -136,11 +133,7 @@ exports.updatePhotographyPackage = async (req, res) => {
     if (description) pkg.description = description;
     if (photographyType) pkg.photographyType = photographyType;
     if (module) pkg.module = module;
-
-    if (basePrice) pkg.basePrice = basePrice;
-    if (offerPrice !== undefined) pkg.offerPrice = offerPrice;
-
-    pkg.finalPrice = Number(pkg.basePrice || 0) - Number(pkg.offerPrice || 0);
+    if (price) pkg.price = price;
 
     if (travelToVenue !== undefined) pkg.travelToVenue = travelToVenue;
     if (advanceBookingAmount) pkg.advanceBookingAmount = advanceBookingAmount;

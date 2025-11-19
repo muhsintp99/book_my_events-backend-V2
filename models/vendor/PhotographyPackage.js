@@ -27,16 +27,15 @@ const photographyPackageSchema = new mongoose.Schema(
       required: true,
     },
 
-includedServices: [
-  {
-    title: { type: String, required: true },
-    items: [{ type: String }]
-  }
-],
+    includedServices: [
+      {
+        title: { type: String, required: true },
+        items: [{ type: String }],
+      }
+    ],
 
-    basePrice: { type: Number, required: true },
-    offerPrice: { type: Number, default: 0 },
-    finalPrice: { type: Number, default: 0 },
+    // UPDATED FIELD
+    price: { type: Number, required: true },
 
     travelToVenue: { type: Boolean, default: false },
 
@@ -45,11 +44,9 @@ includedServices: [
 
     gallery: [{ type: String }],
 
-    // Extra fields (same style as makeup)
-  provider: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-
+    provider: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
     isTopPick: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
