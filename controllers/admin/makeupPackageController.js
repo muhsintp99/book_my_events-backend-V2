@@ -3,6 +3,8 @@ const { v4: uuidv4 } = require("uuid");
 const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
+require("../../models/vendor/Profile");
+
 const User = require("../../models/User");
 
 // ---------------------- Helper: Parse JSON or array ----------------------
@@ -204,7 +206,6 @@ exports.getVendorsForMakeupModule = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid module ID" });
     }
 
-    // Find vendor IDs from makeup packages
     const vendorIds = await Makeup.distinct("provider", { module: moduleId });
 
     if (!vendorIds.length) {
@@ -215,18 +216,21 @@ exports.getVendorsForMakeupModule = async (req, res) => {
       });
     }
 
-    // Populate vendors + their profile (logo)
     const vendors = await User.find({ _id: { $in: vendorIds } })
-      .select("firstName lastName email phone") // select user fields
-      .populate("profile", "logo coverImage storeName"); // select profile fields
+      .select("firstName lastName email phone")
+      .populate("profile", "logo coverImage storeName");
 
-    // OPTIONAL: Convert logo to full URL
     const final = vendors.map((v) => {
-      const vendorObj = v.toObject();
-      if (vendorObj.profile?.logo) {
-        vendorObj.profile.logo = `${req.protocol}://${req.get("host")}${vendorObj.profile.logo}`;
+      const obj = v.toObject();
+
+      // Set profilePhoto = coverImage
+      if (obj.profile?.coverImage) {
+        obj.profilePhoto = `${req.protocol}://${req.get("host")}${obj.profile.coverImage}`;
+      } else {
+        obj.profilePhoto = null;
       }
-      return vendorObj;
+
+      return obj;
     });
 
     res.json({
