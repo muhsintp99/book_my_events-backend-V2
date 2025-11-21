@@ -90,11 +90,11 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:5001",
   "http://localhost:5002",
-//  "http://127.0.0.1:5500",
+ "http://127.0.0.1:5500",
   "http://localhost:5000",
   "http://localhost:5173",
   "https://dashboard.bookmyevent.ae",
-  // "https://www.bookmyevent.ae",
+  "https://www.bookmyevent.ae",
   "https://vendor.bookmyevent.ae",
   "https://api.bookmyevent.ae", // ✅ Add your API domain
 ];
