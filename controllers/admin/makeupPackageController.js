@@ -204,7 +204,6 @@ exports.getVendorsForMakeupModule = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid module ID" });
     }
 
-    // Find vendors who added at least one makeup package under this module
     const vendorIds = await Makeup.distinct("provider", { module: moduleId });
 
     if (!vendorIds.length) {
@@ -215,8 +214,9 @@ exports.getVendorsForMakeupModule = async (req, res) => {
       });
     }
 
+    // 👇 Make sure this matches your User schema field
     const vendors = await User.find({ _id: { $in: vendorIds } })
-      .select("firstName lastName email phone profileImage");
+  .select("firstName lastName email phone profilePhoto");
 
     res.json({
       success: true,
