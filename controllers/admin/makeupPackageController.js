@@ -204,6 +204,7 @@ exports.getVendorsForMakeupModule = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid module ID" });
     }
 
+    // Find vendor IDs from makeup packages
     const vendorIds = await Makeup.distinct("provider", { module: moduleId });
 
     if (!vendorIds.length) {
@@ -214,14 +215,24 @@ exports.getVendorsForMakeupModule = async (req, res) => {
       });
     }
 
-    // 👇 Make sure this matches your User schema field
+    // Populate vendors + their profile (logo)
     const vendors = await User.find({ _id: { $in: vendorIds } })
-  .select("firstName lastName email phone profilePhoto");
+      .select("firstName lastName email phone") // select user fields
+      .populate("profile", "logo coverImage storeName"); // select profile fields
+
+    // OPTIONAL: Convert logo to full URL
+    const final = vendors.map((v) => {
+      const vendorObj = v.toObject();
+      if (vendorObj.profile?.logo) {
+        vendorObj.profile.logo = `${req.protocol}://${req.get("host")}${vendorObj.profile.logo}`;
+      }
+      return vendorObj;
+    });
 
     res.json({
       success: true,
-      count: vendors.length,
-      data: vendors
+      count: final.length,
+      data: final
     });
 
   } catch (err) {
