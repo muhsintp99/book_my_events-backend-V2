@@ -54,12 +54,12 @@ const profileSchema = new mongoose.Schema(
 profileSchema.index({ userId: 1 });
 
 // Virtual populate back to user
-profileSchema.virtual('profile', {
-  ref: 'Profile',
-  localField: '_id',
-  foreignField: 'userId',   // <-- FIXED
-  justOne: true
-});
+// profileSchema.virtual('profile', {
+//   ref: 'Profile',
+//   localField: '_id',
+//   foreignField: 'userId',  
+//   justOne: true
+// });
 
 
 module.exports = mongoose.model("Profile", profileSchema);

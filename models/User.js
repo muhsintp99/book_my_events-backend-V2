@@ -103,7 +103,7 @@ const UserSchema = new mongoose.Schema({
 UserSchema.virtual('profile', {
   ref: 'Profile',
   localField: '_id',
-  foreignField: 'user',
+  foreignField: 'userId',
   justOne: true
 });
 

@@ -216,13 +216,15 @@ exports.getVendorsForMakeupModule = async (req, res) => {
       });
     }
 
+        // Populate vendors + their profile (logo / profilePhoto)
     const vendors = await User.find({ _id: { $in: vendorIds } })
-      .select("firstName lastName email phone")
-      .populate("profile", "logo coverImage storeName");
+      .select("firstName lastName email phone profilePhoto")
+      .populate("profile", "profilePhoto name mobileNumber");
 
-    const final = vendors.map((v) => {
+    // ⭐⭐ THIS IS WHERE YOU ADD THE CODE ⭐⭐
+    const final = vendors.map(v => {
       const obj = v.toObject();
-
+      
       // Set profilePhoto = coverImage
       if (obj.profile?.coverImage) {
         obj.profilePhoto = `${req.protocol}://${req.get("host")}${obj.profile.coverImage}`;

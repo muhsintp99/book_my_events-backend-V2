@@ -84,6 +84,8 @@ const path = require("path");
 const connectDB = require("./config/db");
 connectDB();
 
+require("./models/vendor/Profile");  // Load Profile FIRST
+require("./models/User");  
 const app = express();
 
 // CORS Configuration
