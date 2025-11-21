@@ -24,6 +24,7 @@ router.post(
   makeupController.createMakeupPackage
 );
 
+
 router.get("/", makeupController.getAllMakeupPackages);
 
 router.get("/:id", makeupController.getMakeupPackageById);
