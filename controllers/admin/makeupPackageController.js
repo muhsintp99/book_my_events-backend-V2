@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require("uuid");
 const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
+const User = require("../../models/User");
 
 // ---------------------- Helper: Parse JSON or array ----------------------
 const parseField = (field) => {
@@ -193,6 +194,42 @@ exports.deleteMakeupPackage = async (req, res) => {
 // --------------------------------------------------------------------------
 // GET ALL MAKEUP PACKAGES
 // --------------------------------------------------------------------------
+
+
+exports.getVendorsForMakeupModule = async (req, res) => {
+  try {
+    const { moduleId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(moduleId)) {
+      return res.status(400).json({ success: false, message: "Invalid module ID" });
+    }
+
+    // Find vendors who added at least one makeup package under this module
+    const vendorIds = await Makeup.distinct("provider", { module: moduleId });
+
+    if (!vendorIds.length) {
+      return res.json({
+        success: true,
+        message: "No vendors found for this module",
+        data: []
+      });
+    }
+
+    const vendors = await User.find({ _id: { $in: vendorIds } })
+      .select("firstName lastName email phone profileImage");
+
+    res.json({
+      success: true,
+      count: vendors.length,
+      data: vendors
+    });
+
+  } catch (err) {
+    console.error("Get Vendors Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.getAllMakeupPackages = async (req, res) => {
   try {
     const { search, module } = req.query;
@@ -245,8 +282,17 @@ exports.getMakeupPackageById = async (req, res) => {
 // --------------------------------------------------------------------------
 exports.getMakeupByProvider = async (req, res) => {
   try {
-    const makeups = await Makeup.find({ provider: req.params.providerId })
-      .populate("module", "title images isActive")
+    const { providerId } = req.params;
+    const { moduleId } = req.query;
+
+    let query = { provider: providerId };
+
+    if (moduleId && mongoose.Types.ObjectId.isValid(moduleId)) {
+      query.module = moduleId;
+    }
+
+    const makeups = await Makeup.find(query)
+      .populate("module", "title")
       .populate("categories", "title image")
       .populate("provider", "firstName lastName email phone")
       .sort({ createdAt: -1 });
@@ -256,6 +302,7 @@ exports.getMakeupByProvider = async (req, res) => {
       count: makeups.length,
       data: makeups
     });
+
   } catch (err) {
     console.error("Get Makeup By Provider Error:", err);
     res.status(500).json({ success: false, message: err.message });

@@ -11,6 +11,7 @@ const upload = createUpload("makeup", {
 });
 
 // ---------------------- SPECIAL ROUTES ----------------------
+router.get("/vendors/:moduleId", makeupController.getVendorsForMakeupModule);
 router.get("/provider/:providerId", makeupController.getMakeupByProvider);
 router.get("/top-picks", makeupController.getTopPickMakeups);
 router.patch("/:id/toggle-top-pick", makeupController.toggleTopPickStatus);

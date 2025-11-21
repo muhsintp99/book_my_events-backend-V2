@@ -84,6 +84,7 @@ const UserSchema = new mongoose.Schema({
   },
   
   role: { type: String, enum: ['superadmin','admin','vendor','user'], default: 'user' },
+  
   otp: String,
   otpExpire: Date,
   isActive: { type: Boolean, default: true },
