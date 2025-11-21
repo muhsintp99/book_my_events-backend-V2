@@ -46,7 +46,7 @@ const { protect } = require('../middlewares/authMiddleware');
 const createUpload = require('../middlewares/upload');
 
 const upload = createUpload('vendors', {
-  fileSizeMB: 2,
+  fileSizeMB: 5,
   allowedTypes: [
     'image/jpeg',
     'image/png',
@@ -68,7 +68,9 @@ router.post(
 );
 
 
-router.get('/providers', authController.listProviders);
+// router.get('/providers', authController.listProviders);
+router.get('/providers/:moduleId', authController.listMakeupVendors);
+
 // ---------------- LOGIN/LOGOUT ----------------
 router.post('/login', authController.login);
 router.post('/logout', protect, authController.logout);

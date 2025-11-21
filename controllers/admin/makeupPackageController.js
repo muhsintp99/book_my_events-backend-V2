@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
 require("../../models/vendor/Profile");
+const VendorProfile = require("../../models/vendor/vendorProfile"); // ADD THIS
 
 const User = require("../../models/User");
 
@@ -198,6 +199,56 @@ exports.deleteMakeupPackage = async (req, res) => {
 // --------------------------------------------------------------------------
 
 
+// exports.getVendorsForMakeupModule = async (req, res) => {
+//   try {
+//     const { moduleId } = req.params;
+
+//     if (!mongoose.Types.ObjectId.isValid(moduleId)) {
+//       return res.status(400).json({ success: false, message: "Invalid module ID" });
+//     }
+
+//     const vendorIds = await Makeup.distinct("provider", { module: moduleId });
+
+//     if (!vendorIds.length) {
+//       return res.json({
+//         success: true,
+//         message: "No vendors found for this module",
+//         data: []
+//       });
+//     }
+
+//         // Populate vendors + their profile (logo / profilePhoto)
+//     const vendors = await User.find({ _id: { $in: vendorIds } })
+//       .select("firstName lastName email phone profilePhoto")
+//       .populate("profile", "profilePhoto name mobileNumber");
+
+//     // ⭐⭐ THIS IS WHERE YOU ADD THE CODE ⭐⭐
+//     const final = vendors.map(v => {
+//       const obj = v.toObject();
+      
+//       // Set profilePhoto = coverImage
+//       if (obj.profile?.coverImage) {
+//         obj.profilePhoto = `${req.protocol}://${req.get("host")}${obj.profile.coverImage}`;
+//       } else {
+//         obj.profilePhoto = null;
+//       }
+
+//       return obj;
+//     });
+
+//     res.json({
+//       success: true,
+//       count: final.length,
+//       data: final
+//     });
+
+//   } catch (err) {
+//     console.error("Get Vendors Error:", err);
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
+
 exports.getVendorsForMakeupModule = async (req, res) => {
   try {
     const { moduleId } = req.params;
@@ -216,21 +267,63 @@ exports.getVendorsForMakeupModule = async (req, res) => {
       });
     }
 
-        // Populate vendors + their profile (logo / profilePhoto)
+    // Get users with their Profile (virtual populate)
     const vendors = await User.find({ _id: { $in: vendorIds } })
       .select("firstName lastName email phone profilePhoto")
       .populate("profile", "profilePhoto name mobileNumber");
 
-    // ⭐⭐ THIS IS WHERE YOU ADD THE CODE ⭐⭐
+    // Get VendorProfile data - make sure the field name matches your schema
+    const vendorProfiles = await VendorProfile.find({ user: { $in: vendorIds } })
+      .select("user logo coverImage storeName")
+      .lean();
+
+    // DEBUG: Check if VendorProfiles exist at all in the collection
+    const totalVendorProfiles = await VendorProfile.countDocuments();
+    console.log("=== DEBUG INFO ===");
+    console.log("Total VendorProfiles in DB:", totalVendorProfiles);
+    console.log("Vendor IDs searching for:", vendorIds.map(id => id.toString()));
+    console.log("VendorProfiles found for these vendors:", vendorProfiles.length);
+    
+    // Also check what user field looks like in VendorProfile
+    if (totalVendorProfiles > 0) {
+      const sampleProfile = await VendorProfile.findOne().lean();
+      console.log("Sample VendorProfile user field:", sampleProfile?.user);
+      console.log("Sample VendorProfile user type:", typeof sampleProfile?.user);
+    }
+
+    // Create a map for quick lookup by user ID
+    const vendorProfileMap = {};
+    vendorProfiles.forEach(vp => {
+      const key = vp.user?.toString() || vp.user;
+      vendorProfileMap[key] = vp;
+    });
+
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+
     const final = vendors.map(v => {
       const obj = v.toObject();
-      
-      // Set profilePhoto = coverImage
-      if (obj.profile?.coverImage) {
-        obj.profilePhoto = `${req.protocol}://${req.get("host")}${obj.profile.coverImage}`;
-      } else {
-        obj.profilePhoto = null;
+      const vendorProfile = vendorProfileMap[obj._id.toString()];
+
+      // Priority: VendorProfile.logo > VendorProfile.coverImage > Profile.profilePhoto > User.profilePhoto
+      if (vendorProfile?.logo) {
+        obj.profilePhoto = `${baseUrl}${vendorProfile.logo}`;
+      } else if (vendorProfile?.coverImage) {
+        obj.profilePhoto = `${baseUrl}${vendorProfile.coverImage}`;
+      } else if (obj.profile?.profilePhoto) {
+        obj.profilePhoto = obj.profile.profilePhoto.startsWith('http') 
+          ? obj.profile.profilePhoto 
+          : `${baseUrl}${obj.profile.profilePhoto}`;
+      } else if (obj.profilePhoto && !obj.profilePhoto.startsWith('http')) {
+        obj.profilePhoto = `${baseUrl}${obj.profilePhoto}`;
       }
+
+      // Add vendor store info
+      obj.storeName = vendorProfile?.storeName || `${obj.firstName} ${obj.lastName}`;
+      obj.logo = vendorProfile?.logo ? `${baseUrl}${vendorProfile.logo}` : null;
+      obj.coverImage = vendorProfile?.coverImage ? `${baseUrl}${vendorProfile.coverImage}` : null;
+      
+      // Flag if VendorProfile exists
+      obj.hasVendorProfile = !!vendorProfile;
 
       return obj;
     });
@@ -247,6 +340,46 @@ exports.getVendorsForMakeupModule = async (req, res) => {
   }
 };
 
+
+exports.listMakeupVendors = async (req, res) => {
+  try {
+    const { moduleId } = req.params;
+
+    const vendors = await VendorProfile.find({ module: moduleId })
+      .populate({
+        path: "user",
+        select: "firstName lastName email phone role"
+      })
+      .select("storeName logo coverImage module user");
+
+    const formatted = vendors.map(v => ({
+      _id: v.user?._id,
+      firstName: v.user?.firstName,
+      lastName: v.user?.lastName,
+      email: v.user?.email,
+      phone: v.user?.phone,
+      storeName: v.storeName,
+      logo: v.logo ? `http://localhost:5000${v.logo}` : null,
+      coverImage: v.coverImage ? `http://localhost:5000${v.coverImage}` : null,
+      vendorProfileId: v._id,
+      module: v.module
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: formatted.length,
+      data: formatted,
+    });
+
+  } catch (err) {
+    console.error("Makeup Vendor List Error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch makeup vendors",
+      error: err.message
+    });
+  }
+};
 exports.getAllMakeupPackages = async (req, res) => {
   try {
     const { search, module } = req.query;

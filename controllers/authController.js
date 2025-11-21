@@ -563,31 +563,45 @@ exports.register = async (req, res) => {
 
 
 // ------------------ LIST PROVIDERS ------------------
-exports.listProviders = async (req, res) => {
+exports.listMakeupVendors = async (req, res) => {
   try {
-    const providers = await require("../models/vendor/vendorProfile")
-      .find({})
-      .select("storeName logo coverImage _id")
+    const { moduleId } = req.params;
+
+    const vendors = await VendorProfile.find({ module: moduleId })
       .populate({
         path: "user",
-        select: "firstName lastName email role",
-      });
+        select: "firstName lastName email phone role"
+      })
+      .select("storeName logo coverImage module user");
+
+    const formatted = vendors.map(v => ({
+      _id: v.user?._id,
+      firstName: v.user?.firstName,
+      lastName: v.user?.lastName,
+      email: v.user?.email,
+      phone: v.user?.phone,
+      storeName: v.storeName,
+      logo: v.logo ? `http://localhost:5000${v.logo}` : null,
+      coverImage: v.coverImage ? `http://localhost:5000${v.coverImage}` : null,
+      vendorProfileId: v._id,
+      module: v.module
+    }));
 
     res.status(200).json({
       success: true,
-      count: providers.length,
-      providers,
+      count: formatted.length,
+      data: formatted,
     });
+
   } catch (err) {
-    console.error("List Providers Error:", err);
+    console.error("Makeup Vendor List Error:", err);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch providers",
-      error: err.message,
+      message: "Failed to fetch makeup vendors",
+      error: err.message
     });
   }
 };
-
 
 
 // ------------------ LOGIN ------------------
