@@ -60,7 +60,7 @@ exports.createMakeupPackage = async (req, res) => {
     const parsedIncludes = parseField(includedServices);
 
     const gallery = req.files?.gallery
-      ? req.files.gallery.map((file) => `/Uploads/makeup/${file.filename}`)
+      ? req.files.gallery.map((file) => `/uploads/makeup/${file.filename}`)
       : [];
 
     const finalPrice = Number(basePrice || 0) - Number(offerPrice || 0);
@@ -130,7 +130,7 @@ exports.updateMakeupPackage = async (req, res) => {
       makeup.gallery.forEach((imgPath) =>
         deleteFileIfExists(path.join(__dirname, `../../${imgPath}`))
       );
-      makeup.gallery = req.files.gallery.map((file) => `/Uploads/makeup/${file.filename}`);
+      makeup.gallery = req.files.gallery.map((file) => `/uploads/makeup/${file.filename}`);
     }
 
     if (packageTitle) makeup.packageTitle = packageTitle.trim();
