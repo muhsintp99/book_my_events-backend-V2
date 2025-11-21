@@ -1,37 +1,49 @@
-const Makeup = require("../../models/admin/makeupPackageModel");
-const { v4: uuidv4 } = require("uuid");
-const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
+const Makeup = require("../../models/admin/makeupPackageModel");
 const User = require("../../models/User");
+const { v4: uuidv4 } = require("uuid");
+const mongoose = require("mongoose");
 
-// ---------------------- Helper: Parse JSON or array ----------------------
-const parseField = (field) => {
-  if (!field) return [];
-  try {
-    return Array.isArray(field) ? field : JSON.parse(field);
-  } catch {
-    return [field];
+/* -----------------------------------------------------
+   DELETE FILE UTILITY
+----------------------------------------------------- */
+const deleteFileIfExists = (filePath) => {
+  if (filePath && fs.existsSync(filePath)) {
+    try {
+      fs.unlinkSync(filePath);
+    } catch (err) {
+      console.error("File delete error:", err);
+    }
   }
 };
 
-// ---------------------- Helper: Delete file ----------------------
-const deleteFileIfExists = (filePath) => {
-  if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
+/* -----------------------------------------------------
+   PARSE FIELD UTILITY
+----------------------------------------------------- */
+const parseField = (value) => {
+  if (!value) return [];
+  try {
+    return Array.isArray(value) ? value : JSON.parse(value);
+  } catch {
+    return [value];
+  }
 };
 
-// ---------------------- Helper: Populate Makeup Package ----------------------
+/* -----------------------------------------------------
+   POPULATE MAKEUP PACKAGE
+----------------------------------------------------- */
 const populateMakeup = async (id) => {
   return await Makeup.findById(id)
-    .populate("module", "-__v")
-    .populate("categories", "-__v")
-    .populate("provider", "firstName lastName email phone")
+    .populate("module")
+    .populate("categories")
+    .populate("provider", "firstName lastName email phone profileImage")
     .populate("createdBy", "firstName lastName email phone");
 };
 
-// --------------------------------------------------------------------------
-// CREATE MAKEUP PACKAGE
-// --------------------------------------------------------------------------
+/* -----------------------------------------------------
+   CREATE MAKEUP PACKAGE
+----------------------------------------------------- */
 exports.createMakeupPackage = async (req, res) => {
   try {
     const {
@@ -48,41 +60,45 @@ exports.createMakeupPackage = async (req, res) => {
       advanceBookingAmount,
       cancellationPolicy,
       providerId,
-      createdBy
+      createdBy,
     } = req.body;
 
-    if (!packageTitle) return res.status(400).json({ success: false, message: "Package title is required" });
-    if (!providerId) return res.status(400).json({ success: false, message: "Provider ID is required" });
+    if (!packageTitle)
+      return res.status(400).json({ error: "Package title is required" });
+
+    if (!providerId)
+      return res.status(400).json({ error: "Provider ID is required" });
 
     const makeupId = `MUP-${uuidv4()}`;
 
-    const parsedCategories = parseField(categories);
-    const parsedIncludes = parseField(includedServices);
+    const categoryList = parseField(categories);
+    const includedList = parseField(includedServices);
 
-    const gallery = req.files?.gallery
-      ? req.files.gallery.map((file) => `/uploads/makeup/${file.filename}`)
-      : [];
-
-    const finalPrice = Number(basePrice || 0) - Number(offerPrice || 0);
+    let gallery = [];
+    if (req.files && req.files.gallery) {
+      gallery = req.files.gallery.map(
+        (file) => `/uploads/makeup/${file.filename}`
+      );
+    }
 
     const makeup = await Makeup.create({
       makeupId,
       module,
-      categories: parsedCategories,
+      categories: categoryList,
       packageTitle,
       description,
       makeupType,
-      includedServices: parsedIncludes,
+      includedServices: includedList,
       basePrice,
       offerPrice,
-      finalPrice,
+      finalPrice: Number(basePrice || 0) - Number(offerPrice || 0),
       trialMakeupIncluded,
       travelToVenue,
       advanceBookingAmount,
       cancellationPolicy,
       gallery,
       provider: providerId,
-      createdBy
+      createdBy,
     });
 
     const populated = await populateMakeup(makeup._id);
@@ -90,22 +106,28 @@ exports.createMakeupPackage = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Makeup package created successfully",
-      data: populated
+      data: populated,
     });
-
   } catch (err) {
     console.error("Create Makeup Error:", err);
-    res.status(500).json({ success: false, message: err.message });
+
+    // CLEANUP FILES ON ERROR
+    if (req.files?.gallery) {
+      req.files.gallery.forEach((file) => deleteFileIfExists(file.path));
+    }
+
+    res.status(500).json({ error: err.message });
   }
 };
 
-// --------------------------------------------------------------------------
-// UPDATE MAKEUP PACKAGE
-// --------------------------------------------------------------------------
+/* -----------------------------------------------------
+   UPDATE MAKEUP PACKAGE
+----------------------------------------------------- */
 exports.updateMakeupPackage = async (req, res) => {
   try {
     const makeup = await Makeup.findById(req.params.id);
-    if (!makeup) return res.status(404).json({ success: false, message: "Makeup package not found" });
+    if (!makeup)
+      return res.status(404).json({ error: "Makeup package not found" });
 
     const {
       module,
@@ -120,32 +142,46 @@ exports.updateMakeupPackage = async (req, res) => {
       travelToVenue,
       advanceBookingAmount,
       cancellationPolicy,
-      updatedBy
+      updatedBy,
     } = req.body;
+
+    /* ----------------------------------------------
+       REPLACE GALLERY IMAGES (EXACTLY LIKE CATEGORY)
+    ---------------------------------------------- */
+    if (req.files?.gallery) {
+      // DELETE OLD FILES
+      makeup.gallery.forEach((img) =>
+        deleteFileIfExists(path.join(__dirname, `../../${img}`))
+      );
+
+      // ADD NEW FILES
+      makeup.gallery = req.files.gallery.map(
+        (file) => `/uploads/makeup/${file.filename}`
+      );
+    }
 
     if (categories) makeup.categories = parseField(categories);
     if (includedServices) makeup.includedServices = parseField(includedServices);
-
-    if (req.files?.gallery) {
-      makeup.gallery.forEach((imgPath) =>
-        deleteFileIfExists(path.join(__dirname, `../../${imgPath}`))
-      );
-      makeup.gallery = req.files.gallery.map((file) => `/uploads/makeup/${file.filename}`);
-    }
 
     if (packageTitle) makeup.packageTitle = packageTitle.trim();
     if (description) makeup.description = description;
     if (makeupType) makeup.makeupType = makeupType;
     if (module) makeup.module = module;
 
-    if (basePrice) makeup.basePrice = basePrice;
+    if (basePrice !== undefined) makeup.basePrice = basePrice;
     if (offerPrice !== undefined) makeup.offerPrice = offerPrice;
 
-    makeup.finalPrice = Number(makeup.basePrice || 0) - Number(makeup.offerPrice || 0);
+    makeup.finalPrice =
+      Number(makeup.basePrice || 0) - Number(makeup.offerPrice || 0);
 
-    if (trialMakeupIncluded !== undefined) makeup.trialMakeupIncluded = trialMakeupIncluded;
+    if (trialMakeupIncluded !== undefined)
+      makeup.trialMakeupIncluded = trialMakeupIncluded;
+
     if (travelToVenue !== undefined) makeup.travelToVenue = travelToVenue;
-    if (advanceBookingAmount) makeup.advanceBookingAmount = advanceBookingAmount;
+
+    if (advanceBookingAmount)
+      makeup.advanceBookingAmount = advanceBookingAmount;
+
     if (cancellationPolicy) makeup.cancellationPolicy = cancellationPolicy;
 
     makeup.updatedBy = updatedBy || makeup.updatedBy;
@@ -157,12 +193,17 @@ exports.updateMakeupPackage = async (req, res) => {
     res.json({
       success: true,
       message: "Makeup package updated successfully",
-      data: populated
+      data: populated,
     });
-
   } catch (err) {
     console.error("Update Makeup Error:", err);
-    res.status(500).json({ success: false, message: err.message });
+
+    // CLEANUP FILES ON ERROR
+    if (req.files?.gallery) {
+      req.files.gallery.forEach((file) => deleteFileIfExists(file.path));
+    }
+
+    res.status(500).json({ error: err.message });
   }
 };
 
@@ -172,22 +213,23 @@ exports.updateMakeupPackage = async (req, res) => {
 exports.deleteMakeupPackage = async (req, res) => {
   try {
     const makeup = await Makeup.findById(req.params.id);
-    if (!makeup) return res.status(404).json({ success: false, message: "Makeup package not found" });
+    if (!makeup)
+      return res.status(404).json({ error: "Makeup package not found" });
 
-    makeup.gallery.forEach((imgPath) =>
-      deleteFileIfExists(path.join(__dirname, `../../${imgPath}`))
+    // DELETE GALLERY IMAGES
+    makeup.gallery.forEach((img) =>
+      deleteFileIfExists(path.join(__dirname, `../../${img}`))
     );
 
     await makeup.deleteOne();
 
     res.json({
       success: true,
-      message: "Makeup package deleted successfully"
+      message: "Makeup package deleted successfully",
     });
-
   } catch (err) {
     console.error("Delete Makeup Error:", err);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ error: err.message });
   }
 };
 
