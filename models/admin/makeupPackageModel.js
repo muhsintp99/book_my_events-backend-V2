@@ -32,7 +32,7 @@ const MakeupSchema = new mongoose.Schema(
 
     makeupType: {
       type: String,
-      enum: ["HD", "Airbrush", "Matte", "Traditional"],
+      enum: ["HD Makeup", "Airbrush Makeup", "Matte Makeup", "Dewy/Glass Makeup","Mineral Makeup"],
       required: true
     },
 
