@@ -79,7 +79,7 @@ const fs = require('fs');
 const sanitize = require('sanitize-filename');
 
 // Base upload directory (consistent casing)
-const BASE_UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
+const BASE_UPLOAD_DIR = path.join(__dirname, '..', 'Uploads');
 
 // Ensure upload folder exists
 function ensureDir(folder) {
