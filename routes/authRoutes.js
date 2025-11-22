@@ -57,13 +57,31 @@ const upload = createUpload('vendors', {
 });
 
 // ---------------- REGISTER ----------------
+// router.post(
+//   '/register',
+//   upload.fields([
+//     { name: 'logo', maxCount: 1 },
+//     { name: 'coverImage', maxCount: 1 },
+//     { name: 'tinCertificate', maxCount: 1 }
+//   ]),
+//   authController.register
+// );
+
 router.post(
-  '/register',
-  upload.fields([
-    { name: 'logo', maxCount: 1 },
-    { name: 'coverImage', maxCount: 1 },
-    { name: 'tinCertificate', maxCount: 1 }
-  ]),
+  "/register",
+  (req, res, next) => {
+    upload.fields([
+      { name: "logo", maxCount: 1 },
+      { name: "coverImage", maxCount: 1 },
+      { name: "tinCertificate", maxCount: 1 }
+    ])(req, res, function (err) {
+      if (err) {
+        console.error("🔴 MULTER ERROR:", err);
+        return res.status(400).json({ error: err.message });
+      }
+      next();
+    });
+  },
   authController.register
 );
 
