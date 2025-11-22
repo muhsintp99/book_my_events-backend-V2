@@ -46,7 +46,7 @@ const { protect } = require('../middlewares/authMiddleware');
 const createUpload = require('../middlewares/upload');
 
 const upload = createUpload('vendors', {
-  fileSizeMB: 2,
+  fileSizeMB: 5,
   allowedTypes: [
     'image/jpeg',
     'image/png',
