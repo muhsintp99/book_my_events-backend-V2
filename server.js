@@ -98,7 +98,8 @@ const allowedOrigins = [
   "https://dashboard.bookmyevent.ae",
   "https://www.bookmyevent.ae",
   "https://vendor.bookmyevent.ae",
-  "https://api.bookmyevent.ae", // ✅ Add your API domain
+  "https://api.bookmyevent.ae", 
+  "https://book-my-events-website.vercel.app"
 ];
 
 app.use(
