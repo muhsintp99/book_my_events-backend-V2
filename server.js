@@ -176,6 +176,7 @@ app.use(
   require("./routes/admin/vehicleAttributeRoutes")
 );
 app.use("/api/makeup-packages", require("./routes/admin/makeupPackageRoutes"));
+app.use("/api/makeup-types", require("./routes/admin/makeupTypeRoutes"));
 app.use("/api/portfolio", require("./routes/vendor/portfolioRoutes"));
 app.use("/api/photography-packages", require("./routes/vendor/photographyPackageRoutes"));
 

@@ -31,10 +31,11 @@ const MakeupSchema = new mongoose.Schema(
     description: { type: String, required: true },
 
     makeupType: {
-      type: String,
-      enum: ["HD Makeup", "Airbrush Makeup", "Matte Makeup", "Dewy/Glass Makeup","Mineral Makeup"],
-      required: true
-    },
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "MakeupType",
+  required: true
+},
+
 
     includedServices: [includedServiceSchema],
 
