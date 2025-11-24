@@ -11,12 +11,13 @@ const upload = createUpload("photography", {
 });
 
 // SPECIAL ROUTES
+router.get("/vendors/:moduleId", controller.getVendorsForPhotographyModule);
 router.get("/provider/:providerId", controller.getPhotographyByProvider);
 router.get("/top-picks", controller.getTopPickPhotographies);
 router.patch("/:id/toggle-top-pick", controller.toggleTopPickStatus);
 router.patch("/:id/toggle-active", controller.toggleActiveStatus);
 
-// CRUD ROUTES
+// CRUD
 router.post(
   "/",
   upload.fields([{ name: "gallery", maxCount: 10 }]),

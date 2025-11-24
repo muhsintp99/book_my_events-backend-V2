@@ -1,4 +1,6 @@
 const Photography = require("../../models/vendor/PhotographyPackage");
+const VendorProfile = require("../../models/vendor/vendorProfile");
+const User = require("../../models/User");
 const { v4: uuidv4 } = require("uuid");
 const mongoose = require("mongoose");
 const fs = require("fs");
@@ -19,18 +21,18 @@ const deleteFileIfExists = (filePath) => {
   if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
 };
 
-// ---------------------- Helper: Populate Photography Package ----------------------
+// ---------------------- Helper: Populate Package ----------------------
 const populatePhotography = async (id) => {
   return await Photography.findById(id)
-    .populate("module", "-__v")
-    .populate("categories", "-__v")
+    .populate("module")
+    .populate("categories")
     .populate("provider", "firstName lastName email phone")
     .populate("createdBy", "firstName lastName email phone");
 };
 
-// --------------------------------------------------------------------------
-// CREATE PHOTOGRAPHY PACKAGE
-// --------------------------------------------------------------------------
+// =======================================================================
+// CREATE PACKAGE
+// =======================================================================
 exports.createPhotographyPackage = async (req, res) => {
   try {
     const {
@@ -40,7 +42,7 @@ exports.createPhotographyPackage = async (req, res) => {
       description,
       photographyType,
       includedServices,
-      price,   // <-- updated
+      price,
       travelToVenue,
       advanceBookingAmount,
       cancellationPolicy,
@@ -63,7 +65,7 @@ exports.createPhotographyPackage = async (req, res) => {
     const parsedIncludes = parseField(includedServices);
 
     const gallery = req.files?.gallery
-      ? req.files.gallery.map((file) => `uploads/photography/${file.filename}`)
+      ? req.files.gallery.map((file) => `/uploads/photography/${file.filename}`)
       : [];
 
     const pkg = await Photography.create({
@@ -90,15 +92,16 @@ exports.createPhotographyPackage = async (req, res) => {
       message: "Photography package created successfully",
       data: populated
     });
+
   } catch (err) {
     console.error("Create Photography Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// --------------------------------------------------------------------------
-// UPDATE PHOTOGRAPHY PACKAGE
-// --------------------------------------------------------------------------
+// =======================================================================
+// UPDATE PACKAGE
+// =======================================================================
 exports.updatePhotographyPackage = async (req, res) => {
   try {
     const pkg = await Photography.findById(req.params.id);
@@ -123,10 +126,8 @@ exports.updatePhotographyPackage = async (req, res) => {
     if (includedServices) pkg.includedServices = parseField(includedServices);
 
     if (req.files?.gallery) {
-      pkg.gallery.forEach((imgPath) =>
-        deleteFileIfExists(path.join(__dirname, `../../${imgPath}`))
-      );
-      pkg.gallery = req.files.gallery.map((file) => `uploads/photography/${file.filename}`);
+      pkg.gallery.forEach((img) => deleteFileIfExists(path.join(__dirname, `../../${img}`)));
+      pkg.gallery = req.files.gallery.map((file) => `/uploads/photography/${file.filename}`);
     }
 
     if (packageTitle) pkg.packageTitle = packageTitle.trim();
@@ -150,40 +151,141 @@ exports.updatePhotographyPackage = async (req, res) => {
       message: "Photography package updated successfully",
       data: populated
     });
+
   } catch (err) {
     console.error("Update Photography Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// --------------------------------------------------------------------------
-// DELETE PHOTOGRAPHY PACKAGE
-// --------------------------------------------------------------------------
+// =======================================================================
+// DELETE PACKAGE
+// =======================================================================
 exports.deletePhotographyPackage = async (req, res) => {
   try {
     const pkg = await Photography.findById(req.params.id);
     if (!pkg)
       return res.status(404).json({ success: false, message: "Photography package not found" });
 
-    pkg.gallery.forEach((imgPath) =>
-      deleteFileIfExists(path.join(__dirname, `../../${imgPath}`))
+    pkg.gallery.forEach((img) =>
+      deleteFileIfExists(path.join(__dirname, `../../${img}`))
     );
 
     await pkg.deleteOne();
 
-    res.json({
-      success: true,
-      message: "Photography package deleted successfully"
-    });
+    res.json({ success: true, message: "Photography package deleted successfully" });
+
   } catch (err) {
     console.error("Delete Photography Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// --------------------------------------------------------------------------
-// GET ALL PHOTOGRAPHY PACKAGES
-// --------------------------------------------------------------------------
+// =======================================================================
+// VENDOR LIST BY MODULE (Same as Makeup)
+// =======================================================================
+exports.getVendorsForPhotographyModule = async (req, res) => {
+  try {
+    const { moduleId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(moduleId)) {
+      return res.status(400).json({ success: false, message: "Invalid module ID" });
+    }
+
+    const vendorIds = await Photography.distinct("provider", { module: moduleId });
+
+    if (!vendorIds.length) {
+      return res.json({
+        success: true,
+        message: "No vendors found for this module",
+        data: []
+      });
+    }
+
+    const vendors = await User.find({ _id: { $in: vendorIds } })
+      .select("firstName lastName email phone profilePhoto")
+      .populate("profile", "profilePhoto name mobileNumber");
+
+    const vendorProfiles = await VendorProfile.find({ user: { $in: vendorIds } })
+      .select("user logo coverImage storeName")
+      .lean();
+
+    const map = {};
+    vendorProfiles.forEach((vp) => {
+      map[vp.user.toString()] = vp;
+    });
+
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+    const final = vendors.map((v) => {
+      const obj = v.toObject();
+      const vp = map[obj._id.toString()];
+
+      // Priority: logo > coverImage > profile.profilePhoto > user.profilePhoto
+      if (vp?.logo) {
+        obj.profilePhoto = `${baseUrl}${vp.logo}`;
+      } else if (vp?.coverImage) {
+        obj.profilePhoto = `${baseUrl}${vp.coverImage}`;
+      } else if (obj.profile?.profilePhoto) {
+        obj.profilePhoto = `${baseUrl}${obj.profile.profilePhoto}`;
+      } else if (obj.profilePhoto) {
+        obj.profilePhoto = `${baseUrl}${obj.profilePhoto}`;
+      }
+
+      obj.storeName = vp?.storeName || `${obj.firstName} ${obj.lastName}`;
+      obj.logo = vp?.logo ? `${baseUrl}${vp.logo}` : null;
+      obj.coverImage = vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null;
+
+      return obj;
+    });
+
+    res.json({
+      success: true,
+      count: final.length,
+      data: final
+    });
+
+  } catch (err) {
+    console.error("Get Vendors Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// =======================================================================
+// GET PACKAGES BY PROVIDER (Same as Makeup)
+// =======================================================================
+exports.getPhotographyByProvider = async (req, res) => {
+  try {
+    const { providerId } = req.params;
+    const { moduleId } = req.query;
+
+    let query = { provider: providerId };
+
+    if (moduleId && mongoose.Types.ObjectId.isValid(moduleId)) {
+      query.module = moduleId;
+    }
+
+    const pkgs = await Photography.find(query)
+      .populate("module")
+      .populate("categories")
+      .populate("provider", "firstName lastName email phone")
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: pkgs.length,
+      data: pkgs
+    });
+
+  } catch (err) {
+    console.error("Get Photography By Provider Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// =======================================================================
+// GET ALL PACKAGES
+// =======================================================================
 exports.getAllPhotographyPackages = async (req, res) => {
   try {
     const { search, module } = req.query;
@@ -204,15 +306,16 @@ exports.getAllPhotographyPackages = async (req, res) => {
       count: pkgs.length,
       data: pkgs
     });
+
   } catch (err) {
     console.error("Get All Photography Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// --------------------------------------------------------------------------
-// GET PHOTOGRAPHY BY ID
-// --------------------------------------------------------------------------
+// =======================================================================
+// GET SINGLE PACKAGE
+// =======================================================================
 exports.getPhotographyPackageById = async (req, res) => {
   try {
     const pkg = await populatePhotography(req.params.id);
@@ -225,53 +328,9 @@ exports.getPhotographyPackageById = async (req, res) => {
   }
 };
 
-// --------------------------------------------------------------------------
-// GET BY PROVIDER
-// --------------------------------------------------------------------------
-exports.getPhotographyByProvider = async (req, res) => {
-  try {
-    const pkgs = await Photography.find({ provider: req.params.providerId })
-      .populate("module", "title images isActive")
-      .populate("categories", "title image")
-      .populate("provider", "firstName lastName email phone")
-      .sort({ createdAt: -1 });
-
-    res.json({
-      success: true,
-      count: pkgs.length,
-      data: pkgs
-    });
-  } catch (err) {
-    console.error("Get Photography By Provider Error:", err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-// --------------------------------------------------------------------------
-// GET BY MODULE
-// --------------------------------------------------------------------------
-exports.getPhotographyByModule = async (req, res) => {
-  try {
-    const pkgs = await Photography.find({ module: req.params.moduleId })
-      .populate("module")
-      .populate("categories")
-      .populate("provider")
-      .sort({ createdAt: -1 });
-
-    res.json({
-      success: true,
-      count: pkgs.length,
-      data: pkgs
-    });
-  } catch (err) {
-    console.error("Get Photography By Module Error:", err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-// --------------------------------------------------------------------------
+// =======================================================================
 // TOGGLE TOP PICK
-// --------------------------------------------------------------------------
+// =======================================================================
 exports.toggleTopPickStatus = async (req, res) => {
   try {
     const pkg = await Photography.findById(req.params.id);
@@ -293,32 +352,32 @@ exports.toggleTopPickStatus = async (req, res) => {
   }
 };
 
-// --------------------------------------------------------------------------
-// GET TOP PICK PHOTOGRAPHY PACKAGES
-// --------------------------------------------------------------------------
+// =======================================================================
+// GET TOP PICKS
+// =======================================================================
 exports.getTopPickPhotographies = async (req, res) => {
   try {
     const pkgs = await Photography.find({ isTopPick: true, isActive: true })
-      .populate("module", "-__v")
-      .populate("categories", "-__v")
+      .populate("module")
+      .populate("categories")
       .populate("provider", "firstName lastName email phone")
       .sort({ createdAt: -1 });
 
     res.json({
       success: true,
-      message: "Top pick photography packages fetched successfully",
       count: pkgs.length,
-      data: pkgs,
+      data: pkgs
     });
+
   } catch (err) {
     console.error("Get Top Pick Photographies Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// --------------------------------------------------------------------------
+// =======================================================================
 // TOGGLE ACTIVE STATUS
-// --------------------------------------------------------------------------
+// =======================================================================
 exports.toggleActiveStatus = async (req, res) => {
   try {
     const pkg = await Photography.findById(req.params.id);
