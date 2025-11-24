@@ -1,3 +1,4 @@
+// controllers/vendor/photographyController.js
 const Photography = require("../../models/vendor/PhotographyPackage");
 const VendorProfile = require("../../models/vendor/vendorProfile");
 const User = require("../../models/User");
@@ -10,15 +11,32 @@ const path = require("path");
 const parseField = (field) => {
   if (!field) return [];
   try {
-    return Array.isArray(field) ? field : JSON.parse(field);
-  } catch {
+    // If it's already an array (e.g., from multer fields) return it
+    if (Array.isArray(field)) return field;
+    // If it's a JSON string, parse it
+    if (typeof field === "string") {
+      const trimmed = field.trim();
+      if (!trimmed) return [];
+      return JSON.parse(trimmed);
+    }
+    // otherwise wrap value in array
     return [field];
+  } catch (err) {
+    // If JSON.parse fails, try to treat as comma separated string
+    if (typeof field === "string") {
+      return field.split(",").map(s => s.trim()).filter(Boolean);
+    }
+    return [];
   }
 };
 
 // ---------------------- Helper: Delete file ----------------------
 const deleteFileIfExists = (filePath) => {
-  if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  try {
+    if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch (err) {
+    console.warn("Error deleting file:", filePath, err.message);
+  }
 };
 
 // ---------------------- Helper: Populate Package ----------------------
@@ -40,7 +58,6 @@ exports.createPhotographyPackage = async (req, res) => {
       categories,
       packageTitle,
       description,
-      photographyType,
       includedServices,
       price,
       travelToVenue,
@@ -56,8 +73,11 @@ exports.createPhotographyPackage = async (req, res) => {
     if (!providerId)
       return res.status(400).json({ success: false, message: "Provider ID is required" });
 
-    if (!price)
+    if (!price && price !== 0)
       return res.status(400).json({ success: false, message: "Price is required" });
+
+    if (!module)
+      return res.status(400).json({ success: false, message: "Module is required" });
 
     const photographyId = `PHP-${uuidv4()}`;
 
@@ -74,10 +94,9 @@ exports.createPhotographyPackage = async (req, res) => {
       categories: parsedCategories,
       packageTitle,
       description,
-      photographyType,
       includedServices: parsedIncludes,
       price,
-      travelToVenue,
+      travelToVenue: travelToVenue === "true" || travelToVenue === true,
       advanceBookingAmount,
       cancellationPolicy,
       gallery,
@@ -95,6 +114,11 @@ exports.createPhotographyPackage = async (req, res) => {
 
   } catch (err) {
     console.error("Create Photography Error:", err);
+    // If it's a Mongoose validation error, send 400 with details
+    if (err.name === "ValidationError") {
+      const messages = Object.values(err.errors).map(e => e.message).join(", ");
+      return res.status(400).json({ success: false, message: messages || err.message });
+    }
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -113,7 +137,6 @@ exports.updatePhotographyPackage = async (req, res) => {
       categories,
       packageTitle,
       description,
-      photographyType,
       includedServices,
       price,
       travelToVenue,
@@ -122,23 +145,27 @@ exports.updatePhotographyPackage = async (req, res) => {
       updatedBy
     } = req.body;
 
+    // categories and includedServices might be sent as JSON strings or arrays
     if (categories) pkg.categories = parseField(categories);
     if (includedServices) pkg.includedServices = parseField(includedServices);
 
     if (req.files?.gallery) {
-      pkg.gallery.forEach((img) => deleteFileIfExists(path.join(__dirname, `../../${img}`)));
+      // delete old images from disk (if stored locally)
+      pkg.gallery.forEach((img) => {
+        // img is like /uploads/photography/filename.jpg
+        deleteFileIfExists(path.join(__dirname, `../../${img}`));
+      });
       pkg.gallery = req.files.gallery.map((file) => `/uploads/photography/${file.filename}`);
     }
 
     if (packageTitle) pkg.packageTitle = packageTitle.trim();
     if (description) pkg.description = description;
-    if (photographyType) pkg.photographyType = photographyType;
     if (module) pkg.module = module;
-    if (price) pkg.price = price;
+    if (price !== undefined) pkg.price = price;
 
-    if (travelToVenue !== undefined) pkg.travelToVenue = travelToVenue;
-    if (advanceBookingAmount) pkg.advanceBookingAmount = advanceBookingAmount;
-    if (cancellationPolicy) pkg.cancellationPolicy = cancellationPolicy;
+    if (travelToVenue !== undefined) pkg.travelToVenue = travelToVenue === "true" || travelToVenue === true;
+    if (advanceBookingAmount !== undefined) pkg.advanceBookingAmount = advanceBookingAmount;
+    if (cancellationPolicy !== undefined) pkg.cancellationPolicy = cancellationPolicy;
 
     pkg.updatedBy = updatedBy || pkg.updatedBy;
 
@@ -154,6 +181,10 @@ exports.updatePhotographyPackage = async (req, res) => {
 
   } catch (err) {
     console.error("Update Photography Error:", err);
+    if (err.name === "ValidationError") {
+      const messages = Object.values(err.errors).map(e => e.message).join(", ");
+      return res.status(400).json({ success: false, message: messages || err.message });
+    }
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -182,7 +213,7 @@ exports.deletePhotographyPackage = async (req, res) => {
 };
 
 // =======================================================================
-// VENDOR LIST BY MODULE (Same as Makeup)
+// VENDOR LIST BY MODULE
 // =======================================================================
 exports.getVendorsForPhotographyModule = async (req, res) => {
   try {
@@ -252,7 +283,7 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
 };
 
 // =======================================================================
-// GET PACKAGES BY PROVIDER (Same as Makeup)
+// GET PACKAGES BY PROVIDER
 // =======================================================================
 exports.getPhotographyByProvider = async (req, res) => {
   try {

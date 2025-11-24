@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const createUpload = require("../../middlewares/upload");
-const controller = require("../../controllers/vendor/photographyPackageController");
+const controller = require("../../controllers/vendor/photographyController");
 
 // Upload middleware
 const upload = createUpload("photography", {
