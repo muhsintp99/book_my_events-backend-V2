@@ -30,11 +30,16 @@ const MakeupSchema = new mongoose.Schema(
     packageTitle: { type: String, required: true, trim: true },
     description: { type: String, required: true },
 
+//     makeupType: {
+//   type: mongoose.Schema.Types.ObjectId,
+//   ref: "MakeupType",
+//   required: true
+// },
     makeupType: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "MakeupType",
-  required: true
-},
+      type: String,
+      required: true,
+      trim: true
+    },
 
 
     includedServices: [includedServiceSchema],
