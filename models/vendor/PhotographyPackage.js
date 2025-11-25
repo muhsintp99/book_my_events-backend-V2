@@ -30,7 +30,20 @@ const PhotographySchema = new mongoose.Schema(
     packageTitle: { type: String, required: true, trim: true },
     description: { type: String, required: true },
 
-
+    // NEW: Basic Add-ons field
+    basicAddons: [{ 
+      type: String,
+      enum: [
+        'drone_video',
+        'pre_wedding',
+        'candid_photography',
+        'traditional_photography',
+        'video_editing',
+        'photo_album',
+        'led_wall',
+        'crane_shoot'
+      ]
+    }],
 
     includedServices: [includedServiceSchema],
 

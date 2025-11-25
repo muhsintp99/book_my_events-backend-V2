@@ -1,4 +1,3 @@
-// controllers/vendor/photographyController.js
 const Photography = require("../../models/vendor/PhotographyPackage");
 const VendorProfile = require("../../models/vendor/vendorProfile");
 const User = require("../../models/User");
@@ -59,6 +58,7 @@ exports.createPhotographyPackage = async (req, res) => {
       packageTitle,
       description,
       includedServices,
+      basicAddons,  // NEW FIELD
       price,
       travelToVenue,
       advanceBookingAmount,
@@ -83,6 +83,7 @@ exports.createPhotographyPackage = async (req, res) => {
 
     const parsedCategories = parseField(categories);
     const parsedIncludes = parseField(includedServices);
+    const parsedAddons = parseField(basicAddons);  // NEW
 
     const gallery = req.files?.gallery
       ? req.files.gallery.map((file) => `/uploads/photography/${file.filename}`)
@@ -94,6 +95,7 @@ exports.createPhotographyPackage = async (req, res) => {
       categories: parsedCategories,
       packageTitle,
       description,
+      basicAddons: parsedAddons,  // NEW
       includedServices: parsedIncludes,
       price,
       travelToVenue: travelToVenue === "true" || travelToVenue === true,
@@ -138,6 +140,7 @@ exports.updatePhotographyPackage = async (req, res) => {
       packageTitle,
       description,
       includedServices,
+      basicAddons,  // NEW FIELD
       price,
       travelToVenue,
       advanceBookingAmount,
@@ -148,6 +151,7 @@ exports.updatePhotographyPackage = async (req, res) => {
     // categories and includedServices might be sent as JSON strings or arrays
     if (categories) pkg.categories = parseField(categories);
     if (includedServices) pkg.includedServices = parseField(includedServices);
+    if (basicAddons !== undefined) pkg.basicAddons = parseField(basicAddons);  // NEW
 
     if (req.files?.gallery) {
       // delete old images from disk (if stored locally)
