@@ -44,6 +44,13 @@ const MakeupSchema = new mongoose.Schema(
 
     includedServices: [includedServiceSchema],
 
+      basicAddOns: {
+      hairStyling: { type: Boolean, default: false },
+      sareeDraping: { type: Boolean, default: false },
+      eyelashExtension: { type: Boolean, default: false },
+      nailPolish: { type: Boolean, default: false }
+    },
+    
     basePrice: { type: Number, required: true },
     offerPrice: { type: Number, default: 0 },
     finalPrice: { type: Number, required: true },

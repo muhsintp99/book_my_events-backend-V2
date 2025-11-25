@@ -4,26 +4,36 @@ const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
 require("../../models/vendor/Profile");
-const VendorProfile = require("../../models/vendor/vendorProfile"); // ADD THIS
-
+const VendorProfile = require("../../models/vendor/vendorProfile");
 const User = require("../../models/User");
 
-// ---------------------- Helper: Parse JSON or array ----------------------
+
+// ---------------------- Helper: Parse JSON or Array ----------------------
 const parseField = (field) => {
   if (!field) return [];
   try {
     return Array.isArray(field) ? field : JSON.parse(field);
   } catch {
-    return [field];
+    return [];
   }
 };
 
-// ---------------------- Helper: Delete file ----------------------
+// ---------------------- Helper: Parse Object ----------------------
+const parseObject = (field) => {
+  if (!field) return {};
+  try {
+    return typeof field === "object" ? field : JSON.parse(field);
+  } catch {
+    return {};
+  }
+};
+
+// ---------------------- Helper: Delete File ----------------------
 const deleteFileIfExists = (filePath) => {
   if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
 };
 
-// ---------------------- Helper: Populate Makeup Package ----------------------
+// ---------------------- Helper: Populate Makeup ----------------------
 const populateMakeup = async (id) => {
   return await Makeup.findById(id)
     .populate("module", "-__v")
@@ -32,9 +42,11 @@ const populateMakeup = async (id) => {
     .populate("createdBy", "firstName lastName email phone");
 };
 
-// --------------------------------------------------------------------------
+
+
+// ==========================================================================
 // CREATE MAKEUP PACKAGE
-// --------------------------------------------------------------------------
+// ==========================================================================
 exports.createMakeupPackage = async (req, res) => {
   try {
     const {
@@ -51,16 +63,24 @@ exports.createMakeupPackage = async (req, res) => {
       advanceBookingAmount,
       cancellationPolicy,
       providerId,
+      basicAddOns,
       createdBy
     } = req.body;
 
-    if (!packageTitle) return res.status(400).json({ success: false, message: "Package title is required" });
-    if (!providerId) return res.status(400).json({ success: false, message: "Provider ID is required" });
+
+    if (!packageTitle)
+      return res.status(400).json({ success: false, message: "Package title is required" });
+
+    if (!providerId)
+      return res.status(400).json({ success: false, message: "Provider ID is required" });
+
 
     const makeupId = `MUP-${uuidv4()}`;
 
     const parsedCategories = parseField(categories);
     const parsedIncludes = parseField(includedServices);
+    const parsedBasicAddOns = parseObject(basicAddOns);
+
 
     const gallery = req.files?.gallery
       ? req.files.gallery.map((file) => `/uploads/makeup/${file.filename}`)
@@ -76,6 +96,10 @@ exports.createMakeupPackage = async (req, res) => {
       description,
       makeupType,
       includedServices: parsedIncludes,
+
+      // ⭐⭐ STORE BASIC ADD ONS ⭐⭐
+      basicAddOns: parsedBasicAddOns,
+
       basePrice,
       offerPrice,
       finalPrice,
@@ -102,13 +126,16 @@ exports.createMakeupPackage = async (req, res) => {
   }
 };
 
-// --------------------------------------------------------------------------
+
+
+// ==========================================================================
 // UPDATE MAKEUP PACKAGE
-// --------------------------------------------------------------------------
+// ==========================================================================
 exports.updateMakeupPackage = async (req, res) => {
   try {
     const makeup = await Makeup.findById(req.params.id);
-    if (!makeup) return res.status(404).json({ success: false, message: "Makeup package not found" });
+    if (!makeup)
+      return res.status(404).json({ success: false, message: "Makeup package not found" });
 
     const {
       module,
@@ -123,18 +150,25 @@ exports.updateMakeupPackage = async (req, res) => {
       travelToVenue,
       advanceBookingAmount,
       cancellationPolicy,
+      basicAddOns,
       updatedBy
     } = req.body;
 
     if (categories) makeup.categories = parseField(categories);
     if (includedServices) makeup.includedServices = parseField(includedServices);
 
+    // ⭐⭐ UPDATE BASIC ADD ONS ⭐⭐
+    if (basicAddOns) makeup.basicAddOns = parseObject(basicAddOns);
+
+
+    // Replace gallery if new one uploaded
     if (req.files?.gallery) {
       makeup.gallery.forEach((imgPath) =>
         deleteFileIfExists(path.join(__dirname, `../../${imgPath}`))
       );
       makeup.gallery = req.files.gallery.map((file) => `/uploads/makeup/${file.filename}`);
     }
+
 
     if (packageTitle) makeup.packageTitle = packageTitle.trim();
     if (description) makeup.description = description;
@@ -148,6 +182,7 @@ exports.updateMakeupPackage = async (req, res) => {
 
     if (trialMakeupIncluded !== undefined) makeup.trialMakeupIncluded = trialMakeupIncluded;
     if (travelToVenue !== undefined) makeup.travelToVenue = travelToVenue;
+
     if (advanceBookingAmount) makeup.advanceBookingAmount = advanceBookingAmount;
     if (cancellationPolicy) makeup.cancellationPolicy = cancellationPolicy;
 
@@ -169,13 +204,16 @@ exports.updateMakeupPackage = async (req, res) => {
   }
 };
 
-// --------------------------------------------------------------------------
+
+
+// ==========================================================================
 // DELETE MAKEUP PACKAGE
-// --------------------------------------------------------------------------
+// ==========================================================================
 exports.deleteMakeupPackage = async (req, res) => {
   try {
     const makeup = await Makeup.findById(req.params.id);
-    if (!makeup) return res.status(404).json({ success: false, message: "Makeup package not found" });
+    if (!makeup)
+      return res.status(404).json({ success: false, message: "Makeup package not found" });
 
     makeup.gallery.forEach((imgPath) =>
       deleteFileIfExists(path.join(__dirname, `../../${imgPath}`))
@@ -193,6 +231,7 @@ exports.deleteMakeupPackage = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
 
 // --------------------------------------------------------------------------
 // GET ALL MAKEUP PACKAGES
