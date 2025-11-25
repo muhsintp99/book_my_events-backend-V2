@@ -1,3 +1,4 @@
+// models/admin/makeupTypeModel.js
 const mongoose = require("mongoose");
 
 const MakeupTypeSchema = new mongoose.Schema(
@@ -9,10 +10,8 @@ const MakeupTypeSchema = new mongoose.Schema(
       trim: true
     },
 
-    image: {
-      type: String,
-      default: null
-    },
+    // ❌ Image Removed Completely
+    // image: String,
 
     isActive: {
       type: Boolean,

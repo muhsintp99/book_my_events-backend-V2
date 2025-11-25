@@ -1,3 +1,4 @@
+// controllers/admin/makeupTypeController.js
 const MakeupType = require("../../models/admin/makeupTypeModel");
 
 // Create Makeup Type
@@ -8,7 +9,7 @@ exports.createMakeupType = async (req, res) => {
     if (!name) {
       return res.status(400).json({
         success: false,
-        message: "Type name is required"
+        message: "Type name is required",
       });
     }
 
@@ -16,23 +17,20 @@ exports.createMakeupType = async (req, res) => {
     if (existing) {
       return res.status(400).json({
         success: false,
-        message: "Makeup type already exists"
+        message: "Makeup type already exists",
       });
     }
 
-    const image = req.file ? req.file.filename : null;
-
+    // ❌ NO IMAGE SAVING
     const created = await MakeupType.create({
       name: name.trim(),
-      image
     });
 
     res.status(201).json({
       success: true,
       message: "Makeup type created successfully",
-      data: created
+      data: created,
     });
-
   } catch (err) {
     console.error("Create Makeup Type Error:", err);
     res.status(500).json({ success: false, message: err.message });
@@ -47,9 +45,8 @@ exports.getMakeupTypes = async (req, res) => {
     res.json({
       success: true,
       count: types.length,
-      data: types
+      data: types,
     });
-
   } catch (err) {
     console.error("Get Types Error:", err);
     res.status(500).json({ success: false, message: err.message });
@@ -63,22 +60,22 @@ exports.updateMakeupType = async (req, res) => {
     if (!type) {
       return res.status(404).json({
         success: false,
-        message: "Type not found"
+        message: "Type not found",
       });
     }
 
     if (req.body.name) type.name = req.body.name.trim();
     if (req.body.isActive !== undefined) type.isActive = req.body.isActive;
-    if (req.file) type.image = req.file.filename;
+
+    // ❌ NO IMAGE UPDATE
 
     await type.save();
 
     res.json({
       success: true,
       message: "Makeup type updated",
-      data: type
+      data: type,
     });
-
   } catch (err) {
     console.error("Update Type Error:", err);
     res.status(500).json({ success: false, message: err.message });
@@ -92,7 +89,7 @@ exports.deleteMakeupType = async (req, res) => {
     if (!type) {
       return res.status(404).json({
         success: false,
-        message: "Type not found"
+        message: "Type not found",
       });
     }
 
@@ -100,9 +97,8 @@ exports.deleteMakeupType = async (req, res) => {
 
     res.json({
       success: true,
-      message: "Makeup type deleted"
+      message: "Makeup type deleted",
     });
-
   } catch (err) {
     console.error("Delete Type Error:", err);
     res.status(500).json({ success: false, message: err.message });
