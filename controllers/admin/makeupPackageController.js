@@ -126,6 +126,96 @@ exports.createMakeupPackage = async (req, res) => {
   }
 };
 
+// ==========================================================
+// SEARCH MAKEUP PACKAGES
+// ==========================================================
+exports.searchMakeupPackages = async (req, res) => {
+  try {
+    const {
+      keyword,
+      moduleId,
+      categoryId,
+      providerId,
+      minPrice,
+      maxPrice,
+      page = 1,
+      limit = 20,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+    } = req.query;
+
+    let query = { isActive: true };
+
+    // Keyword search
+    if (keyword && keyword.trim()) {
+      const regex = new RegExp(keyword.trim(), "i");
+      query.$or = [
+        { packageTitle: regex },
+        { description: regex },
+      ];
+    }
+
+    // Module filter
+    if (moduleId && mongoose.Types.ObjectId.isValid(moduleId)) {
+      query.module = moduleId;
+    }
+
+    // Category filter
+    if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) {
+      query.categories = categoryId;
+    }
+
+    // Provider filter
+    if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
+      query.provider = providerId;
+    }
+
+    // Price filtering
+    if (minPrice !== undefined) {
+      query.finalPrice = { ...query.finalPrice, $gte: Number(minPrice) };
+    }
+    if (maxPrice !== undefined) {
+      query.finalPrice = { ...query.finalPrice, $lte: Number(maxPrice) };
+    }
+
+    // Sorting field
+    const validSortFields = {
+      price: "finalPrice",
+      createdAt: "createdAt",
+      title: "packageTitle",
+    };
+
+    const sortField = validSortFields[sortBy] || "createdAt";
+    const order = sortOrder === "asc" ? 1 : -1;
+
+    // Pagination
+    const skip = (page - 1) * limit;
+
+    // Query execution
+    const makeupPackages = await Makeup.find(query)
+      .populate("module", "title images")
+      .populate("categories", "title image")
+      .populate("provider", "firstName lastName email phone")
+      .sort({ [sortField]: order })
+      .skip(skip)
+      .limit(Number(limit));
+
+    const total = await Makeup.countDocuments(query);
+
+    res.json({
+      success: true,
+      count: makeupPackages.length,
+      totalResults: total,
+      totalPages: Math.ceil(total / limit),
+      page: Number(page),
+      data: makeupPackages,
+    });
+
+  } catch (err) {
+    console.error("Search Makeup Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 
 // ==========================================================================

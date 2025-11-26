@@ -193,6 +193,99 @@ exports.updatePhotographyPackage = async (req, res) => {
   }
 };
 
+
+// =======================================================================
+// SEARCH PHOTOGRAPHY PACKAGES (Advanced Search)
+// =======================================================================
+exports.searchPhotographyPackages = async (req, res) => {
+  try {
+    const {
+      keyword,
+      moduleId,
+      providerId,
+      categoryId,
+      minPrice,
+      maxPrice,
+      page = 1,
+      limit = 20,
+      sortBy = "createdAt",
+      sortOrder = "desc"
+    } = req.query;
+
+    let query = { isActive: true };
+
+    // Keyword search
+    if (keyword && keyword.trim()) {
+      const regex = new RegExp(keyword.trim(), "i");
+      query.$or = [
+        { packageTitle: regex },
+        { description: regex },
+        { includedServices: { $elemMatch: { $regex: regex } } }
+      ];
+    }
+
+    // Module filter
+    if (moduleId && mongoose.Types.ObjectId.isValid(moduleId)) {
+      query.module = moduleId;
+    }
+
+    // Category filter
+    if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) {
+      query.categories = categoryId;
+    }
+
+    // Provider filter
+    if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
+      query.provider = providerId;
+    }
+
+    // Price filter
+    if (minPrice !== undefined) {
+      query.price = { ...query.price, $gte: Number(minPrice) };
+    }
+    if (maxPrice !== undefined) {
+      query.price = { ...query.price, $lte: Number(maxPrice) };
+    }
+
+    // Sorting
+    const validSortFields = {
+      price: "price",
+      createdAt: "createdAt",
+      title: "packageTitle"
+    };
+
+    const sortField = validSortFields[sortBy] || "createdAt";
+    const order = sortOrder === "asc" ? 1 : -1;
+
+    // Pagination
+    const skip = (Number(page) - 1) * Number(limit);
+
+    // Fetch data
+    const packages = await Photography.find(query)
+      .populate("module", "title")
+      .populate("categories", "title image")
+      .populate("provider", "firstName lastName email phone")
+      .sort({ [sortField]: order })
+      .skip(skip)
+      .limit(Number(limit));
+
+    const total = await Photography.countDocuments(query);
+
+    res.json({
+      success: true,
+      count: packages.length,
+      totalResults: total,
+      totalPages: Math.ceil(total / limit),
+      page: Number(page),
+      data: packages
+    });
+
+  } catch (err) {
+    console.error("Search Photography Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // =======================================================================
 // DELETE PACKAGE
 // =======================================================================

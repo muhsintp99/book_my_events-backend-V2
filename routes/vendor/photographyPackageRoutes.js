@@ -11,6 +11,8 @@ const upload = createUpload("photography", {
 });
 
 // SPECIAL ROUTES
+router.get("/search", controller.searchPhotographyPackages);
+
 router.get("/vendors/:moduleId", controller.getVendorsForPhotographyModule);
 router.get("/provider/:providerId", controller.getPhotographyByProvider);
 router.get("/top-picks", controller.getTopPickPhotographies);

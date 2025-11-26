@@ -244,6 +244,7 @@ const allowedOrigins = [
 
   // API Domain (self)
   "https://api.bookmyevent.ae",
+  "https://bookmyevents-v2.vercel.app/"
 ];
 
 // Enable wildcard for any *.bookmyevent.ae subdomain
