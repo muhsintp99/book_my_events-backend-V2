@@ -240,11 +240,10 @@ const allowedOrigins = [
   // Main Website
   "https://www.bookmyevent.ae",
   "https://bookmyevent.ae",
-  "https://book-my-events-website.vercel.app",
 
   // API Domain (self)
   "https://api.bookmyevent.ae",
-  "https://bookmyevents-v2.vercel.app/"
+  "https://bookmyevents-v2.vercel.app"
 ];
 
 // Enable wildcard for any *.bookmyevent.ae subdomain
