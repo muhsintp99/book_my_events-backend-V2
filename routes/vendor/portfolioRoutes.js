@@ -24,6 +24,9 @@ router.post(
   portfolioController.createPortfolio
 );
 
+// ⭐ GET ALL PORTFOLIO
+router.get("/", portfolioController.getAllPortfolio);
+
 // ⭐ SEPARATE ROUTE → GET PORTFOLIO BY MODULE
 router.get(
   "/module/:moduleId",

@@ -220,6 +220,26 @@ exports.updatePortfolio = async (req, res) => {
 };
 
 // ========================================================
+// ⭐ GET ALL PORTFOLIO WORKS
+// ========================================================
+exports.getAllPortfolio = async (req, res) => {
+  try {
+    const portfolio = await Portfolio.find()
+      .sort({ createdAt: -1 })
+      .populate("module", "title"); // Only show module title
+
+    res.json({
+      success: true,
+      count: portfolio.length,
+      data: portfolio,
+    });
+  } catch (err) {
+    console.error("❌ Get All Portfolio Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ========================================================
 // ⭐ DELETE PORTFOLIO
 // ========================================================
 exports.deletePortfolio = async (req, res) => {
