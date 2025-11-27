@@ -837,7 +837,7 @@ exports.filterVenues = async (req, res) => {
     }
 
     // Fetch venues with populated fields
-    let venues = await Venue.find(query)
+    let venues = await Venue.find(query).sort({ createdAt: -1 })
       .populate({
         path: "categories",
         select: "title image categoryId module isActive",
@@ -1117,7 +1117,8 @@ exports.searchVenues = async (req, res) => {
     }
 
     // Fetch venues
-    let venues = await Venue.find(searchQuery)
+    let venues = await Venue.find(searchQuery)  .sort({ createdAt: -1 })
+
       .populate({
         path: "categories",
         select: "title image categoryId module isActive",
@@ -1231,7 +1232,7 @@ exports.searchVenues = async (req, res) => {
 // Get all venues
 exports.getVenues = async (req, res) => {
   try {
-    const venues = await Venue.find()
+    const venues = await Venue.find().sort({ createdAt: -1 })
       .populate({
         path: "categories",
         select: "title image categoryId module isActive",
@@ -1303,7 +1304,7 @@ exports.getVenuesByLocation = async (req, res) => {
       latitude: { $exists: true, $ne: null },
       longitude: { $exists: true, $ne: null },
       isActive: true,
-    })
+    }).sort({ createdAt: -1 })
       .populate({
         path: "categories",
         select: "title image categoryId module isActive",
@@ -2470,7 +2471,7 @@ exports.getTopPicks = async (req, res) => {
       query.longitude = { $exists: true, $ne: null };
     }
 
-    let venues = await Venue.find(query)
+    let venues = await Venue.find(query) .sort({ createdAt: -1 })
       .populate({
         path: "categories",
         select: "title image categoryId module isActive",
