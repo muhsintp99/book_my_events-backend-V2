@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Venue = require("../../models/vendor/Venue");
+const Category = require("../../models/admin/category");
 
 // Helper function to convert old format to new format
 const convertLegacyPricing = (oldPricing) => {
@@ -1224,6 +1225,45 @@ exports.searchVenues = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to search venues",
+      error: err.message,
+    });
+  }
+};
+
+
+// GET Venue Categories by Venue Module
+exports.getModuleCategories = async (req, res) => {
+  try {
+    const { moduleId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(moduleId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid module ID",
+      });
+    }
+
+    // Fetch parent categories for this module
+    const parentCategories = await Category.find({
+      module: moduleId,
+      parentCategory: null,
+    })
+      .populate({
+        path: "subCategories",
+        select: "title image _id",
+      })
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      data: parentCategories,
+      message: "Categories fetched successfully",
+    });
+  } catch (err) {
+    console.error("Error in getModuleCategories:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch categories",
       error: err.message,
     });
   }

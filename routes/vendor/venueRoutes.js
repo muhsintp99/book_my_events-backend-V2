@@ -273,6 +273,7 @@ router.get('/sort', venueController.sortVenues);
 
 router.get('/filter', venueController.filterVenues);
 
+router.get('/module/:moduleId/categories', venueController.getModuleCategories);
 
 // Location-based search route
 router.get('/reverse-geocode', venueController.getVenuesByLocation);
