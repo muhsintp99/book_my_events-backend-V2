@@ -9,17 +9,13 @@ const PortfolioSchema = new mongoose.Schema(
       index: true
     },
     module: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "Module",
-  required: true,
-  index: true
-},
-
-
+      type: String,                    // FIXED: Now accepts "MOD-xxx" string IDs
+      required: true,
+      index: true
+    },
     workTitle: { type: String, default: "" },
     description: { type: String, default: "" },
 
-    // List of uploaded photos or short videos
     media: [
       {
         url: { type: String, required: true },
@@ -28,12 +24,18 @@ const PortfolioSchema = new mongoose.Schema(
       }
     ],
 
-    // Tags like Bridal, Engagement, HD Makeup, etc.
     tags: [{ type: String }],
-
     isActive: { type: Boolean, default: true, index: true }
   },
   { timestamps: true }
 );
+
+// Enable population even with string _id (optional but helpful)
+PortfolioSchema.virtual("moduleInfo", {
+  ref: "Module",
+  localField: "module",
+  foreignField: "_id", // assuming Module uses string _id like "MOD-..."
+  justOne: true
+});
 
 module.exports = mongoose.model("Portfolio", PortfolioSchema);
