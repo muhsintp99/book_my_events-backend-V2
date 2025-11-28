@@ -32,9 +32,18 @@ const parseTags = (tags) => {
 // ------------------------------
 const extractVideoLink = (input) => {
   if (!input) return null;
-  const match = input.match(/src="([^"]+)"/);
-  return match ? match[1] : input;
+
+  // If iframe → extract src
+  const iframeMatch = input.match(/src="([^"]+)"/);
+  if (iframeMatch) return iframeMatch[1];
+
+  // Convert normal Vimeo link → embed link
+  const vimeoMatch = input.match(/vimeo\.com\/(\d+)/);
+  if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+
+  return input;
 };
+
 
 // ========================================================
 // ⭐ CREATE PORTFOLIO WORK
