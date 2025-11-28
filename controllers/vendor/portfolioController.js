@@ -3,19 +3,6 @@ const fs = require("fs");
 const path = require("path");
 
 // ------------------------------
-// Helper: Delete File
-// ------------------------------
-const deleteFileIfExists = (filePath) => {
-  try {
-    if (filePath && fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-  } catch (err) {
-    console.log("Error deleting file:", err.message);
-  }
-};
-
-// ------------------------------
 // Helper: Parse Tags String / JSON / Array
 // ------------------------------
 const parseTags = (tags) => {
@@ -27,54 +14,98 @@ const parseTags = (tags) => {
   }
 };
 
+// ------------------------------
+// Extract Video Link From Iframe
+// ------------------------------
+const extractVideoLink = (input) => {
+  if (!input) return null;
+
+  // Check iframe src
+  const match = input.match(/src="([^"]+)"/);
+  return match ? match[1] : input;
+};
+
 // ========================================================
-// ⭐ CREATE PORTFOLIO WORK
+// ⭐ CREATE PORTFOLIO WORK (FINAL CLEAN VERSION)
 // ========================================================
 exports.createPortfolio = async (req, res) => {
   try {
-    const { providerId, workTitle, description, tags, moduleId } = req.body;
+    const { providerId, workTitle, description, tags, module, videoLinks } = req.body;
 
     if (!providerId) {
-      return res.status(400).json({
-        success: false,
-        message: "Provider ID is required",
-      });
+      return res.status(400).json({ success: false, message: "Provider ID is required" });
     }
 
-    if (!moduleId) {
-      return res.status(400).json({
-        success: false,
-        message: "Module ID is required",
-      });
+    if (!module) {
+      return res.status(400).json({ success: false, message: "Module is required" });
     }
 
     const parsedTags = parseTags(tags);
+    const media = [];
 
-    const media = (req.files || []).map((file) => ({
-      url: `uploads/portfolio/${file.filename}`,
-      type: file.mimetype.startsWith("video") ? "video" : "image",
-      isFeatured: false,
-    }));
+    // ---------------------------
+    // IMAGES
+    // ---------------------------
+    if (req.files?.images) {
+      media.push({
+        type: "image",
+        images: req.files.images.map((f) => `uploads/portfolio/${f.filename}`),
+        isFeatured: false
+      });
+    }
 
+    // ---------------------------
+    // UPLOADED VIDEOS
+    // ---------------------------
+    if (req.files?.videos) {
+      media.push({
+        type: "video",
+        videos: req.files.videos.map((f) => `uploads/portfolio/${f.filename}`),
+        isFeatured: false
+      });
+    }
+
+    // ---------------------------
+    // VIDEO LINKS (YOUTUBE / VIMEO)
+    // ---------------------------
+    if (videoLinks) {
+      let parsedLinks = [];
+
+      try {
+        parsedLinks = JSON.parse(videoLinks);
+      } catch {
+        parsedLinks = [videoLinks];
+      }
+
+      const cleanedLinks = parsedLinks.map((item) => extractVideoLink(item));
+
+      media.push({
+        type: "videoLink",
+        videoLinks: cleanedLinks,
+        isFeatured: false
+      });
+    }
+
+    // ---------------------------
+    // SAVE PORTFOLIO
+    // ---------------------------
     const newPortfolio = await Portfolio.create({
       provider: providerId,
-      module: moduleId,
-      workTitle: workTitle || "",
-      description: description || "",
+      module: module,
+      workTitle,
+      description,
       tags: parsedTags,
-      media,
+      media
     });
-
-    const populated = await Portfolio.findById(newPortfolio._id)
-      .populate("module", "title"); // ⭐ Only show title
 
     res.status(201).json({
       success: true,
-      message: "Portfolio work added successfully",
-      data: populated,
+      message: "Portfolio created",
+      data: newPortfolio
     });
+
   } catch (err) {
-    console.error("❌ Create Portfolio Error:", err);
+    console.error("❌ Portfolio Creation Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -153,8 +184,10 @@ exports.getPortfolioByModule = async (req, res) => {
 // ========================================================
 exports.getPortfolioById = async (req, res) => {
   try {
-    const item = await Portfolio.findById(req.params.id)
-      .populate("module", "title"); // ⭐ Only title
+    const item = await Portfolio.findById(req.params.id).populate(
+      "module",
+      "title"
+    ); // ⭐ Only title
 
     if (!item) {
       return res.status(404).json({
@@ -205,8 +238,10 @@ exports.updatePortfolio = async (req, res) => {
 
     await work.save();
 
-    const updated = await Portfolio.findById(work._id)
-      .populate("module", "title"); // ⭐ Only title
+    const updated = await Portfolio.findById(work._id).populate(
+      "module",
+      "title"
+    ); // ⭐ Only title
 
     res.json({
       success: true,
@@ -292,13 +327,14 @@ exports.toggleFeaturedMedia = async (req, res) => {
       });
     }
 
-    work.media[mediaIndex].isFeatured =
-      !work.media[mediaIndex].isFeatured;
+    work.media[mediaIndex].isFeatured = !work.media[mediaIndex].isFeatured;
 
     await work.save();
 
-    const updated = await Portfolio.findById(work._id)
-      .populate("module", "title");
+    const updated = await Portfolio.findById(work._id).populate(
+      "module",
+      "title"
+    );
 
     res.json({
       success: true,

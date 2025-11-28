@@ -17,48 +17,58 @@ const upload = createUpload("portfolio", {
   ]
 });
 
-// CREATE
+// ===============================
+// CREATE PORTFOLIO
+// ===============================
 router.post(
   "/",
-  upload.array("media", 10),
+  upload.fields([
+    { name: "images", maxCount: 20 },
+    { name: "videos", maxCount: 10 }
+  ]),
   portfolioController.createPortfolio
 );
 
-// ⭐ GET ALL PORTFOLIO
+// ===============================
+// GET ALL
+// ===============================
 router.get("/", portfolioController.getAllPortfolio);
 
-// ⭐ SEPARATE ROUTE → GET PORTFOLIO BY MODULE
-router.get(
-  "/module/:moduleId",
-  portfolioController.getPortfolioByModule
-);
+// ===============================
+// GET BY MODULE
+// ===============================
+router.get("/module/:moduleId", portfolioController.getPortfolioByModule);
 
-// ⭐ GET PORTFOLIO BY PROVIDER
-router.get(
-  "/provider/:providerId",
-  portfolioController.getPortfolioByProvider
-);
+// ===============================
+// GET BY PROVIDER
+// ===============================
+router.get("/provider/:providerId", portfolioController.getPortfolioByProvider);
 
-// OPTIONAL: GET BY PROVIDER + MODULE
-// router.get(
-//   "/provider/:providerId/module/:moduleId",
-//   portfolioController.getPortfolioByProviderAndModule
-// );
-
+// ===============================
 // GET ONE
+// ===============================
 router.get("/:id", portfolioController.getPortfolioById);
 
+// ===============================
 // UPDATE
+// ===============================
 router.put(
   "/:id",
-  upload.array("media", 10),
+  upload.fields([
+    { name: "images", maxCount: 20 },
+    { name: "videos", maxCount: 10 }
+  ]),
   portfolioController.updatePortfolio
 );
 
+// ===============================
 // DELETE
+// ===============================
 router.delete("/:id", portfolioController.deletePortfolio);
 
+// ===============================
 // FEATURED MEDIA
+// ===============================
 router.patch(
   "/:workId/featured/:mediaIndex",
   portfolioController.toggleFeaturedMedia
