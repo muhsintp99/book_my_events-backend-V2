@@ -56,78 +56,49 @@
 // router.patch('/:id/reactivate', cateringController.reactivateCatering);
 
 // module.exports = router;
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const createUpload = require('../../middlewares/upload');
-const cateringController = require('../../controllers/vendor/cateringcategoryController');
 
-// ✅ Create upload middleware for "catering"
-const upload = createUpload('catering', {
-  fileSizeMB: 5,
-  allowedTypes: ['image/png', 'image/jpeg', 'image/webp']
+const createUpload = require("../../middlewares/upload");
+const cateringController = require("../../controllers/vendor/cateringcategoryController");
+
+const upload = createUpload("catering", {
+  fileSizeMB: 10,
+  allowedTypes: ["image/jpeg", "image/png", "image/webp"],
 });
 
+// -------- Vendor List --------
+router.get("/vendors/:moduleId", cateringController.getVendorsForCateringModule);
 
-// ============================
-// 🍽 Catering Routes
-// ============================
+// -------- Vendor Packages --------
+router.get("/provider/:providerId", cateringController.getCateringsByProvider);
 
-// ✅ IMPORTANT: Specific routes MUST come BEFORE parameterized /:id routes
+// -------- TopPick & Active --------
+router.patch("/:id/toggle-active", cateringController.toggleActiveStatus);
+router.patch("/:id/toggle-top-pick", cateringController.toggleTopPickStatus);
 
-// ─────────────────────────────────────────────────────────────
-// NEW: Toggle Routes (BEFORE /:id)
-// ─────────────────────────────────────────────────────────────
-router.patch('/:id/toggle-top-pick', cateringController.toggleTopPickStatus);
-router.patch('/:id/toggle-active', cateringController.toggleActiveStatus);
-
-// ─────────────────────────────────────────────────────────────
-// NEW: Special Query Routes (BEFORE /:id)
-// ─────────────────────────────────────────────────────────────
-router.get('/top-picks', cateringController.getTopPickCaterings);
-
-// ─────────────────────────────────────────────────────────────
-// Existing Routes
-// ─────────────────────────────────────────────────────────────
-
-// ✅ Get by module
-router.get('/module/:moduleId', cateringController.getCateringsByModule);
-
-// ✅ Get by provider
-router.get('/provider/:providerId', cateringController.getCateringsByProvider);
-
-// ✅ Create Catering
+// -------- CRUD --------
 router.post(
-  '/',
+  "/",
   upload.fields([
-    { name: 'images', maxCount: 10 },
-    { name: 'thumbnail', maxCount: 1 }
+    { name: "images", maxCount: 10 },
+    { name: "thumbnail", maxCount: 1 }
   ]),
   cateringController.createCatering
 );
 
-// ✅ Update Catering
+router.get("/", cateringController.getCaterings);
+router.get("/:id", cateringController.getCatering);
+
 router.put(
-  '/:id',
+  "/:id",
   upload.fields([
-    { name: 'images', maxCount: 10 },
-    { name: 'thumbnail', maxCount: 1 }
+    { name: "images", maxCount: 10 },
+    { name: "thumbnail", maxCount: 1 }
   ]),
   cateringController.updateCatering
 );
 
-// ✅ Get all (NOW supports ?search=keyword&zone=zoneId&module=moduleId)
-router.get('/', cateringController.getCaterings);
-
-// ✅ Get single (MUST be after all specific routes)
-router.get('/:id', cateringController.getCatering);
-
-// ✅ Delete
-router.delete('/:id', cateringController.deleteCatering);
-
-// ✅ Block (DEPRECATED: Use toggle-active instead)
-router.patch('/:id/block', cateringController.blockCatering);
-
-// ✅ Reactivate (DEPRECATED: Use toggle-active instead)
-router.patch('/:id/reactivate', cateringController.reactivateCatering);
+router.delete("/:id", cateringController.deleteCatering);
 
 module.exports = router;
