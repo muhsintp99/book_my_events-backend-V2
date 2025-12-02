@@ -3,11 +3,11 @@
 // const CateringSchema = new mongoose.Schema({
 //   cateringId: { type: String, unique: true, sparse: true },
 
-//   module: { 
-//     type: mongoose.Schema.Types.ObjectId, 
-//     ref: 'Module', 
-//     index: true, 
-//     required: false 
+//   module: {
+//     type: mongoose.Schema.Types.ObjectId,
+//     ref: 'Module',
+//     index: true,
+//     required: false
 //   },
 
 //   categories: [{
@@ -67,7 +67,7 @@ const mongoose = require("mongoose");
 const includesSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
-    items: [{ type: String, required: true }]
+    items: [{ type: String, required: true }],
   },
   { _id: true }
 );
@@ -79,14 +79,14 @@ const CateringSchema = new mongoose.Schema(
     module: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Module",
-      index: true
+      index: true,
     },
 
     categories: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Category"
-      }
+        ref: "Category",
+      },
     ],
 
     title: { type: String, required: true, trim: true },
@@ -106,14 +106,14 @@ const CateringSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true
+      index: true,
     },
 
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
     isTopPick: { type: Boolean, default: false, index: true },
-    isActive: { type: Boolean, default: true, index: true }
+    isActive: { type: Boolean, default: true, index: true },
   },
   { timestamps: true }
 );
