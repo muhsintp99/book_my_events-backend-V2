@@ -6,7 +6,8 @@ const controller = require("../../controllers/admin/subscriptionController");
 router.post("/plan", controller.createPlan);
 router.get("/plan", controller.getPlans);
 router.delete("/plan/:id", controller.deletePlan);
-
+router.get("/plan/:id", controller.getSinglePlan);   // <-- NEW (fetch single plan)
+router.put("/plan/:id", controller.updatePlan);      // <-- NEW (update plan)
 // USER SUBSCRIPTION ROUTES
 router.post("/subscribe", controller.subscribeUser);
 router.get("/status/:userId", controller.getUserSubscription);

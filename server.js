@@ -325,7 +325,7 @@ const subscriptionRoutes = require("./routes/admin/subscriptionRoutes");
   app.use("/api/makeup-types", require("./routes/admin/makeupTypeRoutes"));
   app.use("/api/portfolio", require("./routes/vendor/portfolioRoutes"));
   app.use("/api/photography-packages", require("./routes/vendor/photographyPackageRoutes"));
-app.use("/api/subscription", subscriptionRoutes);
+  app.use("/api/subscription", require("./routes/admin/subscriptionRoutes"));
 
   /* -------------------------------------------
     GLOBAL ERROR HANDLER

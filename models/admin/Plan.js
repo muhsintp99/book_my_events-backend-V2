@@ -24,11 +24,17 @@ const mongoose = require("mongoose");
 
 const planSchema = new mongoose.Schema(
   {
+    moduleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Module",
+      required: false, // optional
+    },
+
     name: { type: String, required: true },
     description: { type: String },
 
     price: { type: Number, required: true },
-    currency: { type: String, default: "USD" },
+    currency: { type: String, default: "INR" },
 
     durationInDays: { type: Number, required: true },
 
@@ -55,7 +61,6 @@ const planSchema = new mongoose.Schema(
 
     planType: { type: String, default: "yearly" }
   },
-
   { timestamps: true }
 );
 

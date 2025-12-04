@@ -18,6 +18,7 @@ const Subscription = require("../../models/admin/Subscription");
 exports.createPlan = async (req, res) => {
   try {
     const {
+      moduleId,
       name,
       description,
       price,
@@ -37,7 +38,6 @@ exports.createPlan = async (req, res) => {
       planType
     } = req.body;
 
-    // Only yearly allowed → 365 days
     if (durationInDays !== 365) {
       return res.status(400).json({
         success: false,
@@ -46,6 +46,7 @@ exports.createPlan = async (req, res) => {
     }
 
     const plan = await Plan.create({
+      moduleId,
       name,
       description,
       price,
@@ -66,7 +67,6 @@ exports.createPlan = async (req, res) => {
     });
 
     res.status(201).json({ success: true, plan });
-
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -89,20 +89,19 @@ exports.createPlan = async (req, res) => {
 exports.getPlans = async (req, res) => {
   try {
     const plans = await Plan.find()
-      .populate("moduleId", "title icon")
+      .populate("moduleId", "title icon") // NOW VALID
       .lean();
 
     for (let plan of plans) {
-      const count = await Subscription.countDocuments({ planId: plan._id });
-      plan.subscriberCount = count;
+      plan.subscriberCount = await Subscription.countDocuments({ planId: plan._id });
     }
 
     res.json({ success: true, plans });
-
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
 
 
 
@@ -136,7 +135,6 @@ exports.subscribeUser = async (req, res) => {
       status: "active"
     });
 
-    // Populate module title + icon + plan details
     const populated = await Subscription.findById(subscription._id)
       .populate("planId")
       .populate("moduleId", "title icon");
@@ -165,6 +163,48 @@ exports.deletePlan = async (req, res) => {
   }
 };
 
+exports.getSinglePlan = async (req, res) => {
+  try {
+    const plan = await Plan.findById(req.params.id).populate("moduleId");
+
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: "Plan not found",
+      });
+    }
+
+    res.json({ success: true, plan });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.updatePlan = async (req, res) => {
+  try {
+    const updatedPlan = await Plan.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+
+    if (!updatedPlan) {
+      return res.status(404).json({
+        success: false,
+        message: "Plan not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Plan updated successfully",
+      plan: updatedPlan,
+    });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 // --------------------------------------------------------
 // GET USER SUBSCRIPTION STATUS

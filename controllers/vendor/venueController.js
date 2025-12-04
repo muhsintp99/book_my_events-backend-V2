@@ -1229,6 +1229,33 @@ exports.searchVenues = async (req, res) => {
     });
   }
 };
+// Helper: apply consistent populates to a Mongoose query for venues
+const applyVenuePopulates = (query) => {
+  return query
+    .populate({
+      path: "categories",
+      select: "title image categoryId module isActive",
+      populate: { path: "module", select: "title moduleId" },
+    })
+    .populate({
+      path: "module",
+      select: "title moduleId icon isActive",
+    })
+    // IMPORTANT: populate packages WITHOUT select to include all package fields
+    .populate({
+      path: "packages",
+      // no 'select' here — we want full package object (images, thumbnail, price, includes, createdAt, etc.)
+    })
+    .populate("createdBy", "name email phone")
+    .populate({
+      path: "provider",
+      select: "userId firstName lastName email phone profile",
+      populate: {
+        path: "profile",
+        select: "mobileNumber socialLinks profilePhoto",
+      },
+    });
+};
 
 
 // GET Venue Categories by Venue Module
@@ -1270,29 +1297,58 @@ exports.getModuleCategories = async (req, res) => {
 };
 
 // Get all venues
+// exports.getVenues = async (req, res) => {
+//   try {
+//     const venues = await Venue.find().sort({ createdAt: -1 })
+//       .populate({
+//         path: "categories",
+//         select: "title image categoryId module isActive",
+//         populate: { path: "module", select: "title moduleId" },
+//       })
+//       .populate({
+//         path: "module",
+//         select: "title moduleId icon isActive",
+//       })
+//       .populate("packages") // FIXED - No select restriction
+//       .populate("createdBy", "name email phone")
+//       .populate({
+//         path: "provider",
+//         select: "userId firstName lastName email phone",
+//         populate: {
+//           path: "profile",
+//           select: "mobileNumber socialLinks profilePhoto",
+//         },
+//       })
+//       .lean();
+
+//     if (!venues || venues.length === 0) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "No venues found",
+//       });
+//     }
+
+//     res.status(200).json({
+//       success: true,
+//       count: venues.length,
+//       data: venues,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching venues:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch venues",
+//       error: error.message,
+//     });
+//   }
+// };
+// Get all venues (fixed - full package fields populated)
 exports.getVenues = async (req, res) => {
   try {
-    const venues = await Venue.find().sort({ createdAt: -1 })
-      .populate({
-        path: "categories",
-        select: "title image categoryId module isActive",
-        populate: { path: "module", select: "title moduleId" },
-      })
-      .populate({
-        path: "module",
-        select: "title moduleId icon isActive",
-      })
-      .populate("packages") // FIXED - No select restriction
-      .populate("createdBy", "name email phone")
-      .populate({
-        path: "provider",
-        select: "userId firstName lastName email phone",
-        populate: {
-          path: "profile",
-          select: "mobileNumber socialLinks profilePhoto",
-        },
-      })
-      .lean();
+    let query = Venue.find().sort({ createdAt: -1 }).lean();
+    query = applyVenuePopulates(query);
+
+    const venues = await query.exec();
 
     if (!venues || venues.length === 0) {
       return res.status(404).json({
@@ -1476,6 +1532,65 @@ exports.getVenuesByProvider = async (req, res) => {
 };
 
 // Get single venue
+// exports.getVenue = async (req, res) => {
+//   try {
+//     const venueId = req.params.id;
+//     if (!mongoose.Types.ObjectId.isValid(venueId)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid venue ID",
+//       });
+//     }
+
+//     const venue = await Venue.findById(venueId)
+//       .populate({
+//         path: "categories",
+//         select: "title image categoryId module isActive",
+//         populate: { path: "module", select: "title moduleId" },
+//       })
+//       .populate({
+//         path: "module",
+//         select: "title moduleId icon isActive",
+//       })
+//       .populate({
+//         path: "packages",
+//         select: "title subtitle description packageType priceRange isActive",
+//       })
+//       .populate({
+//         path: "createdBy",
+//         select: "name email phone",
+//       })
+//       .populate({
+//         path: "provider",
+//         select: "userId firstName lastName email phone",
+//         populate: {
+//           path: "profile",
+//           select: "mobileNumber socialLinks profilePhoto",
+//         },
+//       })
+//       .lean();
+
+//     if (!venue) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Venue not found",
+//       });
+//     }
+
+//     res.status(200).json({
+//       success: true,
+//       data: venue,
+//     });
+//   } catch (err) {
+//     console.error("Error in getVenue:", err.message);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch venue",
+//       error: err.message,
+//     });
+//   }
+// };
+// Get single venue (fixed - full package fields populated)
 exports.getVenue = async (req, res) => {
   try {
     const venueId = req.params.id;
@@ -1486,33 +1601,12 @@ exports.getVenue = async (req, res) => {
       });
     }
 
-    const venue = await Venue.findById(venueId)
-      .populate({
-        path: "categories",
-        select: "title image categoryId module isActive",
-        populate: { path: "module", select: "title moduleId" },
-      })
-      .populate({
-        path: "module",
-        select: "title moduleId icon isActive",
-      })
-      .populate({
-        path: "packages",
-        select: "title subtitle description packageType priceRange isActive",
-      })
-      .populate({
-        path: "createdBy",
-        select: "name email phone",
-      })
-      .populate({
-        path: "provider",
-        select: "userId firstName lastName email phone",
-        populate: {
-          path: "profile",
-          select: "mobileNumber socialLinks profilePhoto",
-        },
-      })
-      .lean();
+    // Build base query
+    let query = Venue.findById(venueId).lean();
+    // Apply consistent populates
+    query = applyVenuePopulates(query);
+
+    const venue = await query.exec();
 
     if (!venue) {
       return res.status(404).json({
