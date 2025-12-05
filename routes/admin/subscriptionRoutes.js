@@ -3,6 +3,8 @@ const router = express.Router();
 const controller = require("../../controllers/admin/subscriptionController");
 
 // PLAN ROUTES
+router.get("/plan/module/:moduleId", controller.getPlansByModule);
+
 router.post("/plan", controller.createPlan);
 router.get("/plan", controller.getPlans);
 router.delete("/plan/:id", controller.deletePlan);

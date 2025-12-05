@@ -1,5 +1,5 @@
 const juspay = require("../../config/juspay");
-const config = require("../../config/config.json");
+const config = require("../../config/smartgateway_config.json");
 const { APIError } = require("expresscheckout-nodejs");
 
 
@@ -175,3 +175,59 @@ exports.handleJuspayResponse = async (req, res) => {
     return res.json({ success: false, error: error.message });
   }
 };
+
+
+
+// const juspay = require("../../utils/juspayApi");
+// const Booking = require("../../models/vendor/Booking");
+
+// exports.createPaymentSession = async (req, res) => {
+//   try {
+//     const { bookingId } = req.body;
+
+//     // 1️⃣ Validate booking
+//     const booking = await Booking.findById(bookingId).populate("userId");
+//     if (!booking) {
+//       return res.status(404).json({ success: false, message: "Booking not found" });
+//     }
+
+//     // 2️⃣ Juspay expects amount in PAISE
+//     const amountInPaise = booking.finalPrice * 100;
+
+//     // 3️⃣ Order creation
+//     const orderPayload = {
+//       order_id: "order_" + Date.now(),
+//       amount: amountInPaise,
+//       currency: "INR",
+//       customer_id: booking.userId._id.toString(),
+//       customer_email: booking.userId.email,
+//       customer_phone: booking.userId.mobile || "9999999999",
+//       description: "Booking Payment",
+//       return_url: "https://dashboard.bookmyevent.ae/payment-status",
+//       create_payment: true
+//     };
+
+//     const orderResponse = await juspay.post("/orders", orderPayload);
+
+//     // 4️⃣ Create Juspay Session (Payment Page Link)
+//     const sessionResponse = await juspay.post("/payment/session", {
+//       order_id: orderPayload.order_id,
+//       payment_page_client_id: "hdfcmaster",
+//       action: "paymentPage"
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       orderId: orderPayload.order_id,
+//       payment_url: sessionResponse.data.payment_links.web
+//     });
+
+//   } catch (err) {
+//     console.error("❌ Payment Error:", err.response?.data || err.message);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to create payment session",
+//       error: err.response?.data || err.message
+//     });
+//   }
+// };

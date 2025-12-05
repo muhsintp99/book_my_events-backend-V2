@@ -514,6 +514,51 @@ exports.register = async (req, res) => {
         ],
         { session }
       );
+
+      vendorProfile = await VendorProfile.create(
+  [
+    {
+      storeName: storeName || "",
+      storeAddress,
+      logo: req.files?.logo
+        ? `/uploads/vendors/${req.files.logo[0].filename}`
+        : "",
+      coverImage: req.files?.coverImage
+        ? `/uploads/vendors/${req.files.coverImage[0].filename}`
+        : "",
+      tinCertificate: req.files?.tinCertificate
+        ? `/uploads/vendors/${req.files.tinCertificate[0].filename}`
+        : "",
+      ownerFirstName: firstName,
+      ownerLastName: lastName,
+      ownerPhone: phone || "",
+      ownerEmail: email,
+      businessTIN: businessTIN || "",
+      tinExpireDate: tinExpireDate || null,
+
+      // ⭐ ADD FREE TRIAL & SUBSCRIPTION FIELDS HERE
+      isFreeTrial: req.body.isFreeTrial === "true",
+      subscriptionPlan: req.body.subscriptionPlan || null,
+      subscriptionStatus: req.body.isFreeTrial === "true" ? "trial" : "active",
+      trialStartDate: req.body.isFreeTrial === "true" ? new Date() : null,
+      trialEndDate: req.body.isFreeTrial === "true"
+        ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        : null,
+
+      module: mongoose.Types.ObjectId.isValid(module)
+        ? new mongoose.Types.ObjectId(module)
+        : null,
+      zone: mongoose.Types.ObjectId.isValid(zone)
+        ? new mongoose.Types.ObjectId(zone)
+        : null,
+
+      user: user[0]._id,
+      status: "pending",
+    },
+  ],
+  { session }
+);
+
     }
 
     await session.commitTransaction();

@@ -151,6 +151,36 @@ exports.subscribeUser = async (req, res) => {
 };
 
 
+
+// --------------------------------------------------------
+// GET PLANS BY MODULE ID
+// --------------------------------------------------------
+exports.getPlansByModule = async (req, res) => {
+  try {
+    const { moduleId } = req.params;
+
+    if (!moduleId) {
+      return res.status(400).json({
+        success: false,
+        message: "moduleId is required"
+      });
+    }
+
+    const plans = await Plan.find({ moduleId })
+      .populate("moduleId", "title icon")
+      .lean();
+
+    res.json({
+      success: true,
+      plans
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
+
 // --------------------------------------------------------
 // DELETE PLAN
 // --------------------------------------------------------

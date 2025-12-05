@@ -2,9 +2,23 @@ const crypto = require("crypto");
 const Booking = require("../models/vendor/Booking");
 const config = require("../config/smartgateway_config.json");
 
-// Generate HMAC SHA256 signature
-function generateSignature(data, key) {
-  return crypto.createHmac("sha256", key).update(JSON.stringify(data)).digest("base64");
+// ✅ Generate HDFC SmartGateway Signature Correctly
+function generateSignature(requestData, key) {
+  // Required concatenation order (HDFC Rules)
+  const dataString =
+    requestData.merchantId +
+    requestData.amount +
+    requestData.currency +
+    requestData.merchantTxnId +
+    requestData.redirectUrl +
+    requestData.paymentPageClientId +
+    requestData.customerEmail +
+    requestData.customerMobile;
+
+  return crypto
+    .createHmac("sha256", key)
+    .update(dataString)
+    .digest("base64");
 }
 
 exports.createOrderLegacy = async (req, res) => {
@@ -14,11 +28,16 @@ exports.createOrderLegacy = async (req, res) => {
     const booking = await Booking.findById(bookingId).populate("userId");
 
     if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found"
+      });
     }
 
+    // Convert amount to string exactly as HDFC expects
     const amount = booking.finalPrice.toString();
 
+    // REQUIRED FIELDS (STRICT ORDER)
     const requestData = {
       merchantId: config.MERCHANT_ID,
       amount: amount,
@@ -30,19 +49,23 @@ exports.createOrderLegacy = async (req, res) => {
       customerMobile: booking.userId.mobile || "0000000000",
     };
 
-    // SIGNATURE REQUIRED BY SMARTGATEWAY LEGACY
+    // Generate VALID HDFC signature
     const signature = generateSignature(requestData, config.API_KEY);
 
+    // Build the full payment payload sent to frontend
     const paymentPayload = {
       ...requestData,
       signature,
       actionUrl: `${config.BASE_URL}/paymentpage/merchant/v1/pay`,
     };
 
+    console.log("🔍 Sending Payment Payload to Frontend:", paymentPayload);
+
     return res.json({
       success: true,
       payment_form: paymentPayload,
     });
+
   } catch (err) {
     console.error("❌ Legacy PG Error:", err.message);
     return res.status(500).json({
@@ -52,6 +75,7 @@ exports.createOrderLegacy = async (req, res) => {
     });
   }
 };
+
 // const juspay = require("../utils/juspayApi");
 // const Booking = require("../models/vendor/Booking");
 // const config = require("../config/smartgateway_config.json");

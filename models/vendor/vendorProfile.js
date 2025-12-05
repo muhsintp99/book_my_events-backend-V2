@@ -49,6 +49,36 @@ const vendorProfileSchema = new mongoose.Schema(
         "Please enter a valid email"
       ]
     },
+
+
+    // ⭐ Subscription System
+isFreeTrial: {
+  type: Boolean,
+  default: false
+},
+
+subscriptionPlan: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "SubscriptionPlan",
+  default: null
+},
+
+subscriptionStatus: {
+  type: String,
+  enum: ["trial", "active", "expired", "none"],
+  default: "none"
+},
+
+trialStartDate: {
+  type: Date,
+  default: null
+},
+
+trialEndDate: {
+  type: Date,
+  default: null
+},
+
     businessTIN: {
       type: String,
       trim: true,
