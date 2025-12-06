@@ -325,6 +325,8 @@ app.use("/api/catering", require("./routes/vendor/cateringRoutes"));
 app.use("/api/profile", require("./routes/vendor/profileRoutes"));
 app.use("/api/bookings", require("./routes/vendor/bookingRoutes"));
 app.use("/api/payment", require("./routes/payment.routes"));
+
+
 // app.use("/api/payment", require("./routes/payment"));
 
 app.use("/api/vehicle-attributes", require("./routes/admin/vehicleAttributeRoutes"));
@@ -336,7 +338,7 @@ app.use("/api/subscription", require("./routes/admin/subscriptionRoutes"));
 
 /* -------------------------------------------
   GLOBAL ERROR HANDLER
--------------------------------------------- */
+--------------------------------------- */
 app.use((err, req, res, next) => {
   console.error("❌ Error:", err.message);
   res.status(err.status || 500).json({
