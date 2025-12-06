@@ -302,3 +302,88 @@ exports.createSmartGatewayPayment = async (req, res) => {
     });
   }
 };
+
+// Add this to your payment.smart_legacy.controller.js
+
+/**
+ * CREATE PAYMENT SESSION FOR SUBSCRIPTION
+ */
+exports.createSubscriptionPayment = async (req, res) => {
+  try {
+    const { providerId, planId, amount, customerEmail, customerPhone } = req.body;
+
+    // Validate inputs
+    if (!providerId || !planId || !amount) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields: providerId, planId, amount"
+      });
+    }
+
+    const orderId = "subscription_" + Date.now();
+    const amountInPaise = Math.round(amount * 100); // convert to paise
+
+    console.log("📝 Creating subscription payment order:", {
+      orderId,
+      amount: amountInPaise,
+      providerId,
+      planId
+    });
+
+    // 1️⃣ Create Order
+    const orderResponse = await juspay.order.create({
+      order_id: orderId,
+      amount: amountInPaise,
+      currency: "INR",
+      customer_id: providerId,
+      customer_email: customerEmail || "provider@bookmyevent.ae",
+      customer_phone: customerPhone || "9999999999",
+      description: `Subscription Payment - Plan ${planId}`,
+      metadata: {
+        providerId: providerId,
+        planId: planId,
+        type: "subscription"
+      }
+    });
+
+    console.log("✅ Order created:", orderResponse);
+
+    // 2️⃣ Create Session → Payment Page URL
+    const session = await juspay.orderSession.create({
+      order_id: orderId,
+      amount: amountInPaise,
+      action: "paymentPage",
+      payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
+      return_url: "https://dashboard.bookmyevent.ae/payment-status",
+      currency: "INR",
+      customer_id: providerId,
+      customer_email: customerEmail || "provider@bookmyevent.ae",
+      customer_phone: customerPhone || "9999999999"
+    });
+
+    console.log("✅ Payment session created:", session);
+
+    // Return response with payment link
+    return res.json({
+      success: true,
+      status: session.status,
+      id: session.id,
+      order_id: session.order_id,
+      payment_links: {
+        web: session.payment_links?.web || session.payment_links,
+        expiry: session.payment_links?.expiry
+      },
+      sdk_payload: session.sdk_payload
+    });
+
+  } catch (error) {
+    console.error("❌ Subscription Payment Error:", error);
+    console.error("❌ Error details:", error.response?.data || error.message);
+
+    return res.status(500).json({
+      success: false,
+      error: error.response?.data || error.message,
+      details: error.toString()
+    });
+  }
+};

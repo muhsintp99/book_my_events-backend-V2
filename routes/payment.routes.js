@@ -19,4 +19,7 @@ router.get("/test-connection", controller.testConnection);
 // Main payment creation endpoint
 router.post("/create-payment-session", controller.createSmartGatewayPayment);
 
+router.post("/create-subscription-payment", controller.createSubscriptionPayment);
+
+
 module.exports = router;
