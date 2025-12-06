@@ -357,6 +357,8 @@
 
 
 const User = require("../models/User");
+const Subscription = require("../models/admin/Subscription");
+
 const { generateUserId } = require("../utils/generateId");
 const sendEmail = require("../utils/sendEmail");
 const {
@@ -665,52 +667,114 @@ exports.listMakeupVendors = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password)
+
+    if (!email || !password) {
       return res.status(400).json({ message: "Provide email and password" });
+    }
 
     const user = await User.findOne({ email });
-    if (!user) return res.status(401).json({ message: "Invalid credentials" });
+    if (!user) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
 
     const isMatch = await user.comparePassword(password);
-    if (!isMatch)
+    if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
+    }
 
+    // Generate refresh token
     const refreshToken = crypto.randomBytes(32).toString("hex");
     user.refreshToken = refreshToken;
     user.lastLogin = new Date();
     await user.save();
 
+    // -------------------------------
+    // GET VENDOR PROFILE (IF VENDOR)
+    // -------------------------------
     let vendorProfile = null;
     if (user.role === "vendor") {
       vendorProfile = await VendorProfile.findOne({ user: user._id }).populate([
         {
           path: "module",
-          select: "moduleId title icon categories isActive createdAt updatedAt",
+          select: "moduleId title icon categories isActive",
           populate: {
             path: "categories",
-            select: "title description isActive createdAt updatedAt",
+            select: "title description isActive",
           },
         },
         {
           path: "zone",
-          select: "name description coordinates city country isActive",
+          select: "name description city country isActive",
         },
       ]);
     }
 
+    // -----------------------------------------
+    // ⭐ ALWAYS define subscriptionInfo at top
+    // -----------------------------------------
+    let subscriptionInfo = {
+      isSubscribed: false,
+      plan: null,
+      expiresOn: null,
+      status: "none",
+    };
+
+    // -----------------------------------------
+    // FETCH SUBSCRIPTION DETAILS (ONLY FOR VENDORS)
+    // -----------------------------------------
+   // -----------------------------------------
+// FETCH FULL SUBSCRIPTION DETAILS
+// -----------------------------------------
+if (user.role === "vendor") {
+  const subscriptionData = await Subscription.findOne({ userId: user._id })
+    .populate("planId")  // <-- populate entire plan object
+    .populate("moduleId") // <-- optional but recommended
+    .sort({ createdAt: -1 });
+
+  if (subscriptionData) {
+    subscriptionInfo = {
+      isSubscribed:
+        subscriptionData.status === "active" ||
+        subscriptionData.status === "trial",
+
+      plan: subscriptionData.planId || null,   // FULL PLAN DETAILS
+      module: subscriptionData.moduleId || null,
+
+      startDate: subscriptionData.startDate,
+      endDate: subscriptionData.endDate,
+
+      status: subscriptionData.status,
+      autoRenew: subscriptionData.autoRenew,
+      paymentId: subscriptionData.paymentId,
+      createdAt: subscriptionData.createdAt
+    };
+  }
+}
+
+    // Create JWT token
     const token = generateJwtToken({ id: user._id });
-    res.json({
+
+    return res.json({
       message: "Logged in",
-      user: user.toJSON(),
-      profile: vendorProfile,
+      vendorId: user._id,
+      name: `${user.firstName} ${user.lastName}`,
       token,
       refreshToken,
+      profile: vendorProfile,
+
+      // ⭐ Subscription Data
+      subscription: subscriptionInfo,
+
+      user: user.toJSON(),
     });
   } catch (err) {
     console.error("Login Error:", err);
-    res.status(500).json({ message: "Login failed", error: err.message });
+    return res
+      .status(500)
+      .json({ message: "Login failed", error: err.message });
   }
 };
+
 
 // ------------------ LOGOUT ------------------
 exports.logout = async (req, res) => {
