@@ -206,19 +206,11 @@
 
 
 
-<<<<<<< HEAD
   const express = require("express");
   const cors = require("cors");
   require("dotenv").config();
   const path = require("path");
   const subscriptionRoutes = require("./routes/admin/subscriptionRoutes");
-=======
-const express = require("express");
-const cors = require("cors");
-require("dotenv").config();
-const path = require("path");
-const subscriptionRoutes = require("./routes/admin/subscriptionRoutes");
->>>>>>> 2fc3e6bbe678c3727c06a35a2ebb7c43c85217a4
 
 // DB Connection
 const connectDB = require("./config/db");
