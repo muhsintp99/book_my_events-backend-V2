@@ -319,7 +319,7 @@ const subscriptionRoutes = require("./routes/admin/subscriptionRoutes");
   app.use("/api/catering", require("./routes/vendor/cateringRoutes"));
   app.use("/api/profile", require("./routes/vendor/profileRoutes"));
   app.use("/api/bookings", require("./routes/vendor/bookingRoutes"));
-  app.use("/api/payment", require("./routes/payment.routes"));
+app.use("/api/payment", require("./routes/payment.routes"));
   // app.use("/api/payment", require("./routes/payment"));
 
   app.use("/api/vehicle-attributes", require("./routes/admin/vehicleAttributeRoutes"));

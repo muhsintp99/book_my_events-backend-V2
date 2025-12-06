@@ -1,12 +1,9 @@
 
 
 {
-  "API_KEY":"****FCB5",
-  "MERCHANT_ID":"SG3864",
-  "ENABLE_LOGGING":false,
-  "PAYMENT_PAGE_CLIENT_ID":"hdfcmaster",
-  "BASE_URL":"https://smartgateway.hdfcuat.bank.in",
-  "RESPONSE_KEY":"19521112ADF4DE0B045632EA7A00D5"
+  "MERCHANT_ID": "SG3864",
+  "KEY_UUID": "key_4757ba66bbd6450c9e6d67846d39f82a",
+  "PAYMENT_PAGE_CLIENT_ID": "hdfcmaster",
+  "BASE_URL": "https://smartgateway.hdfcuat.bank.in",
+  "API_KEY": "799484BD4004EF3B803E64CAA60F73"
 }
-
-
