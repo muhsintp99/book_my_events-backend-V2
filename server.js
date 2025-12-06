@@ -210,7 +210,7 @@
   const cors = require("cors");
   require("dotenv").config();
   const path = require("path");
-const subscriptionRoutes = require("./routes/admin/subscriptionRoutes");
+  const subscriptionRoutes = require("./routes/admin/subscriptionRoutes");
 
   // DB Connection
   const connectDB = require("./config/db");
