@@ -1,5 +1,5 @@
 const axios = require("axios");
-const config = require("../config/config.json");
+const config = require("./smartgateway_config.json");
 
 const api = axios.create({
   baseURL: config.BASE_URL,
