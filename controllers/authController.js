@@ -1041,6 +1041,22 @@ exports.register = async (req, res) => {
       subscriptionPlan
     } = req.body;
 
+    const finalRole = req.body.role === "vendor" ? "vendor" : "user";
+
+
+    // ❌ Prevent vendor fields for normal users
+if (finalRole === "user") {
+  req.body.storeName = undefined;
+  req.body.businessTIN = undefined;
+  req.body.tinExpireDate = undefined;
+  req.body.module = undefined;
+  req.body.zone = undefined;
+  req.body.subscriptionPlan = undefined;
+
+  // Remove uploaded vendor files
+  req.files = {};
+}
+
     // Parse nested storeAddress from FormData
     const storeAddress = {
       street: req.body["storeAddress[street]"] || "",
@@ -1081,7 +1097,7 @@ exports.register = async (req, res) => {
     }
 
     let userPassword = password;
-    if (role === "vendor") {
+    if (finalRole === "vendor") {
       userPassword = Math.random().toString(36).slice(-8);
     } else {
       if (!userPassword || userPassword.length < 6) {
@@ -1102,7 +1118,7 @@ exports.register = async (req, res) => {
       }
     }
 
-    const userId = await generateUserId(role || "user");
+const userId = await generateUserId(finalRole);
     const refreshToken = crypto.randomBytes(32).toString("hex");
     
     const user = await User.create(
@@ -1114,7 +1130,7 @@ exports.register = async (req, res) => {
           email,
           password: userPassword,
           phone,
-          role: role || "user",
+role: finalRole,
           refreshToken,
         },
       ],

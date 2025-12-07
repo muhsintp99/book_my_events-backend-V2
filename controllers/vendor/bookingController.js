@@ -1343,6 +1343,67 @@ exports.createBooking = async (req, res) => {
   }
 };
 
+
+
+
+
+
+exports.getAllBookings = async (req, res) => {
+  try {
+    const bookings = await Booking.find().populate("userId");
+    return res.json({ success: true, bookings });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
+exports.getBookingById = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id).populate("userId");
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
+
+    return res.json({ success: true, booking });
+  } catch (err) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid booking ID",
+      error: err.message
+    });
+  }
+};
+
+
+// ⭐ GET BOOKINGS BY PAYMENT STATUS FOR A PROVIDER
+exports.getBookingsByPaymentStatus = async (req, res) => {
+  try {
+    const { providerId, paymentStatus } = req.params;
+
+    const bookings = await Booking.find({
+      providerId: providerId,
+      paymentStatus: { $regex: new RegExp(`^${paymentStatus}$`, "i") } // case-insensitive
+    })
+      .populate("userId")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: bookings.length,
+      bookings,
+    });
+  } catch (error) {
+    console.error("Error fetching bookings by payment status:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch payment status bookings",
+      error: error.message,
+    });
+  }
+};
+
 // =======================================================
 // HELPER: CALCULATE VENUE PRICING
 // =======================================================

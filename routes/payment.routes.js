@@ -13,6 +13,8 @@ const router = express.Router();
 
 const controller = require("../controllers/payment.smart_legacy.controller");
 
+
+
 // Test endpoint to verify SDK is working
 router.get("/test-connection", controller.testConnection);
 
@@ -21,5 +23,6 @@ router.post("/create-payment-session", controller.createSmartGatewayPayment);
 
 router.post("/create-subscription-payment", controller.createSubscriptionPayment);
 
+router.get("/handle-response", controller.handleJuspayResponse);
 
 module.exports = router;
