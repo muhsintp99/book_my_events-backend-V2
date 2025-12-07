@@ -240,20 +240,32 @@ exports.createSmartGatewayPayment = async (req, res) => {
 
     const orderId = "order_" + Date.now();
 
-    // ⭐ FIX: Auto-detect advance amount if DB value is missing
-    let advanceAmount = booking.advanceDepositAmount;
+    // ⭐ FIX: Get advance amount from DB
+    let advanceAmount = Number(booking.advanceDepositAmount);
+    console.log("Before Fix - advanceDepositAmount in DB:", advanceAmount);
 
-    if (!advanceAmount || advanceAmount <= 0) {
-      console.log("⚠️ advanceDepositAmount missing in DB, using fallback value 25");
-      advanceAmount = 25; 
+    // ⭐ FIX: If DB mistakenly stored 2500 instead of 25 → auto-correct
+    let payableAdvance = advanceAmount;
+
+    if (advanceAmount > 100) {
+      console.log("⚠ Wrong value detected (>100), auto-correcting...");
+      payableAdvance = advanceAmount / 100; // FIX WRONG DB VALUE
     }
 
-    // Convert to paise
-    const amountInPaise = Math.round(advanceAmount * 100);
+    // ⭐ FIX: Fallback value
+    if (!payableAdvance || payableAdvance <= 0) {
+      console.log("⚠ No advance found, setting default 25");
+      payableAdvance = 25;
+    }
 
-    console.log("💰 Creating order with ADVANCE ONLY:", {
-      finalPrice: booking.finalPrice,
-      advanceAmount,
+    console.log("✔ Payable Advance (Final):", payableAdvance);
+
+    // Convert rupees → paise
+    const amountInPaise = Math.round(payableAdvance * 100);
+
+    console.log("💰 Sending to Juspay:", {
+      orderId,
+      payableAdvance,
       amountInPaise
     });
 
@@ -265,10 +277,10 @@ exports.createSmartGatewayPayment = async (req, res) => {
       customer_id: booking.userId._id.toString(),
       customer_email: booking.userId.email,
       customer_phone: booking.userId.mobile || "9999999999",
-      description: `Advance Payment ₹${advanceAmount}`
+      description: `Advance Payment ₹${payableAdvance.toFixed(2)}`
     });
 
-    // Payment page session
+    // Create payment session
     const session = await juspay.orderSession.create({
       order_id: orderId,
       amount: amountInPaise,
@@ -284,7 +296,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
     return res.json({
       success: true,
       order_id: orderId,
-      advanceAmount,
+      advanceAmount: payableAdvance,
       payment_links: session.payment_links,
       sdk_payload: session.sdk_payload
     });
