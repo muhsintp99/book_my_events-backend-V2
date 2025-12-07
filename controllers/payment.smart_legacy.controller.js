@@ -229,6 +229,10 @@ exports.testConnection = async (req, res) => {
 /**
  * CREATE PAYMENT SESSION (SmartGateway Payment Page)
  */
+/**
+ * CREATE PAYMENT SESSION (SmartGateway Payment Page)
+ * FIXED VERSION - Proper Redirect Handling
+ */
 exports.createSmartGatewayPayment = async (req, res) => {
   try {
     const { bookingId } = req.body;
@@ -244,7 +248,6 @@ exports.createSmartGatewayPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Booking not found" });
     }
 
-    // ⭐ GET ADVANCE FROM VENUE
     const advanceDeposit = booking.venueId?.advanceDeposit || 0;
 
     console.log("🔥 Venue Advance Deposit:", advanceDeposit);
@@ -256,12 +259,14 @@ exports.createSmartGatewayPayment = async (req, res) => {
       });
     }
 
-    // ⭐ AMOUNT MUST BE IN RUPEES FOR PAYMENT PAGE
     const amountInRupees = Number(advanceDeposit).toFixed(2);
-
     console.log("🏦 FINAL ADVANCE AMOUNT SENT TO HDFC:", amountInRupees);
 
     const orderId = "order_" + Date.now();
+
+    // ✅ FIXED: Use your actual frontend domain
+    const successUrl = `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}&orderId=${orderId}`;
+    const failureUrl = `https://bookmyevent.ae/booking.html?status=failed&bookingId=${bookingId}&orderId=${orderId}`;
 
     // Create Juspay Order
     const orderResponse = await juspay.order.create({
@@ -271,33 +276,47 @@ exports.createSmartGatewayPayment = async (req, res) => {
       customer_id: booking.userId._id.toString(),
       customer_email: booking.userId.email,
       customer_phone: booking.userId.mobile || "9999999999",
-      description: `Advance Payment ₹${amountInRupees}`
+      description: `Advance Payment ₹${amountInRupees}`,
+      return_url: successUrl  // ✅ Add to order creation
     });
 
-    // Create Session
+    // Create Session with proper redirect configuration
     const session = await juspay.orderSession.create({
       order_id: orderId,
       amount: amountInRupees,
       action: "paymentPage",
       payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
-      returnUrl: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`,
-        merchant_redirect_url: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`,
-  redirect_after_payment: true,
-
+      
+      // ✅ CRITICAL: These fields control redirect behavior
+      return_url: successUrl,
+      merchant_redirect_url: successUrl,
+      redirect_after_payment: true,
+      
+      // ✅ Optional: Add failure URL
+      merchant_failure_url: failureUrl,
+      
       currency: "INR",
       customer_id: booking.userId._id.toString(),
       customer_email: booking.userId.email,
-      customer_phone: booking.userId.mobile || "9999999999"
+      customer_phone: booking.userId.mobile || "9999999999",
+      
+      // ✅ Additional metadata for tracking
+      metadata: {
+        bookingId: bookingId,
+        userId: booking.userId._id.toString()
+      }
     });
 
     console.log("🎯 Payment Link:", session.payment_links?.web);
+    console.log("🔄 Return URL:", successUrl);
 
     return res.json({
       success: true,
       order_id: orderId,
       advanceAmount: amountInRupees,
       payment_links: session.payment_links,
-      sdk_payload: session.sdk_payload
+      sdk_payload: session.sdk_payload,
+      return_url: successUrl  // ✅ Send to frontend for reference
     });
 
   } catch (error) {
@@ -308,7 +327,6 @@ exports.createSmartGatewayPayment = async (req, res) => {
     });
   }
 };
-
 
 // Add this to your payment.smart_legacy.controller.js
 
