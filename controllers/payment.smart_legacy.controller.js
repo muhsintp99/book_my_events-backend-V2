@@ -233,57 +233,83 @@ exports.createSmartGatewayPayment = async (req, res) => {
   try {
     const { bookingId } = req.body;
 
-    // 1️⃣ Fetch booking first (booking MUST be defined before using it!)
+    console.log("\n===================== PAYMENT DEBUG LOG =====================");
+
+    // Fetch booking
     const booking = await Booking.findById(bookingId).populate("userId");
     if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: "Booking not found"
-      });
+      console.log("❌ Booking not found");
+      return res.status(404).json({ success: false, message: "Booking not found" });
     }
 
-    const orderId = "order_" + Date.now();
+    console.log("📌 Booking ID:", bookingId);
+    console.log("📌 User:", booking.userId?.email);
 
-    // 2️⃣ LOG RAW VALUE FROM DB
+    const orderId = "order_" + Date.now();
+    console.log("🆔 Generated Order ID:", orderId);
+
+    // Step 1: Read DB value
     let rawAdvance = Number(booking.advanceDepositAmount);
     console.log("🔥 RAW advanceDepositAmount from DB:", rawAdvance);
 
-    // 3️⃣ NORMALIZE WRONG VALUES
+    // Step 2: Normalize incorrect values
     let payableAdvance = rawAdvance;
 
-    // If DB stored wrong value like 2500 instead of 25
     if (rawAdvance > 500) {
-      console.log("⚠ Wrong DB value detected (>500). Converting from paise → rupees");
+      console.log("⚠ WRONG DB VALUE (>500) → converting paise → rupees");
       payableAdvance = rawAdvance / 100;
     }
 
-    // If missing or zero, fallback to 25
     if (!payableAdvance || payableAdvance <= 0) {
-      console.log("⚠ No valid deposit found, using fallback = 25");
+      console.log("⚠ No valid value found → setting default ₹25");
       payableAdvance = 25;
     }
 
-    console.log("✔ FINAL Payable Advance:", payableAdvance);
+    console.log("✔ FINAL Payable Advance (RUPEES):", payableAdvance);
 
-    // 4️⃣ Convert rupees → paise
-    const amountInPaise = Math.round(payableAdvance * 100);
-    console.log("✔ FINAL amountInPaise SENT TO HDFC:", amountInPaise);
+    // Step 3: Format amount for HDFC
+    const amountInRupees = payableAdvance.toFixed(2);
+    console.log("🏦 AMOUNT SENT TO HDFC (RUPEES):", amountInRupees);
 
-    // 5️⃣ Create Juspay order
-    const orderResponse = await juspay.order.create({
+    console.log("-------------------------------------------------------------");
+    console.log("📤 JUSPAY ORDER CREATE PAYLOAD:");
+    console.log({
       order_id: orderId,
-      amount: amountInPaise,
+      amount: amountInRupees,
       currency: "INR",
       customer_id: booking.userId._id.toString(),
       customer_email: booking.userId.email,
       customer_phone: booking.userId.mobile || "9999999999",
-      description: `Advance Payment ₹${payableAdvance.toFixed(2)}`
+      description: `Advance Payment ₹${amountInRupees}`
+    });
+    console.log("-------------------------------------------------------------");
+
+    // Create Juspay Order
+    const orderResponse = await juspay.order.create({
+      order_id: orderId,
+      amount: amountInRupees,
+      currency: "INR",
+      customer_id: booking.userId._id.toString(),
+      customer_email: booking.userId.email,
+      customer_phone: booking.userId.mobile || "9999999999",
+      description: `Advance Payment ₹${amountInRupees}`
     });
 
-    // 6️⃣ Create session for payment page
+    console.log("✅ Juspay Order Created Successfully:", orderResponse.id);
+
+    // Step 5: Create payment session
+    console.log("-------------------------------------------------------------");
+    console.log("📤 JUSPAY SESSION CREATE PAYLOAD:");
+    console.log({
+      order_id: orderId,
+      amount: amountInRupees,
+      action: "paymentPage"
+    });
+    console.log("-------------------------------------------------------------");
+
     const session = await juspay.orderSession.create({
       order_id: orderId,
-      amount: amountInPaise,
+      amount: amountInRupees,
       action: "paymentPage",
       payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
       return_url: `https://vendor.bookmyevent.ae/bookings/all?orderId=${orderId}&bookingId=${bookingId}`,
@@ -293,16 +319,22 @@ exports.createSmartGatewayPayment = async (req, res) => {
       customer_phone: booking.userId.mobile || "9999999999"
     });
 
+    console.log("🎯 Payment Link:", session.payment_links?.web);
+    console.log("===================== END PAYMENT DEBUG LOG =====================\n");
+
     return res.json({
       success: true,
       order_id: orderId,
-      advanceAmount: payableAdvance,
+      advanceAmount: amountInRupees,
       payment_links: session.payment_links,
       sdk_payload: session.sdk_payload
     });
 
   } catch (error) {
+    console.log("===================== PAYMENT ERROR LOG =====================");
     console.error("❌ Payment Error:", error.response?.data || error.message);
+    console.log("==============================================================");
+
     return res.status(500).json({
       success: false,
       error: error.response?.data || error.message
@@ -342,7 +374,7 @@ amount: String(amountInPaise),
     // 1️⃣ Create Order
     const orderResponse = await juspay.order.create({
       order_id: orderId,
-amount: String(amountInPaise),
+      amount: String(amountInPaise),
       currency: "INR",
       customer_id: providerId,
       customer_email: customerEmail || "provider@bookmyevent.ae",
@@ -360,7 +392,7 @@ amount: String(amountInPaise),
     // 2️⃣ Create Session → Payment Page URL
     const session = await juspay.orderSession.create({
       order_id: orderId,
-amount: String(amountInPaise),
+      amount: String(amountInPaise),
       action: "paymentPage",
       payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
       // return_url: "https://dashboard.bookmyevent.ae/payment-status",
