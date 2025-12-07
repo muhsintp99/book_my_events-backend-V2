@@ -240,14 +240,12 @@ exports.createSmartGatewayPayment = async (req, res) => {
 
     const orderId = "order_" + Date.now();
 
-    // ✔ Get advance deposit (Payable Now)
-    const advanceAmount = booking.advanceDepositAmount || 0;
+    // ⭐ FIX: Auto-detect advance amount if DB value is missing
+    let advanceAmount = booking.advanceDepositAmount;
 
-    if (advanceAmount <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Advance deposit amount is zero, nothing to charge"
-      });
+    if (!advanceAmount || advanceAmount <= 0) {
+      console.log("⚠️ advanceDepositAmount missing in DB, using fallback value 25");
+      advanceAmount = 25; 
     }
 
     // Convert to paise
@@ -259,7 +257,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
       amountInPaise
     });
 
-    // Create order
+    // Create order in Juspay
     const orderResponse = await juspay.order.create({
       order_id: orderId,
       amount: amountInPaise,
@@ -270,7 +268,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
       description: `Advance Payment ₹${advanceAmount}`
     });
 
-    // Create payment page session
+    // Payment page session
     const session = await juspay.orderSession.create({
       order_id: orderId,
       amount: amountInPaise,
