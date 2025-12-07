@@ -233,43 +233,43 @@ exports.createSmartGatewayPayment = async (req, res) => {
   try {
     const { bookingId } = req.body;
 
+    // 1️⃣ Fetch booking first (booking MUST be defined before using it!)
     const booking = await Booking.findById(bookingId).populate("userId");
     if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found"
+      });
     }
 
     const orderId = "order_" + Date.now();
 
-    // ⭐ FIX: Get advance amount from DB
-    let advanceAmount = Number(booking.advanceDepositAmount);
-    console.log("Before Fix - advanceDepositAmount in DB:", advanceAmount);
+    // 2️⃣ LOG RAW VALUE FROM DB
+    let rawAdvance = Number(booking.advanceDepositAmount);
+    console.log("🔥 RAW advanceDepositAmount from DB:", rawAdvance);
 
-    // ⭐ FIX: If DB mistakenly stored 2500 instead of 25 → auto-correct
-    let payableAdvance = advanceAmount;
+    // 3️⃣ NORMALIZE WRONG VALUES
+    let payableAdvance = rawAdvance;
 
-    if (advanceAmount > 100) {
-      console.log("⚠ Wrong value detected (>100), auto-correcting...");
-      payableAdvance = advanceAmount / 100; // FIX WRONG DB VALUE
+    // If DB stored wrong value like 2500 instead of 25
+    if (rawAdvance > 500) {
+      console.log("⚠ Wrong DB value detected (>500). Converting from paise → rupees");
+      payableAdvance = rawAdvance / 100;
     }
 
-    // ⭐ FIX: Fallback value
+    // If missing or zero, fallback to 25
     if (!payableAdvance || payableAdvance <= 0) {
-      console.log("⚠ No advance found, setting default 25");
+      console.log("⚠ No valid deposit found, using fallback = 25");
       payableAdvance = 25;
     }
 
-    console.log("✔ Payable Advance (Final):", payableAdvance);
+    console.log("✔ FINAL Payable Advance:", payableAdvance);
 
-    // Convert rupees → paise
+    // 4️⃣ Convert rupees → paise
     const amountInPaise = Math.round(payableAdvance * 100);
+    console.log("✔ FINAL amountInPaise SENT TO HDFC:", amountInPaise);
 
-    console.log("💰 Sending to Juspay:", {
-      orderId,
-      payableAdvance,
-      amountInPaise
-    });
-
-    // Create order in Juspay
+    // 5️⃣ Create Juspay order
     const orderResponse = await juspay.order.create({
       order_id: orderId,
       amount: amountInPaise,
@@ -280,7 +280,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
       description: `Advance Payment ₹${payableAdvance.toFixed(2)}`
     });
 
-    // Create payment session
+    // 6️⃣ Create session for payment page
     const session = await juspay.orderSession.create({
       order_id: orderId,
       amount: amountInPaise,
@@ -302,7 +302,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ SmartGateway Error:", error.response?.data || error.message);
+    console.error("❌ Payment Error:", error.response?.data || error.message);
     return res.status(500).json({
       success: false,
       error: error.response?.data || error.message
@@ -334,7 +334,7 @@ exports.createSubscriptionPayment = async (req, res) => {
 
     console.log("📝 Creating subscription payment order:", {
       orderId,
-      amount: amountInPaise,
+amount: String(amountInPaise),
       providerId,
       planId
     });
@@ -342,7 +342,7 @@ exports.createSubscriptionPayment = async (req, res) => {
     // 1️⃣ Create Order
     const orderResponse = await juspay.order.create({
       order_id: orderId,
-      amount: amountInPaise,
+amount: String(amountInPaise),
       currency: "INR",
       customer_id: providerId,
       customer_email: customerEmail || "provider@bookmyevent.ae",
@@ -360,7 +360,7 @@ exports.createSubscriptionPayment = async (req, res) => {
     // 2️⃣ Create Session → Payment Page URL
     const session = await juspay.orderSession.create({
       order_id: orderId,
-      amount: amountInPaise,
+amount: String(amountInPaise),
       action: "paymentPage",
       payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
       // return_url: "https://dashboard.bookmyevent.ae/payment-status",
