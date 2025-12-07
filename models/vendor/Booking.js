@@ -90,7 +90,7 @@ const bookingSchema = new mongoose.Schema(
     packageId: { 
       type: mongoose.Schema.Types.ObjectId, 
       ref: "Package", 
-      required: true 
+      // required: true 
     },
 
     providerId: { 
@@ -117,7 +117,7 @@ const bookingSchema = new mongoose.Schema(
       }
     },
     bookingDate: { type: Date, required: true },
-    timeSlot: { type: String, required: true }, // Morning / Evening / Full Day
+    timeSlot: { type: String, }, 
     location: { type: String },
     
     bookingType: { 

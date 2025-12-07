@@ -309,6 +309,30 @@ const getMaxPrice = (pricingSchedule) => {
   }
   return maxPrice;
 };
+const normalizePricingSchedule = (schedule) => {
+  const days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+
+  const newSchedule = {};
+
+  days.forEach(day => {
+    const d = schedule[day] || {};
+
+    newSchedule[day] = {
+      morning: d.morning ? {
+        ...d.morning,
+        perDay: Number(d.morning.perDay || d.morning.price || 0),
+      } : null,
+
+      evening: d.evening ? {
+        ...d.evening,
+        perDay: Number(d.evening.perDay || d.evening.price || 0),
+      } : null
+    };
+  });
+
+  return newSchedule;
+};
+
 
 // Create Venue
 exports.createVenue = async (req, res) => {
@@ -1643,12 +1667,13 @@ exports.updateVenue = async (req, res) => {
     let data = normalizeFormData(req.body);
 
     // Parse pricing schedule
-    if (data.pricingSchedule && typeof data.pricingSchedule === "string") {
-      const parsed = JSON.parse(data.pricingSchedule);
-      data.pricingSchedule = Array.isArray(parsed)
-        ? convertLegacyPricing(parsed)
-        : parsed;
-    }
+   if (data.pricingSchedule && typeof data.pricingSchedule === "string") {
+  const parsed = JSON.parse(data.pricingSchedule);
+  data.pricingSchedule = Array.isArray(parsed)
+    ? convertLegacyPricing(parsed)
+    : parsed;
+}
+
 
     // Parse categories
     if (data.categories) {
@@ -2677,3 +2702,5 @@ exports.getTopPicks = async (req, res) => {
     });
   }
 };
+
+

@@ -1050,12 +1050,19 @@ exports.createBooking = async (req, res) => {
     } = req.body;
 
     // Validate common required fields
-    if (!moduleId || !packageId || !bookingDate || !timeSlot) {
-      return res.status(400).json({
-        success: false,
-        message: "moduleId, packageId, bookingDate, and timeSlot are required"
-      });
-    }
+    // if (!moduleId  || !bookingDate ) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "moduleId, packageId, bookingDate, and timeSlot are required"
+    //   });
+    // }
+    if (!moduleId || !bookingDate) {
+  return res.status(400).json({
+    success: false,
+    message: "moduleId and bookingDate are required"
+  });
+}
+
 
     // Validate MongoDB ObjectId format
     const mongoose = require('mongoose');
@@ -1065,12 +1072,12 @@ exports.createBooking = async (req, res) => {
         message: "Invalid moduleId format"
       });
     }
-    if (!mongoose.Types.ObjectId.isValid(packageId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid packageId format"
-      });
-    }
+    // if (!mongoose.Types.ObjectId.isValid(packageId)) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Invalid packageId format"
+    //   });
+    // }
 
     // Get module information
     const moduleData = await Module.findById(moduleId);
@@ -1230,15 +1237,24 @@ exports.createBooking = async (req, res) => {
     } else {
       // For other modules (Venues, etc.), use the Package model
       pkg = await Package.findById(packageId).lean();
-      if (!pkg) {
-        return res.status(404).json({ 
-          success: false, 
-          message: `Package not found with ID: ${packageId}` 
-        });
-      }
-      packagePrice = moduleType === "Venues" 
-        ? pkg.price * numberOfGuests 
-        : pkg.price;
+      // If venue has no packages, skip package pricing
+if (!packageId) {
+  pkg = null;
+  packagePrice = 0;
+} else {
+  pkg = await Package.findById(packageId).lean();
+  if (!pkg) {
+    return res.status(404).json({
+      success: false,
+      message: `Package not found`
+    });
+  }
+  packagePrice = moduleType === "Venues"
+    ? pkg.price * numberOfGuests
+    : pkg.price;
+}
+
+     
     }
 
     // -------------------------
@@ -1415,9 +1431,18 @@ async function calculateVenuePricing(venue, bookingDate, timeSlot, numberOfGuest
   const slot = timeSlot.toLowerCase();
 
   const priceData = venue.pricingSchedule?.[bookingDay]?.[slot];
+  // if (!priceData) {
+  //   throw new Error(`No pricing found for ${bookingDay} - ${slot}`);
+  // }
   if (!priceData) {
-    throw new Error(`No pricing found for ${bookingDay} - ${slot}`);
-  }
+  return {
+    basePrice: venue.basePrice || 0,
+    perDayPrice: venue.basePrice || 0,
+    perPersonCharge: 0,
+    discount: venue.discount?.nonAc || 0
+  };
+}
+
 
   const perDayPrice = priceData.perDay || 0;
   const perPerson = priceData.perPerson || 0;
