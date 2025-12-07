@@ -231,60 +231,37 @@ exports.testConnection = async (req, res) => {
  */
 exports.createSmartGatewayPayment = async (req, res) => {
   try {
-    const { bookingId, amount } = req.body;
+    const { bookingId } = req.body;
 
     console.log("\n===================== PAYMENT DEBUG LOG =====================");
-    console.log("📥 Received amount from frontend:", amount);
 
-    // Fetch booking
-    const booking = await Booking.findById(bookingId).populate("userId");
+    // Fetch booking with venue populated
+    const booking = await Booking.findById(bookingId)
+      .populate("userId")
+      .populate("venueId");
+
     if (!booking) {
-      console.log("❌ Booking not found");
       return res.status(404).json({ success: false, message: "Booking not found" });
     }
 
-    console.log("📌 Booking ID:", bookingId);
-    console.log("📌 User:", booking.userId?.email);
+    // ⭐ GET ADVANCE FROM VENUE
+    const advanceDeposit = booking.venueId?.advanceDeposit || 0;
 
-    const orderId = "order_" + Date.now();
-    console.log("🆔 Generated Order ID:", orderId);
+    console.log("🔥 Venue Advance Deposit:", advanceDeposit);
 
-    // ✅ PRIORITY 1 → Use the amount sent by frontend
-    let payableAdvance = Number(amount);
-
-    // If frontend didn't send a valid amount, fallback to DB
-    if (!payableAdvance || payableAdvance <= 0) {
-      console.log("⚠ No valid amount from frontend → checking DB value...");
-      payableAdvance = Number(booking.advanceDepositAmount);
-    }
-
-    // If DB also invalid → throw error (do NOT default ₹25)
-    if (!payableAdvance || payableAdvance <= 0) {
+    if (advanceDeposit <= 0) {
       return res.status(400).json({
         success: false,
-        message: "Invalid advance amount. Cannot process payment."
+        message: "Venue does not have an advance deposit amount"
       });
     }
 
-    console.log("✔ FINAL Payable Advance (RUPEES):", payableAdvance);
+    // ⭐ AMOUNT MUST BE IN RUPEES FOR PAYMENT PAGE
+    const amountInRupees = Number(advanceDeposit).toFixed(2);
 
-    // Juspay expects string or paise converted
-    const amountInRupees = Number(payableAdvance).toFixed(2);
+    console.log("🏦 FINAL ADVANCE AMOUNT SENT TO HDFC:", amountInRupees);
 
-    console.log("🏦 AMOUNT SENT TO HDFC:", amountInRupees);
-
-    console.log("-------------------------------------------------------------");
-    console.log("📤 JUSPAY ORDER CREATE PAYLOAD:");
-    console.log({
-      order_id: orderId,
-      amount: amountInRupees,
-      currency: "INR",
-      customer_id: booking.userId._id.toString(),
-      customer_email: booking.userId.email,
-      customer_phone: booking.userId.mobile || "9999999999",
-      description: `Advance Payment ₹${amountInRupees}`
-    });
-    console.log("-------------------------------------------------------------");
+    const orderId = "order_" + Date.now();
 
     // Create Juspay Order
     const orderResponse = await juspay.order.create({
@@ -297,15 +274,16 @@ exports.createSmartGatewayPayment = async (req, res) => {
       description: `Advance Payment ₹${amountInRupees}`
     });
 
-    console.log("✅ Juspay Order Created Successfully:", orderResponse.id);
-
-    // Create Payment Session
+    // Create Session
     const session = await juspay.orderSession.create({
       order_id: orderId,
       amount: amountInRupees,
       action: "paymentPage",
       payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
       returnUrl: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`,
+        merchant_redirect_url: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`,
+  redirect_after_payment: true,
+
       currency: "INR",
       customer_id: booking.userId._id.toString(),
       customer_email: booking.userId.email,
@@ -313,7 +291,6 @@ exports.createSmartGatewayPayment = async (req, res) => {
     });
 
     console.log("🎯 Payment Link:", session.payment_links?.web);
-    console.log("===================== END PAYMENT DEBUG LOG =====================\n");
 
     return res.json({
       success: true,
@@ -324,16 +301,14 @@ exports.createSmartGatewayPayment = async (req, res) => {
     });
 
   } catch (error) {
-    console.log("===================== PAYMENT ERROR LOG =====================");
     console.error("❌ Payment Error:", error.response?.data || error.message);
-    console.log("==============================================================");
-
     return res.status(500).json({
       success: false,
       error: error.response?.data || error.message
     });
   }
 };
+
 
 // Add this to your payment.smart_legacy.controller.js
 
