@@ -177,7 +177,6 @@ const { Juspay, APIError } = require("expresscheckout-nodejs");
 const Booking = require("../models/vendor/Booking");
 const config = require("../config/smartgateway_config.json");
 
-
 // Initialize SmartGateway with BASIC Authentication (API Key)
 const juspay = new Juspay({
   merchantId: config.MERCHANT_ID,
@@ -198,10 +197,9 @@ exports.testConnection = async (req, res) => {
     
     console.log("🧪 Testing SDK with order:", testOrderId);
     
-    // Simple order creation test
     const orderResponse = await juspay.order.create({
       order_id: testOrderId,
-      amount: 10000, // 100 INR
+      amount: 10000,
       currency: "INR",
       customer_id: "test_customer_123",
       customer_email: "test@example.com",
@@ -228,6 +226,7 @@ exports.testConnection = async (req, res) => {
 
 /**
  * CREATE PAYMENT SESSION (SmartGateway Payment Page)
+ * ✅ FIXED: Proper redirect configuration
  */
 exports.createSmartGatewayPayment = async (req, res) => {
   try {
@@ -244,7 +243,6 @@ exports.createSmartGatewayPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Booking not found" });
     }
 
-    // ⭐ GET ADVANCE FROM VENUE
     const advanceDeposit = booking.venueId?.advanceDeposit || 0;
 
     console.log("🔥 Venue Advance Deposit:", advanceDeposit);
@@ -256,12 +254,18 @@ exports.createSmartGatewayPayment = async (req, res) => {
       });
     }
 
-    // ⭐ AMOUNT MUST BE IN RUPEES FOR PAYMENT PAGE
     const amountInRupees = Number(advanceDeposit).toFixed(2);
-
     console.log("🏦 FINAL ADVANCE AMOUNT SENT TO HDFC:", amountInRupees);
 
     const orderId = "order_" + Date.now();
+
+    // ✅ OPTION 1: Direct to frontend (if HDFC allows)
+    const returnUrl = `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}&orderId=${orderId}`;
+    
+    // ✅ OPTION 2: Via backend handler (more reliable)
+    // const returnUrl = `${req.protocol}://${req.get('host')}/api/payment/payment-success?orderId=${orderId}&bookingId=${bookingId}`;
+    
+    console.log("🔗 Return URL:", returnUrl);
 
     // Create Juspay Order
     const orderResponse = await juspay.order.create({
@@ -271,33 +275,45 @@ exports.createSmartGatewayPayment = async (req, res) => {
       customer_id: booking.userId._id.toString(),
       customer_email: booking.userId.email,
       customer_phone: booking.userId.mobile || "9999999999",
-      description: `Advance Payment ₹${amountInRupees}`
+      description: `Advance Payment ₹${amountInRupees}`,
+      return_url: returnUrl
     });
 
-    // Create Session
+    console.log("✅ Order Created:", orderResponse.order_id);
+
+    // ✅ Create Session with ALL redirect parameters
     const session = await juspay.orderSession.create({
       order_id: orderId,
       amount: amountInRupees,
       action: "paymentPage",
       payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
-      returnUrl: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`,
-        merchant_redirect_url: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`,
-  redirect_after_payment: true,
-
       currency: "INR",
       customer_id: booking.userId._id.toString(),
       customer_email: booking.userId.email,
-      customer_phone: booking.userId.mobile || "9999999999"
+      customer_phone: booking.userId.mobile || "9999999999",
+      
+      // ✅ ALL POSSIBLE RETURN URL PARAMETERS
+      return_url: returnUrl,
+      returnUrl: returnUrl,
+      merchant_redirect_url: returnUrl,
+      redirect_after_payment: true
     });
 
+    console.log("✅ Session Created:", session.id);
     console.log("🎯 Payment Link:", session.payment_links?.web);
+
+    // ✅ Store order ID in booking for later verification
+    await Booking.findByIdAndUpdate(bookingId, {
+      paymentOrderId: orderId
+    });
 
     return res.json({
       success: true,
       order_id: orderId,
       advanceAmount: amountInRupees,
       payment_links: session.payment_links,
-      sdk_payload: session.sdk_payload
+      sdk_payload: session.sdk_payload,
+      return_url: returnUrl
     });
 
   } catch (error) {
@@ -309,17 +325,193 @@ exports.createSmartGatewayPayment = async (req, res) => {
   }
 };
 
+/**
+ * ✅ NEW: HANDLE PAYMENT SUCCESS (Backend redirect handler)
+ * Use this if HDFC redirects to backend first
+ */
+exports.handlePaymentSuccess = async (req, res) => {
+  try {
+    const { orderId, bookingId } = req.query;
+    
+    console.log("🎉 Payment Success Handler Called");
+    console.log("  - Order ID:", orderId);
+    console.log("  - Booking ID:", bookingId);
+    
+    if (!orderId || !bookingId) {
+      return res.redirect('https://bookmyevent.ae/booking.html?status=failed');
+    }
 
-// Add this to your payment.smart_legacy.controller.js
+    // Get order status from Juspay
+    const order = await juspay.order.status(orderId);
+    
+    console.log("💳 Order Status:", order.status);
+
+    // Update booking
+    if (order.status === "CHARGED") {
+      await Booking.findByIdAndUpdate(bookingId, {
+        paymentStatus: "completed",
+        paymentOrderId: orderId,
+        transactionId: order.txn_id || null,
+        paidAmount: order.amount
+      });
+      
+      console.log("✅ Booking updated successfully");
+      
+      // Redirect to frontend success page
+      return res.redirect(
+        `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}&orderId=${orderId}`
+      );
+    } else {
+      return res.redirect(
+        `https://bookmyevent.ae/booking.html?status=pending&bookingId=${bookingId}&orderId=${orderId}`
+      );
+    }
+
+  } catch (error) {
+    console.error("❌ Payment Success Handler Error:", error);
+    return res.redirect('https://bookmyevent.ae/booking.html?status=failed');
+  }
+};
 
 /**
- * CREATE PAYMENT SESSION FOR SUBSCRIPTION
+ * ✅ VERIFY PAYMENT STATUS (Called by frontend after redirect)
+ */
+exports.verifyPayment = async (req, res) => {
+  try {
+    const { orderId, bookingId } = req.query;
+
+    console.log("🔍 Verifying Payment:");
+    console.log("  - orderId:", orderId);
+    console.log("  - bookingId:", bookingId);
+
+    if (!orderId || !bookingId) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing orderId or bookingId"
+      });
+    }
+
+    // Get order status from Juspay
+    const order = await juspay.order.status(orderId);
+    
+    console.log("💳 Juspay Order Status:", order.status);
+
+    const paymentStatus = order.status;
+    let bookingStatus = "pending";
+
+    // Map Juspay status to booking status
+    if (paymentStatus === "CHARGED") {
+      bookingStatus = "completed";
+    } else if (["PENDING", "PENDING_VBV", "AUTHORIZING", "NEW"].includes(paymentStatus)) {
+      bookingStatus = "pending";
+    } else {
+      bookingStatus = "failed";
+    }
+
+    // Update booking in database
+    const updatedBooking = await Booking.findByIdAndUpdate(
+      bookingId,
+      {
+        paymentStatus: bookingStatus,
+        paymentOrderId: orderId,
+        paidAmount: order.amount,
+        transactionId: order.txn_id || null,
+        paymentMethod: order.payment_method_type || "Unknown",
+        updatedAt: new Date()
+      },
+      { new: true }
+    );
+
+    if (!updatedBooking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found"
+      });
+    }
+
+    console.log("✅ Booking Updated:", updatedBooking._id);
+
+    return res.json({
+      success: bookingStatus === "completed",
+      bookingId: updatedBooking._id,
+      orderId: order.order_id,
+      amount: order.amount,
+      status: bookingStatus,
+      paymentStatus: paymentStatus,
+      transactionId: order.txn_id || null,
+      message: bookingStatus === "completed" 
+        ? "Payment successful" 
+        : "Payment " + bookingStatus
+    });
+
+  } catch (error) {
+    console.error("❌ Verification Error:", error.response?.data || error.message);
+    
+    return res.status(500).json({
+      success: false,
+      message: "Error verifying payment",
+      error: error.response?.data || error.message
+    });
+  }
+};
+
+/**
+ * HANDLE PAYMENT RESPONSE (S2S Callback - Optional)
+ */
+exports.handleJuspayResponse = async (req, res) => {
+  try {
+    const { orderId, bookingId } = req.query;
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        message: "orderId is required"
+      });
+    }
+
+    console.log("🔍 Checking Juspay order status:", orderId);
+
+    const order = await juspay.order.status(orderId);
+    const status = order.status;
+
+    let bookingStatus = "pending";
+
+    if (status === "CHARGED") bookingStatus = "completed";
+    else if (["PENDING", "PENDING_VBV", "AUTHORIZING", "NEW"].includes(status)) bookingStatus = "pending";
+    else bookingStatus = "failed";
+
+    // Update booking in database
+    if (bookingId) {
+      await Booking.findByIdAndUpdate(bookingId, {
+        paymentStatus: bookingStatus,
+        paymentOrderId: orderId,
+        paidAmount: order.amount,
+        transactionId: order.txn_id || null
+      });
+    }
+
+    return res.json({
+      success: bookingStatus === "completed",
+      orderId: order.order_id,
+      amount: order.amount,
+      status: bookingStatus
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error checking payment status"
+    });
+  }
+};
+
+/**
+ * CREATE SUBSCRIPTION PAYMENT
  */
 exports.createSubscriptionPayment = async (req, res) => {
   try {
     const { providerId, planId, amount, customerEmail, customerPhone } = req.body;
 
-    // Validate inputs
     if (!providerId || !planId || !amount) {
       return res.status(400).json({
         success: false,
@@ -328,18 +520,18 @@ exports.createSubscriptionPayment = async (req, res) => {
     }
 
     const orderId = "subscription_" + Date.now();
-    // const amountInPaise = Math.round(amount * 100); 
-    const amountInPaise = amount;  
-
+    const amountInPaise = amount;
 
     console.log("📝 Creating subscription payment order:", {
       orderId,
-amount: String(amountInPaise),
+      amount: String(amountInPaise),
       providerId,
       planId
     });
 
-    // 1️⃣ Create Order
+    const returnUrl = `https://bookmyevent.ae/subscription-success.html?orderId=${orderId}&providerId=${providerId}`;
+
+    // Create Order
     const orderResponse = await juspay.order.create({
       order_id: orderId,
       amount: String(amountInPaise),
@@ -348,6 +540,7 @@ amount: String(amountInPaise),
       customer_email: customerEmail || "provider@bookmyevent.ae",
       customer_phone: customerPhone || "9999999999",
       description: `Subscription Payment - Plan ${planId}`,
+      return_url: returnUrl,
       metadata: {
         providerId: providerId,
         planId: planId,
@@ -357,15 +550,16 @@ amount: String(amountInPaise),
 
     console.log("✅ Order created:", orderResponse);
 
-    // 2️⃣ Create Session → Payment Page URL
+    // Create Session
     const session = await juspay.orderSession.create({
       order_id: orderId,
       amount: String(amountInPaise),
       action: "paymentPage",
       payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
-      // return_url: "https://dashboard.bookmyevent.ae/payment-status",
-      returnUrl: `https://https://www.bookmyevent.ae/index.html?status=success&bookingId=${bookingId}`,
-
+      return_url: returnUrl,
+      returnUrl: returnUrl,
+      merchant_redirect_url: returnUrl,
+      redirect_after_payment: true,
       currency: "INR",
       customer_id: providerId,
       customer_email: customerEmail || "provider@bookmyevent.ae",
@@ -374,7 +568,6 @@ amount: String(amountInPaise),
 
     console.log("✅ Payment session created:", session);
 
-    // Return response with payment link
     return res.json({
       success: true,
       status: session.status,
@@ -395,120 +588,6 @@ amount: String(amountInPaise),
       success: false,
       error: error.response?.data || error.message,
       details: error.toString()
-    });
-  }
-};
-
-
-/**
- * HANDLE PAYMENT RESPONSE (S2S Order Status Check)
- */
-// exports.handleJuspayResponse = async (req, res) => {
-//   try {
-//     const { orderId } = req.query;
-
-//     if (!orderId) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "orderId is required"
-//       });
-//     }
-
-//     console.log("🔍 Checking Juspay order status:", orderId);
-
-//     // 1️⃣ Fetch order status from Juspay
-//     const statusResponse = await juspay.order.status(orderId);
-
-//     console.log("💳 Order Status Response:", statusResponse);
-
-//     const status = statusResponse.status;
-
-//     // 2️⃣ Handle based on status
-//     if (status === "CHARGED") {
-//       console.log("✅ Payment successful for:", orderId);
-
-//       // TODO: Update your DB booking/subscription here
-
-//       return res.json({
-//         success: true,
-//         status: "success",
-//         order: statusResponse
-//       });
-//     }
-
-//     if (status === "PENDING_VBV" || status === "AUTHORIZING" || status === "PENDING") {
-//       console.log("⏳ Payment still pending:", orderId);
-
-//       return res.json({
-//         success: true,
-//         status: "pending",
-//         order: statusResponse
-//       });
-//     }
-
-//     console.log("❌ Payment failed:", orderId);
-
-//     return res.json({
-//       success: false,
-//       status: "failed",
-//       order: statusResponse
-//     });
-
-//   } catch (error) {
-//     console.error("❌ Error checking order status:", error.response?.data || error.message);
-
-//     return res.status(500).json({
-//       success: false,
-//       message: "Error checking order status",
-//       error: error.response?.data || error.message
-//     });
-//   }
-// };
-
-
-
-exports.handleJuspayResponse = async (req, res) => {
-  try {
-    const { orderId, bookingId } = req.query;
-
-    if (!orderId) {
-      return res.status(400).json({
-        success: false,
-        message: "orderId is required"
-      });
-    }
-
-    // Get status from Juspay
-    const order = await juspay.order.status(orderId);
-    const status = order.status;
-
-    let bookingStatus = "pending";
-
-    if (status === "CHARGED") bookingStatus = "completed";
-    else if (["PENDING", "PENDING_VBV", "AUTHORIZING", "NEW"].includes(status)) bookingStatus = "pending";
-    else bookingStatus = "failed";
-
-    // 🔥 Update booking in database
-    if (bookingId) {
-      await Booking.findByIdAndUpdate(bookingId, {
-        paymentStatus: bookingStatus,
-        paymentOrderId: orderId,
-        paidAmount: order.amount
-      });
-    }
-
-    // Send clean response
-    return res.json({
-      success: bookingStatus === "completed",
-      orderId: order.order_id,
-      amount: order.amount,
-      status: bookingStatus
-    });
-
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Error checking payment status"
     });
   }
 };
