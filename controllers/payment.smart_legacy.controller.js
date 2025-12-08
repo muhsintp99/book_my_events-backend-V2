@@ -314,8 +314,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
  */
 exports.createSubscriptionPayment = async (req, res) => {
   try {
-    const { providerId, planId, amount, customerEmail, customerPhone } =
-      req.body;
+    const { providerId, planId, amount, customerEmail, customerPhone } = req.body;
 
     // Validate inputs
     if (!providerId || !planId || !amount) {
@@ -326,12 +325,13 @@ exports.createSubscriptionPayment = async (req, res) => {
     }
 
     const orderId = "subscription_" + Date.now();
-    // const amountInPaise = Math.round(amount * 100);
-    const amountInPaise = amount;
+
+    // Juspay accepts RUPEES — NOT paise unless your account is configured that way
+    const amountInRupees = Number(amount).toFixed(2);
 
     console.log("📝 Creating subscription payment order:", {
       orderId,
-      amount: String(amountInPaise),
+      amount: amountInRupees,
       providerId,
       planId,
     });
@@ -339,15 +339,15 @@ exports.createSubscriptionPayment = async (req, res) => {
     // 1️⃣ Create Order
     const orderResponse = await juspay.order.create({
       order_id: orderId,
-      amount: String(amountInPaise),
+      amount: amountInRupees,
       currency: "INR",
       customer_id: providerId,
       customer_email: customerEmail || "provider@bookmyevent.ae",
       customer_phone: customerPhone || "9999999999",
       description: `Subscription Payment - Plan ${planId}`,
       metadata: {
-        providerId: providerId,
-        planId: planId,
+        providerId,
+        planId,
         type: "subscription",
       },
     });
@@ -357,11 +357,12 @@ exports.createSubscriptionPayment = async (req, res) => {
     // 2️⃣ Create Session → Payment Page URL
     const session = await juspay.orderSession.create({
       order_id: orderId,
-      amount: String(amountInPaise),
+      amount: amountInRupees,
       action: "paymentPage",
       payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
-      // return_url: "https://dashboard.bookmyevent.ae/payment-status",
-      returnUrl: `https://https://www.bookmyevent.ae/index.html?status=success&bookingId=${bookingId}`,
+
+      // ⭐ FIXED RETURN URL — No bookingId, no double https
+      return_url: `https://www.bookmyevent.ae/subscription-status.html?status=success&providerId=${providerId}`,
 
       currency: "INR",
       customer_id: providerId,
@@ -371,18 +372,18 @@ exports.createSubscriptionPayment = async (req, res) => {
 
     console.log("✅ Payment session created:", session);
 
-    // Return response with payment link
+    // Return response: payment link
     return res.json({
       success: true,
-      status: session.status,
-      id: session.id,
       order_id: session.order_id,
+      status: session.status,
       payment_links: {
-        web: session.payment_links?.web || session.payment_links,
+        web: session.payment_links?.web,
         expiry: session.payment_links?.expiry,
       },
       sdk_payload: session.sdk_payload,
     });
+
   } catch (error) {
     console.error("❌ Subscription Payment Error:", error);
     console.error("❌ Error details:", error.response?.data || error.message);
@@ -390,7 +391,6 @@ exports.createSubscriptionPayment = async (req, res) => {
     return res.status(500).json({
       success: false,
       error: error.response?.data || error.message,
-      details: error.toString(),
     });
   }
 };
