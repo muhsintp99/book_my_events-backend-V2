@@ -525,24 +525,20 @@ exports.getAllMakeupPackages = async (req, res) => {
 
     let query = {};
 
-    if (search && search.trim()) {
-      query.$text = { $search: search };
-    }
-
-    if (module && mongoose.Types.ObjectId.isValid(module)) {
-      query.module = module;
-    }
+    if (search && search.trim()) query.$text = { $search: search };
+    if (module && mongoose.Types.ObjectId.isValid(module)) query.module = module;
 
     const makeups = await Makeup.find(query)
-      .populate("module", "title images isActive")
-      .populate("categories", "title image")
-      .populate("provider", "firstName lastName email phone")
       .sort({ isTopPick: -1, createdAt: -1 });
+
+    const final = await Promise.all(
+      makeups.map(m => populateMakeup(m._id, req))
+    );
 
     res.json({
       success: true,
-      count: makeups.length,
-      data: makeups
+      count: final.length,
+      data: final
     });
 
   } catch (err) {
@@ -581,15 +577,16 @@ exports.getMakeupByProvider = async (req, res) => {
     }
 
     const makeups = await Makeup.find(query)
-      .populate("module", "title")
-      .populate("categories", "title image")
-      .populate("provider", "firstName lastName email phone")
       .sort({ createdAt: -1 });
+
+    const final = await Promise.all(
+      makeups.map(m => populateMakeup(m._id, req))
+    );
 
     res.json({
       success: true,
-      count: makeups.length,
-      data: makeups
+      count: final.length,
+      data: final
     });
 
   } catch (err) {
