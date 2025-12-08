@@ -505,75 +505,79 @@ exports.getVendorsForMakeupModule = async (req, res) => {
   try {
     const { moduleId } = req.params;
 
+    // ⭐ Support BOTH providerId AND providerid
+    const providerId =
+      req.query.providerId ||
+      req.query.providerid ||
+      null;
+
     if (!mongoose.Types.ObjectId.isValid(moduleId)) {
       return res.status(400).json({ success: false, message: "Invalid module ID" });
     }
 
-    // ⭐ FIND VENDORS FROM VendorProfile WHERE module MATCHES
-    const vendorProfiles = await VendorProfile.find({ module: moduleId })
+    let query = { module: moduleId };
+
+    // ⭐ Filter for ONE vendor when providerId is given
+    if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
+      query.user = providerId;
+    }
+
+    const vendorProfiles = await VendorProfile.find(query)
       .select("user logo coverImage storeName")
       .lean();
 
     if (!vendorProfiles.length) {
       return res.json({
         success: true,
-        message: "No vendors found for this module",
-        data: []
+        data: [],
+        message: "Vendor not found for this module"
       });
     }
 
-    // Extract user IDs
     const vendorIds = vendorProfiles.map(vp => vp.user);
 
-    // Get User details
-    const vendors = await User.find({ _id: { $in: vendorIds } })
+    const users = await User.find({ _id: { $in: vendorIds } })
       .select("firstName lastName email phone profilePhoto")
-      .populate("profile", "profilePhoto name mobileNumber");
-
-    // Create a map for quick lookup
-    const vendorProfileMap = {};
-    vendorProfiles.forEach(vp => {
-      const key = vp.user?.toString() || vp.user;
-      vendorProfileMap[key] = vp;
-    });
+      .lean();
 
     const baseUrl = `${req.protocol}://${req.get("host")}`;
 
-    const final = vendors.map(v => {
-      const obj = v.toObject();
-      const vendorProfile = vendorProfileMap[obj._id.toString()];
-
-      // Priority: VendorProfile.logo > VendorProfile.coverImage > Profile.profilePhoto > User.profilePhoto
-      if (vendorProfile?.logo) {
-        obj.profilePhoto = `${baseUrl}${vendorProfile.logo}`;
-      } else if (vendorProfile?.coverImage) {
-        obj.profilePhoto = `${baseUrl}${vendorProfile.coverImage}`;
-      } else if (obj.profile?.profilePhoto) {
-        obj.profilePhoto = obj.profile.profilePhoto.startsWith('http') 
-          ? obj.profile.profilePhoto 
-          : `${baseUrl}${obj.profile.profilePhoto}`;
-      } else if (obj.profilePhoto && !obj.profilePhoto.startsWith('http')) {
-        obj.profilePhoto = `${baseUrl}${obj.profilePhoto}`;
-      }
-
-      // Add vendor store info
-      obj.storeName = vendorProfile?.storeName || `${obj.firstName} ${obj.lastName}`;
-      obj.logo = vendorProfile?.logo ? `${baseUrl}${vendorProfile.logo}` : null;
-      obj.coverImage = vendorProfile?.coverImage ? `${baseUrl}${vendorProfile.coverImage}` : null;
-      obj.hasVendorProfile = !!vendorProfile;
-
-      return obj;
+    const final = users.map(u => {
+      const vp = vendorProfiles.find(v => v.user.toString() === u._id.toString());
+      return {
+        _id: u._id,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        email: u.email,
+        phone: u.phone,
+        profilePhoto: u.profilePhoto?.startsWith("http")
+          ? u.profilePhoto
+          : `${baseUrl}${u.profilePhoto || ""}`,
+        storeName: vp?.storeName || `${u.firstName} ${u.lastName}`,
+        logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
+        coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
+        hasVendorProfile: true
+      };
     });
 
-    res.json({
+    // ⭐ If providerId exists → return ONLY 1 vendor
+    if (providerId) {
+      return res.json({
+        success: true,
+        data: final[0] || null
+      });
+    }
+
+    // Otherwise return ALL vendors
+    return res.json({
       success: true,
       count: final.length,
       data: final
     });
 
-  } catch (err) {
-    console.error("Get Vendors Error:", err);
-    res.status(500).json({ success: false, message: err.message });
+  } catch (error) {
+    console.error("Get Vendors Error:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
