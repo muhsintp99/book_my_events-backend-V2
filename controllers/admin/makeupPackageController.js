@@ -35,12 +35,36 @@ const deleteFileIfExists = (filePath) => {
 
 // ---------------------- Helper: Populate Makeup ----------------------
 const populateMakeup = async (id) => {
-  return await Makeup.findById(id)
+  const baseUrl = "http://api.bookmyevent.ae";
+
+  let makeup = await Makeup.findById(id)
     .populate("module", "-__v")
     .populate("categories", "-__v")
-    .populate("provider", "firstName lastName email phone")
-    .populate("createdBy", "firstName lastName email phone");
+    .populate("provider", "firstName lastName email phone profilePhoto")
+    .lean(); // convert to plain object
+
+  if (!makeup) return null;
+
+  // Fetch VendorProfile linked to provider
+  const vendorProfile = await VendorProfile.findOne({ user: makeup.provider._id })
+    .select("storeName logo coverImage")
+    .lean();
+
+  if (vendorProfile) {
+    makeup.provider.storeName = vendorProfile.storeName;
+    makeup.provider.logo = vendorProfile.logo ? baseUrl + vendorProfile.logo : null;
+    makeup.provider.coverImage = vendorProfile.coverImage ? baseUrl + vendorProfile.coverImage : null;
+    makeup.provider.hasVendorProfile = true;
+  } else {
+    makeup.provider.storeName = makeup.provider.firstName + " " + makeup.provider.lastName;
+    makeup.provider.logo = makeup.provider.profilePhoto;
+    makeup.provider.coverImage = null;
+    makeup.provider.hasVendorProfile = false;
+  }
+
+  return makeup;
 };
+
 
 
 
