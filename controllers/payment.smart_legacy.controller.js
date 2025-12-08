@@ -76,8 +76,6 @@
 //   }
 // };
 
-
-
 // const crypto = require("crypto");
 // const Booking = require("../models/vendor/Booking");
 // const config = require("../config/smartgateway_config.json");
@@ -172,17 +170,15 @@
 //   }
 // };
 
-
 const { Juspay, APIError } = require("expresscheckout-nodejs");
 const Booking = require("../models/vendor/Booking");
 const config = require("../config/smartgateway_config.json");
-
 
 // Initialize SmartGateway with BASIC Authentication (API Key)
 const juspay = new Juspay({
   merchantId: config.MERCHANT_ID,
   baseUrl: config.BASE_URL,
-  apiKey: config.API_KEY
+  apiKey: config.API_KEY,
 });
 
 console.log("✅ Juspay SDK initialized with BASIC Auth");
@@ -195,9 +191,9 @@ console.log("   Base URL:", config.BASE_URL);
 exports.testConnection = async (req, res) => {
   try {
     const testOrderId = "test_order_" + Date.now();
-    
+
     console.log("🧪 Testing SDK with order:", testOrderId);
-    
+
     // Simple order creation test
     const orderResponse = await juspay.order.create({
       order_id: testOrderId,
@@ -206,7 +202,7 @@ exports.testConnection = async (req, res) => {
       customer_id: "test_customer_123",
       customer_email: "test@example.com",
       customer_phone: "9999999999",
-      description: "Test Order"
+      description: "Test Order",
     });
 
     console.log("✅ Test order created successfully:", orderResponse);
@@ -214,14 +210,13 @@ exports.testConnection = async (req, res) => {
     return res.json({
       success: true,
       message: "SDK is working correctly",
-      order: orderResponse
+      order: orderResponse,
     });
-
   } catch (error) {
     console.error("❌ SDK Test Failed:", error.response?.data || error.message);
     return res.status(500).json({
       success: false,
-      error: error.response?.data || error.message
+      error: error.response?.data || error.message,
     });
   }
 };
@@ -233,7 +228,9 @@ exports.createSmartGatewayPayment = async (req, res) => {
   try {
     const { bookingId } = req.body;
 
-    console.log("\n===================== PAYMENT DEBUG LOG =====================");
+    console.log(
+      "\n===================== PAYMENT DEBUG LOG ====================="
+    );
 
     // Fetch booking with venue populated
     const booking = await Booking.findById(bookingId)
@@ -241,7 +238,9 @@ exports.createSmartGatewayPayment = async (req, res) => {
       .populate("venueId");
 
     if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
     }
 
     // ⭐ GET ADVANCE FROM VENUE
@@ -252,7 +251,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
     if (advanceDeposit <= 0) {
       return res.status(400).json({
         success: false,
-        message: "Venue does not have an advance deposit amount"
+        message: "Venue does not have an advance deposit amount",
       });
     }
 
@@ -271,24 +270,24 @@ exports.createSmartGatewayPayment = async (req, res) => {
       customer_id: booking.userId._id.toString(),
       customer_email: booking.userId.email,
       customer_phone: booking.userId.mobile || "9999999999",
-      description: `Advance Payment ₹${amountInRupees}`
+      description: `Advance Payment ₹${amountInRupees}`,
     });
 
     // Create Session
     const session = await juspay.orderSession.create({
-      order_id: orderId,
-      amount: amountInRupees,
-      action: "paymentPage",
-      payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
-      returnUrl: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`,
-        merchant_redirect_url: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`,
-  redirect_after_payment: true,
+  order_id: orderId,
+  amount: amountInRupees,
+  customer_id: booking.userId._id,
+  customer_email: booking.userId.email,
+  customer_phone: booking.userId.mobile,
+  payment_page_client_id: "hdfcmaster",
+  action: "paymentPage",
+  return_url: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`,
+  description: `Advance Payment ${amountInRupees}`,
+  first_name: booking.userId.firstName,
+  last_name: booking.userId.lastName
+});
 
-      currency: "INR",
-      customer_id: booking.userId._id.toString(),
-      customer_email: booking.userId.email,
-      customer_phone: booking.userId.mobile || "9999999999"
-    });
 
     console.log("🎯 Payment Link:", session.payment_links?.web);
 
@@ -297,18 +296,16 @@ exports.createSmartGatewayPayment = async (req, res) => {
       order_id: orderId,
       advanceAmount: amountInRupees,
       payment_links: session.payment_links,
-      sdk_payload: session.sdk_payload
+      sdk_payload: session.sdk_payload,
     });
-
   } catch (error) {
     console.error("❌ Payment Error:", error.response?.data || error.message);
     return res.status(500).json({
       success: false,
-      error: error.response?.data || error.message
+      error: error.response?.data || error.message,
     });
   }
 };
-
 
 // Add this to your payment.smart_legacy.controller.js
 
@@ -317,26 +314,26 @@ exports.createSmartGatewayPayment = async (req, res) => {
  */
 exports.createSubscriptionPayment = async (req, res) => {
   try {
-    const { providerId, planId, amount, customerEmail, customerPhone } = req.body;
+    const { providerId, planId, amount, customerEmail, customerPhone } =
+      req.body;
 
     // Validate inputs
     if (!providerId || !planId || !amount) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields: providerId, planId, amount"
+        message: "Missing required fields: providerId, planId, amount",
       });
     }
 
     const orderId = "subscription_" + Date.now();
-    // const amountInPaise = Math.round(amount * 100); 
-    const amountInPaise = amount;  
-
+    // const amountInPaise = Math.round(amount * 100);
+    const amountInPaise = amount;
 
     console.log("📝 Creating subscription payment order:", {
       orderId,
-amount: String(amountInPaise),
+      amount: String(amountInPaise),
       providerId,
-      planId
+      planId,
     });
 
     // 1️⃣ Create Order
@@ -351,8 +348,8 @@ amount: String(amountInPaise),
       metadata: {
         providerId: providerId,
         planId: planId,
-        type: "subscription"
-      }
+        type: "subscription",
+      },
     });
 
     console.log("✅ Order created:", orderResponse);
@@ -369,7 +366,7 @@ amount: String(amountInPaise),
       currency: "INR",
       customer_id: providerId,
       customer_email: customerEmail || "provider@bookmyevent.ae",
-      customer_phone: customerPhone || "9999999999"
+      customer_phone: customerPhone || "9999999999",
     });
 
     console.log("✅ Payment session created:", session);
@@ -382,11 +379,10 @@ amount: String(amountInPaise),
       order_id: session.order_id,
       payment_links: {
         web: session.payment_links?.web || session.payment_links,
-        expiry: session.payment_links?.expiry
+        expiry: session.payment_links?.expiry,
       },
-      sdk_payload: session.sdk_payload
+      sdk_payload: session.sdk_payload,
     });
-
   } catch (error) {
     console.error("❌ Subscription Payment Error:", error);
     console.error("❌ Error details:", error.response?.data || error.message);
@@ -394,11 +390,10 @@ amount: String(amountInPaise),
     return res.status(500).json({
       success: false,
       error: error.response?.data || error.message,
-      details: error.toString()
+      details: error.toString(),
     });
   }
 };
-
 
 /**
  * HANDLE PAYMENT RESPONSE (S2S Order Status Check)
@@ -465,8 +460,6 @@ amount: String(amountInPaise),
 //   }
 // };
 
-
-
 exports.handleJuspayResponse = async (req, res) => {
   try {
     const { orderId, bookingId } = req.query;
@@ -474,7 +467,7 @@ exports.handleJuspayResponse = async (req, res) => {
     if (!orderId) {
       return res.status(400).json({
         success: false,
-        message: "orderId is required"
+        message: "orderId is required",
       });
     }
 
@@ -485,7 +478,8 @@ exports.handleJuspayResponse = async (req, res) => {
     let bookingStatus = "pending";
 
     if (status === "CHARGED") bookingStatus = "completed";
-    else if (["PENDING", "PENDING_VBV", "AUTHORIZING", "NEW"].includes(status)) bookingStatus = "pending";
+    else if (["PENDING", "PENDING_VBV", "AUTHORIZING", "NEW"].includes(status))
+      bookingStatus = "pending";
     else bookingStatus = "failed";
 
     // 🔥 Update booking in database
@@ -493,7 +487,7 @@ exports.handleJuspayResponse = async (req, res) => {
       await Booking.findByIdAndUpdate(bookingId, {
         paymentStatus: bookingStatus,
         paymentOrderId: orderId,
-        paidAmount: order.amount
+        paidAmount: order.amount,
       });
     }
 
@@ -502,13 +496,12 @@ exports.handleJuspayResponse = async (req, res) => {
       success: bookingStatus === "completed",
       orderId: order.order_id,
       amount: order.amount,
-      status: bookingStatus
+      status: bookingStatus,
     });
-
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Error checking payment status"
+      message: "Error checking payment status",
     });
   }
 };

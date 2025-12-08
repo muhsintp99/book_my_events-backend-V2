@@ -133,3 +133,41 @@ exports.resetPasswordEmail = (resetURL) => `
     <p>This link is valid for 10 minutes.</p>
   </div>
 `;
+
+exports.bookingConfirmationEmail = (booking) => `
+  <div style="font-family:Arial,sans-serif;line-height:1.6;color:#333">
+    <h2 style="color:#4CAF50;">🎉 Your Booking is Confirmed!</h2>
+
+    <p>Hi <strong>${booking.fullName}</strong>,</p>
+
+    <p>Your booking at <strong>BookMyEvent</strong> has been successfully <strong>CONFIRMED</strong>.</p>
+
+    <h3>📌 Booking Details</h3>
+
+    <p><strong>Booking ID:</strong> ${booking._id}</p>
+    <p><strong>Event Type:</strong> ${booking.eventType || "Corporate Conference"}</p>
+    <p><strong>Date:</strong> ${new Date(booking.bookingDate).toDateString()}</p>
+    <p><strong>Guests:</strong> ${booking.numberOfGuests}</p>
+    <p><strong>Final Price:</strong> ₹${booking.finalPrice}</p>
+
+    <h3>📅 Event Schedule</h3>
+
+    <p><strong>Setup Time:</strong> ${booking.setupTime || "9:00 AM - 10:00 AM"}</p>
+    <p><strong>Event Time:</strong> ${booking.eventTime || "10:00 AM - 6:00 PM"}</p>
+
+    <br/>
+
+    <p>
+      <a href="https://bookmyevent.ae/my-bookings"
+         style="background:#4CAF50;color:white;padding:10px 18px;
+                text-decoration:none;border-radius:6px;display:inline-block;">
+         View Booking
+      </a>
+    </p>
+
+    <br/>
+    <p>Thank you for choosing BookMyEvent!<br/>We are excited to host your event 🎊</p>
+
+    <p>Best Regards,<br/><strong>BookMyEvent Team</strong></p>
+  </div>
+`;

@@ -378,6 +378,8 @@ exports.deleteMakeupPackage = async (req, res) => {
 // };
 
 
+// ✅ FIXED VERSION - Query VendorProfile directly by module
+// ✅ FIXED VERSION - Query VendorProfile directly by module
 exports.getVendorsForMakeupModule = async (req, res) => {
   try {
     const { moduleId } = req.params;
@@ -386,9 +388,12 @@ exports.getVendorsForMakeupModule = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid module ID" });
     }
 
-    const vendorIds = await Makeup.distinct("provider", { module: moduleId });
+    // ⭐ FIND VENDORS FROM VendorProfile WHERE module MATCHES
+    const vendorProfiles = await VendorProfile.find({ module: moduleId })
+      .select("user logo coverImage storeName")
+      .lean();
 
-    if (!vendorIds.length) {
+    if (!vendorProfiles.length) {
       return res.json({
         success: true,
         message: "No vendors found for this module",
@@ -396,31 +401,15 @@ exports.getVendorsForMakeupModule = async (req, res) => {
       });
     }
 
-    // Get users with their Profile (virtual populate)
+    // Extract user IDs
+    const vendorIds = vendorProfiles.map(vp => vp.user);
+
+    // Get User details
     const vendors = await User.find({ _id: { $in: vendorIds } })
       .select("firstName lastName email phone profilePhoto")
       .populate("profile", "profilePhoto name mobileNumber");
 
-    // Get VendorProfile data - make sure the field name matches your schema
-    const vendorProfiles = await VendorProfile.find({ user: { $in: vendorIds } })
-      .select("user logo coverImage storeName")
-      .lean();
-
-    // DEBUG: Check if VendorProfiles exist at all in the collection
-    const totalVendorProfiles = await VendorProfile.countDocuments();
-    console.log("=== DEBUG INFO ===");
-    console.log("Total VendorProfiles in DB:", totalVendorProfiles);
-    console.log("Vendor IDs searching for:", vendorIds.map(id => id.toString()));
-    console.log("VendorProfiles found for these vendors:", vendorProfiles.length);
-    
-    // Also check what user field looks like in VendorProfile
-    if (totalVendorProfiles > 0) {
-      const sampleProfile = await VendorProfile.findOne().lean();
-      console.log("Sample VendorProfile user field:", sampleProfile?.user);
-      console.log("Sample VendorProfile user type:", typeof sampleProfile?.user);
-    }
-
-    // Create a map for quick lookup by user ID
+    // Create a map for quick lookup
     const vendorProfileMap = {};
     vendorProfiles.forEach(vp => {
       const key = vp.user?.toString() || vp.user;
@@ -450,8 +439,6 @@ exports.getVendorsForMakeupModule = async (req, res) => {
       obj.storeName = vendorProfile?.storeName || `${obj.firstName} ${obj.lastName}`;
       obj.logo = vendorProfile?.logo ? `${baseUrl}${vendorProfile.logo}` : null;
       obj.coverImage = vendorProfile?.coverImage ? `${baseUrl}${vendorProfile.coverImage}` : null;
-      
-      // Flag if VendorProfile exists
       obj.hasVendorProfile = !!vendorProfile;
 
       return obj;
@@ -468,7 +455,6 @@ exports.getVendorsForMakeupModule = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 
 exports.listMakeupVendors = async (req, res) => {
   try {

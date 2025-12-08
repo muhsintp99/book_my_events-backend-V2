@@ -106,40 +106,50 @@ const express = require("express");
 const router = express.Router();
 const ctrl = require("../../controllers/vendor/bookingController");
 
-// CREATE BOOKING
-router.post("/", ctrl.createBooking);
+/* ========================================================
+   FORCE TRIM URL AND PARAMS (Fix all trailing space issues)
+======================================================== */
+router.use((req, res, next) => {
+  req.url = req.url.trim();
+  Object.keys(req.params).forEach(key => {
+    req.params[key] = req.params[key]?.trim();
+  });
+  next();
+});
 
-// ⭐ GET ALL BOOKINGS (MUST COME FIRST)
+/* ========================================================
+   STATIC ROUTES — MUST ALWAYS COME FIRST
+======================================================== */
+router.get("/pending", ctrl.getPendingBookings);
+router.get("/accepted", ctrl.getAcceptedBookings);
+router.get("/completed", ctrl.getCompletedBookings);
+router.get("/rejected", ctrl.getRejectedBookings);
+
+/* ========================================================
+   CREATE + ALL BOOKINGS
+======================================================== */
+router.post("/", ctrl.createBooking);
 router.get("/", ctrl.getAllBookings);
 
-// GET BOOKINGS BY PROVIDER
+/* ========================================================
+   PROVIDER ROUTES
+======================================================== */
 router.get("/provider/:providerId", ctrl.getBookingsByProvider);
-
-// GET BOOKINGS BY PAYMENT STATUS
 router.get("/provider/:providerId/payment-status/:paymentStatus", ctrl.getBookingsByPaymentStatus);
-
-// GET UPCOMING BOOKINGS
 router.get("/provider/:providerId/upcoming", ctrl.getUpcomingBookings);
-
-// GET PAST BOOKINGS
 router.get("/provider/:providerId/past", ctrl.getPastBookings);
 
-// GET BOOKING DETAILS BY ID
-router.get("/:id", ctrl.getBookingById);
-
-// CHECK BOOKING TIMELINE
-router.get("/:id/timeline", ctrl.checkBookingTimeline);
-
-// ACCEPT BOOKING
+/* ========================================================
+   ACTION ROUTES (PATCH)
+======================================================== */
 router.patch("/:id/accept", ctrl.acceptBooking);
-
-// REJECT BOOKING
 router.patch("/:id/reject", ctrl.rejectBooking);
-
-// UPDATE PAYMENT STATUS
 router.patch("/:id/payment", ctrl.updatePaymentStatus);
-
-// ADD CHAT CONVERSATION
 router.patch("/:id/chat", ctrl.addChatConversation);
+
+/* ========================================================
+   DYNAMIC ROUTE — MUST BE LAST
+======================================================== */
+router.get("/:id", ctrl.getBookingById);
 
 module.exports = router;

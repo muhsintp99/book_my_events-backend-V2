@@ -1474,6 +1474,61 @@ async function calculateMakeupPricing(makeup, bookingDate, timeSlot) {
   };
 }
 
+
+exports.getPendingBookings = async (req, res) => {
+  try {
+    const bookings = await Booking.find({
+      $or: [
+        { status: "Pending" },
+        { paymentStatus: "pending" }
+      ]
+    }).sort({ createdAt: -1 });
+
+    res.json({ success: true, bookings });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
+exports.getAcceptedBookings = async (req, res) => {
+  try {
+    const bookings = await Booking.find({
+      status: "Accepted"
+    }).sort({ createdAt: -1 });
+
+    res.json({ success: true, bookings });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getCompletedBookings = async (req, res) => {
+  try {
+    const bookings = await Booking.find({
+      paymentStatus: "completed"
+    }).sort({ createdAt: -1 });
+
+    res.json({ success: true, bookings });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
+exports.getRejectedBookings = async (req, res) => {
+  try {
+    const bookings = await Booking.find({
+      status: { $in: ["Rejected", "Cancelled"] }
+    }).sort({ createdAt: -1 });
+
+    res.json({ success: true, bookings });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+  
+
 // =======================================================
 // GET BOOKINGS BY PROVIDER
 // =======================================================
