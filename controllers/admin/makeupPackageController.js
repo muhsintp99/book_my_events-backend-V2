@@ -421,6 +421,82 @@ exports.deleteMakeupPackage = async (req, res) => {
 //     res.status(500).json({ success: false, message: err.message });
 //   }
 // };
+exports.getVendorsForMakeupModule = async (req, res) => {
+  try {
+    const { moduleId } = req.params;
+    const { providerId } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(moduleId)) {
+      return res.status(400).json({ success: false, message: "Invalid module ID" });
+    }
+
+    let vendorProfilesQuery = { module: moduleId };
+
+    // ⭐ If providerId is given → filter a single vendor
+    if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
+      vendorProfilesQuery.user = providerId;
+    }
+
+    const vendorProfiles = await VendorProfile.find(vendorProfilesQuery)
+      .select("user logo coverImage storeName")
+      .lean();
+
+    if (!vendorProfiles.length) {
+      return res.json({
+        success: true,
+        message: providerId
+          ? "Vendor not found for this module"
+          : "No vendors found for this module",
+        data: []
+      });
+    }
+
+    const vendorIds = vendorProfiles.map(vp => vp.user);
+
+    const vendors = await User.find({ _id: { $in: vendorIds } })
+      .select("firstName lastName email phone profilePhoto")
+      .populate("profile", "profilePhoto");
+
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+    const final = vendors.map(v => {
+      const obj = v.toObject();
+      const vp = vendorProfiles.find(p => p.user.toString() === obj._id.toString());
+
+      obj.storeName = vp?.storeName || `${obj.firstName} ${obj.lastName}`;
+      obj.logo = vp?.logo ? `${baseUrl}${vp.logo}` : null;
+      obj.coverImage = vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null;
+
+      // Profile photo fallback logic
+      if (obj.profilePhoto && !obj.profilePhoto.startsWith("http")) {
+        obj.profilePhoto = `${baseUrl}${obj.profilePhoto}`;
+      }
+
+      obj.hasVendorProfile = !!vp;
+
+      return obj;
+    });
+
+    // ⭐ If providerId was passed → return only one
+    if (providerId) {
+      return res.json({
+        success: true,
+        data: final[0] || null
+      });
+    }
+
+    // ⭐ Otherwise return all
+    res.json({
+      success: true,
+      count: final.length,
+      data: final
+    });
+
+  } catch (err) {
+    console.error("Get Vendors Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 
 // ✅ FIXED VERSION - Query VendorProfile directly by module
