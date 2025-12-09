@@ -979,6 +979,7 @@ const Package = require("../../models/admin/Package");
 const Profile = require("../../models/vendor/Profile");
 const Coupon = require("../../models/admin/coupons");
 const Module = require("../../models/admin/module");
+const Photography = require("../../models/vendor/PhotographyPackage");
 
 const AUTH_API_URL = "https://api.bookmyevent.ae/api/auth/login";
 
@@ -1026,6 +1027,7 @@ exports.createBooking = async (req, res) => {
       makeupId,
       packageId,
       numberOfGuests,
+      photographyId,
       bookingDate,
       timeSlot,
       bookingType,
@@ -1137,6 +1139,33 @@ exports.createBooking = async (req, res) => {
         );
         break;
 
+
+
+        case "Photography":
+       if (!photographyId) {
+          return res.status(400).json({
+            success: false,
+            message: "photographyId is required for Photography module",
+          });
+        }
+      serviceProvider = await Photography.findById(req.body.photographyId).lean();
+      if (!serviceProvider) {
+        return res.status(404).json({
+          success: false,
+          message: "Photography service not found",
+        });
+      }
+
+     pricingData = {
+  basePrice: Number(serviceProvider.price) || 0,
+  perDayPrice: 0,
+  perHourCharge: 0,
+  perPersonCharge: 0,
+  discount: 0
+};
+
+        break;
+
       // Add more module types as needed
       default:
         return res.status(400).json({
@@ -1216,28 +1245,24 @@ exports.createBooking = async (req, res) => {
     // -------------------------
     // PACKAGE PRICING
     // -------------------------
-    let pkg = null;
+      let pkg = null;
     let packagePrice = 0;
 
-    // -------------------------
-    // MAKEUP / MAKEUP ARTIST PRICING
-    // -------------------------
     if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
-      pkg = serviceProvider; // Makeup document contains pricing fields
-
-      // Safely pick correct price
+      // Makeup uses service provider pricing directly
+      pkg = serviceProvider;
       packagePrice =
         Number(pkg.finalPrice) ||
         Number(pkg.offerPrice) ||
         Number(pkg.basePrice) ||
         0;
       if (packagePrice < 0) packagePrice = 0;
-    }
-    // -------------------------
-    // VENUE / OTHER MODULE PACKAGE PRICING
-    // -------------------------
-    else {
-      // If no packageId passed → treat packagePrice as 0
+   } else if (moduleType === "Photography") {
+  pkg = serviceProvider;  
+  packagePrice = Number(pkg.price) || 0;
+
+    } else {
+      // Venues and other modules use separate package
       if (!packageId) {
         pkg = null;
         packagePrice = 0;
@@ -1251,7 +1276,6 @@ exports.createBooking = async (req, res) => {
           });
         }
 
-        // Venues multiply price by numberOfGuests
         if (moduleType === "Venues") {
           packagePrice = Number(pkg.price || 0) * Number(numberOfGuests || 0);
         } else {
@@ -1262,15 +1286,16 @@ exports.createBooking = async (req, res) => {
     // -------------------------
     // CALCULATE TOTAL PRICING
     // -------------------------
-    let totalBeforeDiscount = pricingData.basePrice + packagePrice;
+   let totalBeforeDiscount = 0;
 
-    if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
-      // Only package price should count for makeup modules
+    if (moduleType === "Makeup" || moduleType === "Makeup Artist" || moduleType === "Photography") {
+      // For Makeup and Photography, only package price counts
       totalBeforeDiscount = packagePrice;
     } else {
-      // Venues and other modules
+      // For Venues and others, combine base + package
       totalBeforeDiscount = pricingData.basePrice + packagePrice;
     }
+
     const discountValue = pricingData.discount || 0;
     let afterDiscount = totalBeforeDiscount - discountValue;
     if (afterDiscount < 0) afterDiscount = 0;
@@ -1337,13 +1362,13 @@ exports.createBooking = async (req, res) => {
     // CREATE BOOKING DOCUMENT
     // -------------------------
     const bookingData = {
-      moduleId,
+       moduleId,
       moduleType,
-      // ⭐ KEY FIX: Only set packageId for non-makeup modules
       packageId:
-        moduleType === "Makeup" || moduleType === "Makeup Artist"
-          ? null
-          : packageId,
+  moduleType === "Makeup" || moduleType === "Makeup Artist"
+    ? null
+    : packageId,
+
       providerId: serviceProvider.provider || serviceProvider?.createdBy,
       userId: user._id,
       bookingDate,
@@ -1379,6 +1404,8 @@ exports.createBooking = async (req, res) => {
       bookingData.numberOfGuests = numberOfGuests;
     } else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
       bookingData.makeupId = makeupId;
+    } else if (moduleType === "Photography") {
+      bookingData.photographyId = photographyId; // ✅ Store photographyId
     }
 
     const booking = await Booking.create(bookingData);
@@ -1386,40 +1413,46 @@ exports.createBooking = async (req, res) => {
     // Populate the booking
     let populateFields = ["userId", "moduleId"];
 
-// ⭐ KEY FIX: Only populate packageId for non-makeup modules
-if (moduleType === "Venues") {
-  populateFields.push("venueId");
-  populateFields.push("packageId");
-} else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+    // ⭐ KEY FIX: Only populate packageId for non-makeup modules
+    if (moduleType === "Venues") {
+      populateFields.push("venueId");
+      populateFields.push("packageId");
+    } else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
   populateFields.push("makeupId");
-} else {
-  // Other modules
-  if (packageId) populateFields.push("packageId");
 }
 
-const populated = await Booking.findById(booking._id)
-  .populate(populateFields)
-  .select(
-    "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount +discountValue +couponDiscountValue"
-  )
-  .lean();
+else if (moduleType === "Photography") {
+  populateFields.push("photographyId");
 
-// Add timeline info
-const timeline = calculateTimeline(booking.bookingDate);
 
-// ⭐ ENHANCED RESPONSE: Include makeup package details
-return res.status(201).json({
-  success: true,
-  message: "Booking created successfully",
-  data: {
-    ...populated,
-    timeline,
-    pricing: {
-      packagePrice,
-      finalPrice,
-      advanceAmount,
-      remainingAmount,
-    },
+    } else {
+      // Other modules
+      if (packageId) populateFields.push("packageId");
+    }
+
+    const populated = await Booking.findById(booking._id)
+      .populate(populateFields)
+      .select(
+        "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount +discountValue +couponDiscountValue"
+      )
+      .lean();
+
+    // Add timeline info
+    const timeline = calculateTimeline(booking.bookingDate);
+
+    // ⭐ ENHANCED RESPONSE: Include makeup package details
+    return res.status(201).json({
+      success: true,
+      message: "Booking created successfully",
+      data: {
+        ...populated,
+        timeline,
+        pricing: {
+          packagePrice,
+          finalPrice,
+          advanceAmount,
+          remainingAmount,
+        },
       },
       token,
     });

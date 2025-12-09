@@ -83,6 +83,15 @@ const bookingSchema = new mongoose.Schema(
         return this.moduleType === "Makeup";
       }
     },
+    photographyId: { 
+  type: mongoose.Schema.Types.ObjectId, 
+  ref: "Photography",
+  required: function() {
+    return this.moduleType === "Photography";
+  },
+  default: null
+},
+
     // Add more module-specific IDs as needed
     // photographyId: { type: mongoose.Schema.Types.ObjectId, ref: "Photography" },
     // cateringId: { type: mongoose.Schema.Types.ObjectId, ref: "Catering" },

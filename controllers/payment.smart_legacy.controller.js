@@ -235,7 +235,8 @@ exports.createSmartGatewayPayment = async (req, res) => {
       .populate("userId")
       .populate("venueId")
       .populate("makeupId")
-      .populate("moduleId");
+      .populate("moduleId")
+      .populate("photographyId") 
 
     if (!booking) {
       return res.status(404).json({
@@ -257,20 +258,23 @@ exports.createSmartGatewayPayment = async (req, res) => {
     // -----------------------------
     // 2️⃣ FALLBACK LOGIC (for old bookings that don't have advanceAmount)
     // -----------------------------
-    if (advanceAmount <= 0) {
-      console.log("⚠️ advanceAmount missing — applying fallback logic");
+   if (advanceAmount <= 0) {
+  console.log("⚠️ advanceAmount missing — applying fallback logic");
 
-      if (moduleType === "Venues") {
-        advanceAmount = Number(booking.venueId?.advanceDeposit) || 0;
-      } 
-      else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
-        advanceAmount = Number(booking.makeupId?.advanceBookingAmount) || 0;
-      } 
-      else {
-        // Any other module that uses advanceBookingAmount
-        advanceAmount = Number(booking.serviceProvider?.advanceBookingAmount) || 0;
-      }
-    }
+  if (moduleType === "Venues") {
+    advanceAmount = Number(booking.venueId?.advanceDeposit) || 0;
+  } 
+  else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+    advanceAmount = Number(booking.makeupId?.advanceBookingAmount) || 0;
+  }
+  else if (moduleType === "Photography") {
+advanceAmount = Number(booking.photographyId?.advanceBookingAmount || 0);
+  }
+  else {
+    advanceAmount = Number(booking.serviceProvider?.advanceBookingAmount) || 0;
+  }
+}
+
 
     console.log("✅ Final Computed Advance Amount:", advanceAmount);
 
