@@ -369,17 +369,6 @@
 //   }
 // };
 
-
-
-
-
-
-
-
-
-
-
-
 // controllers/vendor/unifiedBookingController.js
 // controllers/vendor/unifiedBookingController.js
 // controllers/vendor/unifiedBookingController.js
@@ -443,9 +432,9 @@
 //     // Get module information
 //     const moduleData = await Module.findById(moduleId);
 //     if (!moduleData) {
-//       return res.status(400).json({ 
-//         success: false, 
-//         message: "Invalid moduleId" 
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid moduleId"
 //       });
 //     }
 
@@ -458,53 +447,53 @@
 //     switch (moduleType) {
 //       case "Venues":
 //         if (!venueId) {
-//           return res.status(400).json({ 
-//             success: false, 
-//             message: "venueId is required for Venues module" 
+//           return res.status(400).json({
+//             success: false,
+//             message: "venueId is required for Venues module"
 //           });
 //         }
 //         if (!numberOfGuests) {
-//           return res.status(400).json({ 
-//             success: false, 
-//             message: "numberOfGuests is required for Venues module" 
+//           return res.status(400).json({
+//             success: false,
+//             message: "numberOfGuests is required for Venues module"
 //           });
 //         }
 
 //         serviceProvider = await Venue.findById(venueId).lean();
 //         if (!serviceProvider) {
-//           return res.status(404).json({ 
-//             success: false, 
-//             message: "Venue not found" 
+//           return res.status(404).json({
+//             success: false,
+//             message: "Venue not found"
 //           });
 //         }
 
 //         pricingData = await calculateVenuePricing(
-//           serviceProvider, 
-//           bookingDate, 
-//           timeSlot, 
+//           serviceProvider,
+//           bookingDate,
+//           timeSlot,
 //           numberOfGuests
 //         );
 //         break;
 
 //       case "Makeup":
 //         if (!makeupId) {
-//           return res.status(400).json({ 
-//             success: false, 
-//             message: "makeupId is required for Makeup module" 
+//           return res.status(400).json({
+//             success: false,
+//             message: "makeupId is required for Makeup module"
 //           });
 //         }
 
 //         serviceProvider = await Makeup.findById(makeupId).lean();
 //         if (!serviceProvider) {
-//           return res.status(404).json({ 
-//             success: false, 
-//             message: "Makeup service not found" 
+//           return res.status(404).json({
+//             success: false,
+//             message: "Makeup service not found"
 //           });
 //         }
 
 //         pricingData = await calculateMakeupPricing(
-//           serviceProvider, 
-//           bookingDate, 
+//           serviceProvider,
+//           bookingDate,
 //           timeSlot
 //         );
 //         break;
@@ -548,9 +537,9 @@
 
 //       // Get auth token
 //       try {
-//         const resp = await axios.post(AUTH_API_URL, { 
-//           email: emailAddress, 
-//           password: "123456" 
+//         const resp = await axios.post(AUTH_API_URL, {
+//           email: emailAddress,
+//           password: "123456"
 //         });
 //         token = resp?.data?.token;
 //       } catch (error) {
@@ -561,17 +550,17 @@
 
 //     } else if (bookingType === "Indirect") {
 //       if (!userId) {
-//         return res.status(400).json({ 
-//           success: false, 
-//           message: "userId is required for Indirect booking" 
+//         return res.status(400).json({
+//           success: false,
+//           message: "userId is required for Indirect booking"
 //         });
 //       }
 
 //       user = await User.findById(userId);
 //       if (!user) {
-//         return res.status(404).json({ 
-//           success: false, 
-//           message: "User not found" 
+//         return res.status(404).json({
+//           success: false,
+//           message: "User not found"
 //         });
 //       }
 
@@ -599,13 +588,13 @@
 //       // For other modules (Venues, etc.), use the Package model
 //       pkg = await Package.findById(packageId).lean();
 //       if (!pkg) {
-//         return res.status(404).json({ 
-//           success: false, 
-//           message: `Package not found with ID: ${packageId}` 
+//         return res.status(404).json({
+//           success: false,
+//           message: `Package not found with ID: ${packageId}`
 //         });
 //       }
-//       packagePrice = moduleType === "Venues" 
-//         ? pkg.price * numberOfGuests 
+//       packagePrice = moduleType === "Venues"
+//         ? pkg.price * numberOfGuests
 //         : pkg.price;
 //     }
 
@@ -695,9 +684,9 @@
 
 //   } catch (error) {
 //     console.error("Create Booking Error:", error);
-//     res.status(500).json({ 
-//       success: false, 
-//       message: error.message 
+//     res.status(500).json({
+//       success: false,
+//       message: error.message
 //     });
 //   }
 // };
@@ -720,8 +709,8 @@
 //   const perDayPrice = priceData.perDay || 0;
 //   const perPerson = priceData.perPerson || 0;
 
-//   const basePrice = perDayPrice > 0 
-//     ? perDayPrice 
+//   const basePrice = perDayPrice > 0
+//     ? perDayPrice
 //     : perPerson * numberOfGuests;
 
 //   const discount = venue.discount?.nonAc || 0;
@@ -782,9 +771,9 @@
 //       .populate("moduleId");
 
 //     if (!booking) {
-//       return res.status(404).json({ 
-//         success: false, 
-//         message: "Booking not found" 
+//       return res.status(404).json({
+//         success: false,
+//         message: "Booking not found"
 //       });
 //     }
 
@@ -857,21 +846,21 @@
 // exports.acceptBooking = async (req, res) => {
 //   try {
 //     const booking = await Booking.findById(req.params.id);
-    
+
 //     if (!booking) {
-//       return res.status(404).json({ 
-//         success: false, 
-//         message: "Booking not found" 
+//       return res.status(404).json({
+//         success: false,
+//         message: "Booking not found"
 //       });
 //     }
 
 //     booking.status = "Accepted";
 //     await booking.save();
 
-//     res.json({ 
-//       success: true, 
-//       message: "Booking accepted", 
-//       data: booking 
+//     res.json({
+//       success: true,
+//       message: "Booking accepted",
+//       data: booking
 //     });
 
 //   } catch (error) {
@@ -886,21 +875,21 @@
 // exports.rejectBooking = async (req, res) => {
 //   try {
 //     const booking = await Booking.findById(req.params.id);
-    
+
 //     if (!booking) {
-//       return res.status(404).json({ 
-//         success: false, 
-//         message: "Booking not found" 
+//       return res.status(404).json({
+//         success: false,
+//         message: "Booking not found"
 //       });
 //     }
 
 //     booking.status = "Rejected";
 //     await booking.save();
 
-//     res.json({ 
-//       success: true, 
-//       message: "Booking rejected", 
-//       data: booking 
+//     res.json({
+//       success: true,
+//       message: "Booking rejected",
+//       data: booking
 //     });
 
 //   } catch (error) {
@@ -915,30 +904,30 @@
 // exports.updatePaymentStatus = async (req, res) => {
 //   try {
 //     const { paymentStatus } = req.body;
-    
+
 //     if (!["Advance", "Pending", "Paid"].includes(paymentStatus)) {
-//       return res.status(400).json({ 
-//         success: false, 
-//         message: "Invalid payment status" 
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid payment status"
 //       });
 //     }
 
 //     const booking = await Booking.findById(req.params.id);
-    
+
 //     if (!booking) {
-//       return res.status(404).json({ 
-//         success: false, 
-//         message: "Booking not found" 
+//       return res.status(404).json({
+//         success: false,
+//         message: "Booking not found"
 //       });
 //     }
 
 //     booking.paymentStatus = paymentStatus;
 //     await booking.save();
 
-//     res.json({ 
-//       success: true, 
-//       message: "Payment status updated", 
-//       data: booking 
+//     res.json({
+//       success: true,
+//       message: "Payment status updated",
+//       data: booking
 //     });
 
 //   } catch (error) {
@@ -955,21 +944,21 @@
 //     const { conversationId } = req.body;
 
 //     const booking = await Booking.findById(req.params.id);
-    
+
 //     if (!booking) {
-//       return res.status(404).json({ 
-//         success: false, 
-//         message: "Booking not found" 
+//       return res.status(404).json({
+//         success: false,
+//         message: "Booking not found"
 //       });
 //     }
 
 //     booking.conversationId = conversationId;
 //     await booking.save();
 
-//     res.json({ 
-//       success: true, 
-//       message: "Chat conversation updated", 
-//       data: booking 
+//     res.json({
+//       success: true,
+//       message: "Chat conversation updated",
+//       data: booking
 //     });
 
 //   } catch (error) {
@@ -977,8 +966,6 @@
 //     res.status(500).json({ success: false, message: error.message });
 //   }
 // };
-
-
 
 // controllers/vendor/unifiedBookingController.js
 // controllers/vendor/unifiedBookingController.js
@@ -1001,7 +988,7 @@ const AUTH_API_URL = "https://api.bookmyevent.ae/api/auth/login";
 function calculateTimeline(bookingDate) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   const bookingDateOnly = new Date(bookingDate);
   bookingDateOnly.setHours(0, 0, 0, 0);
 
@@ -1009,20 +996,22 @@ function calculateTimeline(bookingDate) {
   const isPast = bookingDateOnly < today;
   const isToday = bookingDateOnly.getTime() === today.getTime();
 
-  const daysDifference = Math.ceil((bookingDateOnly - today) / (1000 * 60 * 60 * 24));
+  const daysDifference = Math.ceil(
+    (bookingDateOnly - today) / (1000 * 60 * 60 * 24)
+  );
 
   return {
-    status: isToday ? "Today" : (isUpcoming ? "Upcoming" : "Past"),
+    status: isToday ? "Today" : isUpcoming ? "Upcoming" : "Past",
     isUpcoming,
     isPast,
     isToday,
     daysUntil: isUpcoming && !isToday ? daysDifference : null,
     daysAgo: isPast ? Math.abs(daysDifference) : null,
-    message: isToday 
-      ? "This booking is scheduled for TODAY!" 
-      : isUpcoming 
-      ? `This booking is ${daysDifference} day(s) away` 
-      : `This booking was ${Math.abs(daysDifference)} day(s) ago`
+    message: isToday
+      ? "This booking is scheduled for TODAY!"
+      : isUpcoming
+      ? `This booking is ${daysDifference} day(s) away`
+      : `This booking was ${Math.abs(daysDifference)} day(s) ago`,
   };
 }
 
@@ -1046,7 +1035,7 @@ exports.createBooking = async (req, res) => {
       contactNumber,
       emailAddress,
       address,
-      paymentType // NEW: Payment method
+      paymentType, // NEW: Payment method
     } = req.body;
 
     // Validate common required fields
@@ -1057,19 +1046,18 @@ exports.createBooking = async (req, res) => {
     //   });
     // }
     if (!moduleId || !bookingDate) {
-  return res.status(400).json({
-    success: false,
-    message: "moduleId and bookingDate are required"
-  });
-}
-
+      return res.status(400).json({
+        success: false,
+        message: "moduleId and bookingDate are required",
+      });
+    }
 
     // Validate MongoDB ObjectId format
-    const mongoose = require('mongoose');
+    const mongoose = require("mongoose");
     if (!mongoose.Types.ObjectId.isValid(moduleId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid moduleId format"
+        message: "Invalid moduleId format",
       });
     }
     // if (!mongoose.Types.ObjectId.isValid(packageId)) {
@@ -1082,9 +1070,9 @@ exports.createBooking = async (req, res) => {
     // Get module information
     const moduleData = await Module.findById(moduleId);
     if (!moduleData) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid moduleId" 
+      return res.status(400).json({
+        success: false,
+        message: "Invalid moduleId",
       });
     }
 
@@ -1097,54 +1085,54 @@ exports.createBooking = async (req, res) => {
     switch (moduleType) {
       case "Venues":
         if (!venueId) {
-          return res.status(400).json({ 
-            success: false, 
-            message: "venueId is required for Venues module" 
+          return res.status(400).json({
+            success: false,
+            message: "venueId is required for Venues module",
           });
         }
         if (!numberOfGuests) {
-          return res.status(400).json({ 
-            success: false, 
-            message: "numberOfGuests is required for Venues module" 
+          return res.status(400).json({
+            success: false,
+            message: "numberOfGuests is required for Venues module",
           });
         }
 
         serviceProvider = await Venue.findById(venueId).lean();
         if (!serviceProvider) {
-          return res.status(404).json({ 
-            success: false, 
-            message: "Venue not found" 
+          return res.status(404).json({
+            success: false,
+            message: "Venue not found",
           });
         }
 
         pricingData = await calculateVenuePricing(
-          serviceProvider, 
-          bookingDate, 
-          timeSlot, 
+          serviceProvider,
+          bookingDate,
+          timeSlot,
           numberOfGuests
         );
         break;
 
-case "Makeup":
-case "Makeup Artist":
+      case "Makeup":
+      case "Makeup Artist":
         if (!makeupId) {
-          return res.status(400).json({ 
-            success: false, 
-            message: "makeupId is required for Makeup module" 
+          return res.status(400).json({
+            success: false,
+            message: "makeupId is required for Makeup module",
           });
         }
 
         serviceProvider = await Makeup.findById(makeupId).lean();
         if (!serviceProvider) {
-          return res.status(404).json({ 
-            success: false, 
-            message: "Makeup service not found" 
+          return res.status(404).json({
+            success: false,
+            message: "Makeup service not found",
           });
         }
 
         pricingData = await calculateMakeupPricing(
-          serviceProvider, 
-          bookingDate, 
+          serviceProvider,
+          bookingDate,
           timeSlot
         );
         break;
@@ -1153,7 +1141,7 @@ case "Makeup Artist":
       default:
         return res.status(400).json({
           success: false,
-          message: `Module type "${moduleType}" is not supported yet`
+          message: `Module type "${moduleType}" is not supported yet`,
         });
     }
 
@@ -1168,7 +1156,8 @@ case "Makeup Artist":
       if (!fullName || !contactNumber || !emailAddress || !address) {
         return res.status(400).json({
           success: false,
-          message: "fullName, contactNumber, emailAddress, and address are required for Direct booking"
+          message:
+            "fullName, contactNumber, emailAddress, and address are required for Direct booking",
         });
       }
 
@@ -1182,15 +1171,15 @@ case "Makeup Artist":
           lastName,
           email: emailAddress,
           password: "123456",
-          userId: "USR-" + Date.now()
+          userId: "USR-" + Date.now(),
         });
       }
 
       // Get auth token
       try {
-        const resp = await axios.post(AUTH_API_URL, { 
-          email: emailAddress, 
-          password: "123456" 
+        const resp = await axios.post(AUTH_API_URL, {
+          email: emailAddress,
+          password: "123456",
         });
         token = resp?.data?.token;
       } catch (error) {
@@ -1198,20 +1187,19 @@ case "Makeup Artist":
       }
 
       finalUserDetails = { fullName, contactNumber, emailAddress, address };
-
     } else if (bookingType === "Indirect") {
       if (!userId) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "userId is required for Indirect booking" 
+        return res.status(400).json({
+          success: false,
+          message: "userId is required for Indirect booking",
         });
       }
 
       user = await User.findById(userId);
       if (!user) {
-        return res.status(404).json({ 
-          success: false, 
-          message: "User not found" 
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
         });
       }
 
@@ -1221,7 +1209,7 @@ case "Makeup Artist":
         fullName: `${user.firstName} ${user.lastName || ""}`.trim(),
         contactNumber: profile?.mobileNumber || "N/A",
         emailAddress: user.email,
-        address: profile?.address || "N/A"
+        address: profile?.address || "N/A",
       };
     }
 
@@ -1231,31 +1219,44 @@ case "Makeup Artist":
     let pkg = null;
     let packagePrice = 0;
 
-    if (moduleType === "Makeup") {
-      // For makeup, the package IS the makeup service itself
-      pkg = serviceProvider; // The makeup object already has basePrice, finalPrice, etc.
-      packagePrice = pkg.finalPrice || pkg.basePrice || 0;
-    } else {
-      // For other modules (Venues, etc.), use the Package model
-      pkg = await Package.findById(packageId).lean();
-      // If venue has no packages, skip package pricing
-if (!packageId) {
-  pkg = null;
-  packagePrice = 0;
-} else {
-  pkg = await Package.findById(packageId).lean();
-  if (!pkg) {
-    return res.status(404).json({
-      success: false,
-      message: `Package not found`
-    });
-  }
-  packagePrice = moduleType === "Venues"
-    ? pkg.price * numberOfGuests
-    : pkg.price;
-}
+    // -------------------------
+    // MAKEUP / MAKEUP ARTIST PRICING
+    // -------------------------
+    if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+      pkg = serviceProvider; // Makeup document contains pricing fields
 
-     
+      // Safely pick correct price
+      packagePrice =
+        Number(pkg.finalPrice) ||
+        Number(pkg.offerPrice) ||
+        Number(pkg.basePrice) ||
+        0;
+    }
+    // -------------------------
+    // VENUE / OTHER MODULE PACKAGE PRICING
+    // -------------------------
+    else {
+      // If no packageId passed → treat packagePrice as 0
+      if (!packageId) {
+        pkg = null;
+        packagePrice = 0;
+      } else {
+        pkg = await Package.findById(packageId).lean();
+
+        if (!pkg) {
+          return res.status(404).json({
+            success: false,
+            message: "Package not found",
+          });
+        }
+
+        // Venues multiply price by numberOfGuests
+        if (moduleType === "Venues") {
+          packagePrice = Number(pkg.price || 0) * Number(numberOfGuests || 0);
+        } else {
+          packagePrice = Number(pkg.price || 0);
+        }
+      }
     }
 
     // -------------------------
@@ -1263,6 +1264,13 @@ if (!packageId) {
     // -------------------------
     let totalBeforeDiscount = pricingData.basePrice + packagePrice;
 
+    if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+  // Only package price should count for makeup modules
+  totalBeforeDiscount = packagePrice;
+} else {
+  // Venues and other modules
+  totalBeforeDiscount = pricingData.basePrice + packagePrice;
+}
     const discountValue = pricingData.discount || 0;
     let afterDiscount = totalBeforeDiscount - discountValue;
     if (afterDiscount < 0) afterDiscount = 0;
@@ -1283,6 +1291,22 @@ if (!packageId) {
     }
 
     const finalPrice = afterDiscount - couponDiscountValue;
+
+    // -------------------------
+// ADVANCE BOOKING (Makeup Only)
+// -------------------------
+let advanceAmount = 0;
+let remainingAmount = finalPrice;
+
+if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+  const makeupAdvance = Number(serviceProvider.advanceBookingAmount) || 0;
+
+  advanceAmount = makeupAdvance;
+  remainingAmount = finalPrice - advanceAmount;
+
+  if (remainingAmount < 0) remainingAmount = 0;
+}
+
 
     // -------------------------
     // CREATE BOOKING DOCUMENT
@@ -1314,8 +1338,11 @@ if (!packageId) {
       discountType: discountValue > 0 ? "flat" : "none",
       couponDiscountValue,
       finalPrice,
+      advanceAmount,
+remainingAmount,
 
-      paymentType: paymentType || null // Add payment type
+
+      paymentType: paymentType || null, // Add payment type
     };
 
     // Add module-specific fields
@@ -1335,7 +1362,9 @@ if (!packageId) {
 
     const populated = await Booking.findById(booking._id)
       .populate(populateFields)
-      .select('+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount +discountValue +couponDiscountValue')
+      .select(
+        "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount +discountValue +couponDiscountValue"
+      )
       .lean();
 
     // Add timeline info
@@ -1346,24 +1375,24 @@ if (!packageId) {
       message: "Booking created successfully",
       data: {
         ...populated,
-        timeline
+        timeline,
+         pricing: {
+    packagePrice,
+    finalPrice,
+    advanceAmount,
+    remainingAmount
+  }
       },
-      token
+      token,
     });
-
   } catch (error) {
     console.error("Create Booking Error:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
+    res.status(500).json({
+      success: false,
+      message: error.message,
     });
   }
 };
-
-
-
-
-
 
 exports.getAllBookings = async (req, res) => {
   try {
@@ -1374,13 +1403,14 @@ exports.getAllBookings = async (req, res) => {
   }
 };
 
-
 exports.getBookingById = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id).populate("userId");
 
     if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
     }
 
     return res.json({ success: true, booking });
@@ -1388,11 +1418,10 @@ exports.getBookingById = async (req, res) => {
     return res.status(400).json({
       success: false,
       message: "Invalid booking ID",
-      error: err.message
+      error: err.message,
     });
   }
 };
-
 
 // ⭐ GET BOOKINGS BY PAYMENT STATUS FOR A PROVIDER
 exports.getBookingsByPaymentStatus = async (req, res) => {
@@ -1401,7 +1430,7 @@ exports.getBookingsByPaymentStatus = async (req, res) => {
 
     const bookings = await Booking.find({
       providerId: providerId,
-      paymentStatus: { $regex: new RegExp(`^${paymentStatus}$`, "i") } // case-insensitive
+      paymentStatus: { $regex: new RegExp(`^${paymentStatus}$`, "i") }, // case-insensitive
     })
       .populate("userId")
       .sort({ createdAt: -1 });
@@ -1424,7 +1453,12 @@ exports.getBookingsByPaymentStatus = async (req, res) => {
 // =======================================================
 // HELPER: CALCULATE VENUE PRICING
 // =======================================================
-async function calculateVenuePricing(venue, bookingDate, timeSlot, numberOfGuests) {
+async function calculateVenuePricing(
+  venue,
+  bookingDate,
+  timeSlot,
+  numberOfGuests
+) {
   const bookingDay = new Date(bookingDate)
     .toLocaleDateString("en-US", { weekday: "long" })
     .toLowerCase();
@@ -1436,21 +1470,18 @@ async function calculateVenuePricing(venue, bookingDate, timeSlot, numberOfGuest
   //   throw new Error(`No pricing found for ${bookingDay} - ${slot}`);
   // }
   if (!priceData) {
-  return {
-    basePrice: venue.basePrice || 0,
-    perDayPrice: venue.basePrice || 0,
-    perPersonCharge: 0,
-    discount: venue.discount?.nonAc || 0
-  };
-}
-
+    return {
+      basePrice: venue.basePrice || 0,
+      perDayPrice: venue.basePrice || 0,
+      perPersonCharge: 0,
+      discount: venue.discount?.nonAc || 0,
+    };
+  }
 
   const perDayPrice = priceData.perDay || 0;
   const perPerson = priceData.perPerson || 0;
 
-  const basePrice = perDayPrice > 0 
-    ? perDayPrice 
-    : perPerson * numberOfGuests;
+  const basePrice = perDayPrice > 0 ? perDayPrice : perPerson * numberOfGuests;
 
   const discount = venue.discount?.nonAc || 0;
 
@@ -1458,31 +1489,26 @@ async function calculateVenuePricing(venue, bookingDate, timeSlot, numberOfGuest
     basePrice,
     perDayPrice,
     perPersonCharge: perPerson * numberOfGuests,
-    discount
+    discount,
   };
 }
 
 // =======================================================
 // HELPER: CALCULATE MAKEUP PRICING
 // =======================================================
-async function calculateMakeupPricing(makeup, bookingDate, timeSlot) {
-  // For makeup, no separate pricing - only package price will be used
+async function calculateMakeupPricing(makeup) {
   return {
-    basePrice: 0,
+    basePrice: Number(makeup.finalPrice) || Number(makeup.basePrice),
     perDayPrice: 0,
     perHourCharge: 0,
-    discount: 0
+    discount: 0,
   };
 }
-
 
 exports.getPendingBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({
-      $or: [
-        { status: "Pending" },
-        { paymentStatus: "pending" }
-      ]
+      $or: [{ status: "Pending" }, { paymentStatus: "pending" }],
     }).sort({ createdAt: -1 });
 
     res.json({ success: true, bookings });
@@ -1491,11 +1517,10 @@ exports.getPendingBookings = async (req, res) => {
   }
 };
 
-
 exports.getAcceptedBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({
-      status: "Accepted"
+      status: "Accepted",
     }).sort({ createdAt: -1 });
 
     res.json({ success: true, bookings });
@@ -1507,7 +1532,7 @@ exports.getAcceptedBookings = async (req, res) => {
 exports.getCompletedBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({
-      paymentStatus: "completed"
+      paymentStatus: "completed",
     }).sort({ createdAt: -1 });
 
     res.json({ success: true, bookings });
@@ -1515,12 +1540,11 @@ exports.getCompletedBookings = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 
 exports.getRejectedBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({
-      status: { $in: ["Rejected", "Cancelled"] }
+      status: { $in: ["Rejected", "Cancelled"] },
     }).sort({ createdAt: -1 });
 
     res.json({ success: true, bookings });
@@ -1528,7 +1552,6 @@ exports.getRejectedBookings = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-  
 
 // =======================================================
 // GET BOOKINGS BY PROVIDER
@@ -1544,11 +1567,13 @@ exports.getBookingsByProvider = async (req, res) => {
       .populate("packageId")
       .populate("userId")
       .populate("moduleId")
-      .select('+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount +discountValue +couponDiscountValue')
+      .select(
+        "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount +discountValue +couponDiscountValue"
+      )
       .lean();
 
     // Add timeline info to each booking
-    const bookingsWithTimeline = bookings.map(booking => ({
+    const bookingsWithTimeline = bookings.map((booking) => ({
       ...booking,
       timeline: calculateTimeline(booking.bookingDate),
       paymentInfo: {
@@ -1557,16 +1582,15 @@ exports.getBookingsByProvider = async (req, res) => {
         finalPrice: booking.finalPrice,
         totalBeforeDiscount: booking.totalBeforeDiscount,
         discountValue: booking.discountValue,
-        couponDiscountValue: booking.couponDiscountValue
-      }
+        couponDiscountValue: booking.couponDiscountValue,
+      },
     }));
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       count: bookingsWithTimeline.length,
-      data: bookingsWithTimeline 
+      data: bookingsWithTimeline,
     });
-
   } catch (error) {
     console.error("Provider bookings error:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -1584,13 +1608,15 @@ exports.getBookingById = async (req, res) => {
       .populate("packageId")
       .populate("userId")
       .populate("moduleId")
-      .select('+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount +discountValue +couponDiscountValue')
+      .select(
+        "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount +discountValue +couponDiscountValue"
+      )
       .lean();
 
     if (!booking) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Booking not found" 
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
       });
     }
 
@@ -1608,14 +1634,17 @@ exports.getBookingById = async (req, res) => {
         totalBeforeDiscount: booking.totalBeforeDiscount,
         discountValue: booking.discountValue,
         couponDiscountValue: booking.couponDiscountValue,
-        amountPaid: booking.paymentStatus === "Paid" ? booking.finalPrice : 
-                    booking.paymentStatus === "Advance" ? booking.advanceAmount || 0 : 0,
-        amountDue: booking.paymentStatus === "Paid" ? 0 : booking.finalPrice
-      }
+        amountPaid:
+          booking.paymentStatus === "Paid"
+            ? booking.finalPrice
+            : booking.paymentStatus === "Advance"
+            ? booking.advanceAmount || 0
+            : 0,
+        amountDue: booking.paymentStatus === "Paid" ? 0 : booking.finalPrice,
+      },
     };
 
     res.json({ success: true, data: response });
-
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -1633,7 +1662,7 @@ exports.getUpcomingBookings = async (req, res) => {
 
     const bookings = await Booking.find({
       providerId,
-      bookingDate: { $gte: today }
+      bookingDate: { $gte: today },
     })
       .sort({ bookingDate: 1 })
       .populate("venueId")
@@ -1641,43 +1670,48 @@ exports.getUpcomingBookings = async (req, res) => {
       .populate("packageId")
       .populate("userId")
       .populate("moduleId")
-      .select('+paymentStatus +paymentType +status +bookingType +finalPrice')
+      .select("+paymentStatus +paymentType +status +bookingType +finalPrice")
       .lean();
 
     // Add timeline info to each booking
-    const bookingsWithTimeline = bookings.map(booking => ({
+    const bookingsWithTimeline = bookings.map((booking) => ({
       ...booking,
-      timeline: calculateTimeline(booking.bookingDate)
+      timeline: calculateTimeline(booking.bookingDate),
     }));
 
     // Group by payment status for easy filtering
     const summary = {
       total: bookings.length,
       byPaymentStatus: {
-        paid: bookings.filter(b => b.paymentStatus === "Paid").length,
-        advance: bookings.filter(b => b.paymentStatus === "Advance").length,
-        pending: bookings.filter(b => b.paymentStatus === "Pending").length
+        paid: bookings.filter((b) => b.paymentStatus === "Paid").length,
+        advance: bookings.filter((b) => b.paymentStatus === "Advance").length,
+        pending: bookings.filter((b) => b.paymentStatus === "Pending").length,
       },
       byPaymentType: {
-        cash: bookings.filter(b => b.paymentType === "Cash").length,
-        card: bookings.filter(b => b.paymentType === "Card").length,
-        upi: bookings.filter(b => ["UPI", "GPay", "PhonePe", "Paytm"].includes(b.paymentType)).length,
-        bank: bookings.filter(b => ["Bank Transfer", "Net Banking"].includes(b.paymentType)).length,
-        other: bookings.filter(b => b.paymentType === "Other").length,
-        pending: bookings.filter(b => !b.paymentType).length
+        cash: bookings.filter((b) => b.paymentType === "Cash").length,
+        card: bookings.filter((b) => b.paymentType === "Card").length,
+        upi: bookings.filter((b) =>
+          ["UPI", "GPay", "PhonePe", "Paytm"].includes(b.paymentType)
+        ).length,
+        bank: bookings.filter((b) =>
+          ["Bank Transfer", "Net Banking"].includes(b.paymentType)
+        ).length,
+        other: bookings.filter((b) => b.paymentType === "Other").length,
+        pending: bookings.filter((b) => !b.paymentType).length,
       },
       byTimeline: {
-        today: bookingsWithTimeline.filter(b => b.timeline.isToday).length,
-        upcoming: bookingsWithTimeline.filter(b => b.timeline.isUpcoming && !b.timeline.isToday).length
-      }
+        today: bookingsWithTimeline.filter((b) => b.timeline.isToday).length,
+        upcoming: bookingsWithTimeline.filter(
+          (b) => b.timeline.isUpcoming && !b.timeline.isToday
+        ).length,
+      },
     };
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       summary,
-      data: bookingsWithTimeline 
+      data: bookingsWithTimeline,
     });
-
   } catch (error) {
     console.error("Upcoming booking error:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -1696,7 +1730,7 @@ exports.getPastBookings = async (req, res) => {
 
     const bookings = await Booking.find({
       providerId,
-      bookingDate: { $lt: today }
+      bookingDate: { $lt: today },
     })
       .sort({ bookingDate: -1 })
       .populate("venueId")
@@ -1704,39 +1738,42 @@ exports.getPastBookings = async (req, res) => {
       .populate("packageId")
       .populate("userId")
       .populate("moduleId")
-      .select('+paymentStatus +paymentType +status +bookingType +finalPrice')
+      .select("+paymentStatus +paymentType +status +bookingType +finalPrice")
       .lean();
 
     // Add timeline info to each booking
-    const bookingsWithTimeline = bookings.map(booking => ({
+    const bookingsWithTimeline = bookings.map((booking) => ({
       ...booking,
-      timeline: calculateTimeline(booking.bookingDate)
+      timeline: calculateTimeline(booking.bookingDate),
     }));
 
     // Group by payment status
     const summary = {
       total: bookings.length,
       byPaymentStatus: {
-        paid: bookings.filter(b => b.paymentStatus === "Paid").length,
-        advance: bookings.filter(b => b.paymentStatus === "Advance").length,
-        pending: bookings.filter(b => b.paymentStatus === "Pending").length
+        paid: bookings.filter((b) => b.paymentStatus === "Paid").length,
+        advance: bookings.filter((b) => b.paymentStatus === "Advance").length,
+        pending: bookings.filter((b) => b.paymentStatus === "Pending").length,
       },
       byPaymentType: {
-        cash: bookings.filter(b => b.paymentType === "Cash").length,
-        card: bookings.filter(b => b.paymentType === "Card").length,
-        upi: bookings.filter(b => ["UPI", "GPay", "PhonePe", "Paytm"].includes(b.paymentType)).length,
-        bank: bookings.filter(b => ["Bank Transfer", "Net Banking"].includes(b.paymentType)).length,
-        other: bookings.filter(b => b.paymentType === "Other").length,
-        pending: bookings.filter(b => !b.paymentType).length
-      }
+        cash: bookings.filter((b) => b.paymentType === "Cash").length,
+        card: bookings.filter((b) => b.paymentType === "Card").length,
+        upi: bookings.filter((b) =>
+          ["UPI", "GPay", "PhonePe", "Paytm"].includes(b.paymentType)
+        ).length,
+        bank: bookings.filter((b) =>
+          ["Bank Transfer", "Net Banking"].includes(b.paymentType)
+        ).length,
+        other: bookings.filter((b) => b.paymentType === "Other").length,
+        pending: bookings.filter((b) => !b.paymentType).length,
+      },
     };
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       summary,
-      data: bookingsWithTimeline 
+      data: bookingsWithTimeline,
     });
-
   } catch (error) {
     console.error("Past booking error:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -1749,11 +1786,11 @@ exports.getPastBookings = async (req, res) => {
 exports.acceptBooking = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
-    
+
     if (!booking) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Booking not found" 
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
       });
     }
 
@@ -1762,15 +1799,14 @@ exports.acceptBooking = async (req, res) => {
 
     const timeline = calculateTimeline(booking.bookingDate);
 
-    res.json({ 
-      success: true, 
-      message: "Booking accepted", 
+    res.json({
+      success: true,
+      message: "Booking accepted",
       data: {
         ...booking.toObject(),
-        timeline
-      }
+        timeline,
+      },
     });
-
   } catch (error) {
     console.error("Accept error:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -1783,11 +1819,11 @@ exports.acceptBooking = async (req, res) => {
 exports.rejectBooking = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
-    
+
     if (!booking) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Booking not found" 
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
       });
     }
 
@@ -1796,15 +1832,14 @@ exports.rejectBooking = async (req, res) => {
 
     const timeline = calculateTimeline(booking.bookingDate);
 
-    res.json({ 
-      success: true, 
-      message: "Booking rejected", 
+    res.json({
+      success: true,
+      message: "Booking rejected",
       data: {
         ...booking.toObject(),
-        timeline
-      }
+        timeline,
+      },
     });
-
   } catch (error) {
     console.error("Reject error:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -1817,29 +1852,41 @@ exports.rejectBooking = async (req, res) => {
 exports.updatePaymentStatus = async (req, res) => {
   try {
     const { paymentStatus, paymentType } = req.body;
-    
+
     if (!["Advance", "Pending", "Paid"].includes(paymentStatus)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid payment status. Must be: Advance, Pending, or Paid" 
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment status. Must be: Advance, Pending, or Paid",
       });
     }
 
     // Validate payment type if provided
-    const validPaymentTypes = ["Cash", "Card", "UPI", "GPay", "PhonePe", "Paytm", "Bank Transfer", "Net Banking", "Other"];
+    const validPaymentTypes = [
+      "Cash",
+      "Card",
+      "UPI",
+      "GPay",
+      "PhonePe",
+      "Paytm",
+      "Bank Transfer",
+      "Net Banking",
+      "Other",
+    ];
     if (paymentType && !validPaymentTypes.includes(paymentType)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Invalid payment type. Must be one of: ${validPaymentTypes.join(", ")}` 
+      return res.status(400).json({
+        success: false,
+        message: `Invalid payment type. Must be one of: ${validPaymentTypes.join(
+          ", "
+        )}`,
       });
     }
 
     const booking = await Booking.findById(req.params.id);
-    
+
     if (!booking) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Booking not found" 
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
       });
     }
 
@@ -1851,9 +1898,9 @@ exports.updatePaymentStatus = async (req, res) => {
 
     const timeline = calculateTimeline(booking.bookingDate);
 
-    res.json({ 
-      success: true, 
-      message: "Payment information updated", 
+    res.json({
+      success: true,
+      message: "Payment information updated",
       data: {
         ...booking.toObject(),
         timeline,
@@ -1861,13 +1908,16 @@ exports.updatePaymentStatus = async (req, res) => {
           status: booking.paymentStatus,
           type: booking.paymentType,
           finalPrice: booking.finalPrice,
-          amountPaid: paymentStatus === "Paid" ? booking.finalPrice : 
-                      paymentStatus === "Advance" ? booking.advanceAmount || 0 : 0,
-          amountDue: paymentStatus === "Paid" ? 0 : booking.finalPrice
-        }
-      }
+          amountPaid:
+            paymentStatus === "Paid"
+              ? booking.finalPrice
+              : paymentStatus === "Advance"
+              ? booking.advanceAmount || 0
+              : 0,
+          amountDue: paymentStatus === "Paid" ? 0 : booking.finalPrice,
+        },
+      },
     });
-
   } catch (error) {
     console.error("Payment update error:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -1882,11 +1932,11 @@ exports.addChatConversation = async (req, res) => {
     const { conversationId } = req.body;
 
     const booking = await Booking.findById(req.params.id);
-    
+
     if (!booking) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Booking not found" 
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
       });
     }
 
@@ -1895,15 +1945,14 @@ exports.addChatConversation = async (req, res) => {
 
     const timeline = calculateTimeline(booking.bookingDate);
 
-    res.json({ 
-      success: true, 
-      message: "Chat conversation updated", 
+    res.json({
+      success: true,
+      message: "Chat conversation updated",
       data: {
         ...booking.toObject(),
-        timeline
-      }
+        timeline,
+      },
     });
-
   } catch (error) {
     console.error("Chat update error:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -1918,15 +1967,15 @@ exports.getBookingsByPaymentStatus = async (req, res) => {
     const { providerId, paymentStatus } = req.params;
 
     if (!["Advance", "Pending", "Paid"].includes(paymentStatus)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid payment status. Must be: Advance, Pending, or Paid" 
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment status. Must be: Advance, Pending, or Paid",
       });
     }
 
-    const bookings = await Booking.find({ 
-      providerId, 
-      paymentStatus 
+    const bookings = await Booking.find({
+      providerId,
+      paymentStatus,
     })
       .sort({ bookingDate: -1 })
       .populate("venueId")
@@ -1934,35 +1983,51 @@ exports.getBookingsByPaymentStatus = async (req, res) => {
       .populate("packageId")
       .populate("userId")
       .populate("moduleId")
-      .select('+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount')
+      .select(
+        "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount"
+      )
       .lean();
 
     // Add timeline info to each booking
-    const bookingsWithTimeline = bookings.map(booking => ({
+    const bookingsWithTimeline = bookings.map((booking) => ({
       ...booking,
-      timeline: calculateTimeline(booking.bookingDate)
+      timeline: calculateTimeline(booking.bookingDate),
     }));
 
     // Calculate totals and group by payment type
-    const totalAmount = bookings.reduce((sum, b) => sum + (b.finalPrice || 0), 0);
+    const totalAmount = bookings.reduce(
+      (sum, b) => sum + (b.finalPrice || 0),
+      0
+    );
 
     const paymentTypeSummary = {
-      cash: bookings.filter(b => b.paymentType === "Cash").reduce((sum, b) => sum + (b.finalPrice || 0), 0),
-      card: bookings.filter(b => b.paymentType === "Card").reduce((sum, b) => sum + (b.finalPrice || 0), 0),
-      upi: bookings.filter(b => ["UPI", "GPay", "PhonePe", "Paytm"].includes(b.paymentType)).reduce((sum, b) => sum + (b.finalPrice || 0), 0),
-      bank: bookings.filter(b => ["Bank Transfer", "Net Banking"].includes(b.paymentType)).reduce((sum, b) => sum + (b.finalPrice || 0), 0),
-      other: bookings.filter(b => b.paymentType === "Other").reduce((sum, b) => sum + (b.finalPrice || 0), 0)
+      cash: bookings
+        .filter((b) => b.paymentType === "Cash")
+        .reduce((sum, b) => sum + (b.finalPrice || 0), 0),
+      card: bookings
+        .filter((b) => b.paymentType === "Card")
+        .reduce((sum, b) => sum + (b.finalPrice || 0), 0),
+      upi: bookings
+        .filter((b) =>
+          ["UPI", "GPay", "PhonePe", "Paytm"].includes(b.paymentType)
+        )
+        .reduce((sum, b) => sum + (b.finalPrice || 0), 0),
+      bank: bookings
+        .filter((b) => ["Bank Transfer", "Net Banking"].includes(b.paymentType))
+        .reduce((sum, b) => sum + (b.finalPrice || 0), 0),
+      other: bookings
+        .filter((b) => b.paymentType === "Other")
+        .reduce((sum, b) => sum + (b.finalPrice || 0), 0),
     };
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       paymentStatus,
       count: bookingsWithTimeline.length,
       totalAmount,
       paymentTypeSummary,
-      data: bookingsWithTimeline 
+      data: bookingsWithTimeline,
     });
-
   } catch (error) {
     console.error("Payment status filter error:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -1974,26 +2039,27 @@ exports.getBookingsByPaymentStatus = async (req, res) => {
 // =======================================================
 exports.checkBookingTimeline = async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id).select('bookingDate').lean();
+    const booking = await Booking.findById(req.params.id)
+      .select("bookingDate")
+      .lean();
 
     if (!booking) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Booking not found" 
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
       });
     }
 
     const timeline = calculateTimeline(booking.bookingDate);
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       data: {
         bookingId: booking._id,
         bookingDate: booking.bookingDate,
-        timeline
-      }
+        timeline,
+      },
     });
-
   } catch (error) {
     console.error("Timeline check error:", error);
     res.status(500).json({ success: false, message: error.message });
