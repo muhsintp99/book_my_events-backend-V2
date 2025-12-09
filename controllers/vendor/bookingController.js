@@ -1290,7 +1290,7 @@ if (!packageId) {
       moduleId,
       moduleType,
       packageId,
-      providerId: serviceProvider.provider,
+      providerId: serviceProvider.provider || serviceProvider?.createdBy,
       userId: user._id,
       bookingDate,
       timeSlot,
