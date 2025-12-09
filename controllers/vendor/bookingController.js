@@ -1125,7 +1125,8 @@ exports.createBooking = async (req, res) => {
         );
         break;
 
-      case "Makeup":
+case "Makeup":
+case "Makeup Artist":
         if (!makeupId) {
           return res.status(400).json({ 
             success: false, 
