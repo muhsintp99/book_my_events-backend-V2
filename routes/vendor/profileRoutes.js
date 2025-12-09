@@ -23,6 +23,8 @@ router.get("/", profileController.getProfiles);
 // Get ALL Vendors (NEW)
 router.get("/vendors/all", profileController.getAllVendors);
 
+router.get("/vendor/:providerId", profileController.getSingleVendor);
+
 // Get Profile by Provider ID (userId) — MUST COME BEFORE /:id
 router.get("/provider/:providerId", profileController.getProfileByProviderId);
 

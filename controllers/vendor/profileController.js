@@ -31,6 +31,38 @@ exports.getAllVendors = async (req, res) => {
   }
 };
 
+
+
+exports.getSingleVendor = async (req, res) => {
+  try {
+    const { providerId } = req.params;
+
+    const vendor = await VendorProfile.findOne({ user: providerId })
+      .populate("user", "firstName lastName email phone role profilePhoto")
+      .populate("module", "title moduleId icon")
+      .populate("zone", "name city country");
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: "Vendor not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: vendor,
+    });
+
+  } catch (error) {
+    console.error("Get single vendor error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 exports.createProfile = async (req, res) => {
   try {
     const { userId, name, address, mobileNumber, socialLinks } = req.body;
