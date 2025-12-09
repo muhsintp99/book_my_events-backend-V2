@@ -24,6 +24,7 @@ exports.createPlan = async (req, res) => {
       price,
       currency,
       durationInDays,
+      planBenefits,
       features,
       maxUploads,
       maxStorage,
@@ -52,6 +53,7 @@ exports.createPlan = async (req, res) => {
       price,
       currency,
       durationInDays,
+      planBenefits,
       features,
       maxUploads,
       maxStorage,
@@ -67,6 +69,7 @@ exports.createPlan = async (req, res) => {
     });
 
     res.status(201).json({ success: true, plan });
+
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
