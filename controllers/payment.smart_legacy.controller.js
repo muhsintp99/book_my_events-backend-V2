@@ -273,30 +273,37 @@ exports.createSmartGatewayPayment = async (req, res) => {
       description: `Advance Payment ₹${amountInRupees}`,
     });
 
-    // Create Session
+    // ⭐ FIXED: Use correct parameter name for session creation
     const session = await juspay.orderSession.create({
-  order_id: orderId,
-  amount: amountInRupees,
-  customer_id: booking.userId._id,
-  customer_email: booking.userId.email,
-  customer_phone: booking.userId.mobile,
-  payment_page_client_id: "hdfcmaster",
-  action: "paymentPage",
-  return_url: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`,
-  description: `Advance Payment ${amountInRupees}`,
-  first_name: booking.userId.firstName,
-  last_name: booking.userId.lastName
-});
-
+      order_id: orderId,
+      amount: amountInRupees,
+      customer_id: booking.userId._id.toString(),
+      customer_email: booking.userId.email,
+      customer_phone: booking.userId.mobile || "9999999999",
+      payment_page_client_id: "hdfcmaster",
+      action: "paymentPage",
+      return_url: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`,
+      description: `Advance Payment ${amountInRupees}`,
+      first_name: booking.userId.firstName || "",
+      last_name: booking.userId.lastName || ""
+    });
 
     console.log("🎯 Payment Link:", session.payment_links?.web);
+    console.log("🔗 Return URL in response:", session.returnUrl || session.return_url);
+
+    // ⭐ Clone sdk_payload and remove returnUrl from payload
+    const sdkPayload = JSON.parse(JSON.stringify(session.sdk_payload));
+    if (sdkPayload?.payload?.returnUrl) {
+      delete sdkPayload.payload.returnUrl;
+    }
 
     return res.json({
       success: true,
       order_id: orderId,
       advanceAmount: amountInRupees,
       payment_links: session.payment_links,
-      sdk_payload: session.sdk_payload,
+      sdk_payload: sdkPayload, // ⭐ Modified payload without returnUrl
+      return_url: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`
     });
   } catch (error) {
     console.error("❌ Payment Error:", error.response?.data || error.message);
@@ -306,8 +313,6 @@ exports.createSmartGatewayPayment = async (req, res) => {
     });
   }
 };
-
-// Add this to your payment.smart_legacy.controller.js
 
 /**
  * CREATE PAYMENT SESSION FOR SUBSCRIPTION
@@ -325,8 +330,6 @@ exports.createSubscriptionPayment = async (req, res) => {
     }
 
     const orderId = "subscription_" + Date.now();
-
-    // Juspay accepts RUPEES — NOT paise unless your account is configured that way
     const amountInRupees = Number(amount).toFixed(2);
 
     console.log("📝 Creating subscription payment order:", {
@@ -360,10 +363,7 @@ exports.createSubscriptionPayment = async (req, res) => {
       amount: amountInRupees,
       action: "paymentPage",
       payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
-
-      // ⭐ FIXED RETURN URL — No bookingId, no double https
       return_url: `https://www.bookmyevent.ae/subscription-status.html?status=success&providerId=${providerId}`,
-
       currency: "INR",
       customer_id: providerId,
       customer_email: customerEmail || "provider@bookmyevent.ae",
@@ -372,7 +372,12 @@ exports.createSubscriptionPayment = async (req, res) => {
 
     console.log("✅ Payment session created:", session);
 
-    // Return response: payment link
+    // ⭐ Clone sdk_payload and remove returnUrl from payload
+    const sdkPayload = JSON.parse(JSON.stringify(session.sdk_payload));
+    if (sdkPayload?.payload?.returnUrl) {
+      delete sdkPayload.payload.returnUrl;
+    }
+
     return res.json({
       success: true,
       order_id: session.order_id,
@@ -381,7 +386,8 @@ exports.createSubscriptionPayment = async (req, res) => {
         web: session.payment_links?.web,
         expiry: session.payment_links?.expiry,
       },
-      sdk_payload: session.sdk_payload,
+      sdk_payload: sdkPayload, // ⭐ Modified payload without returnUrl
+      return_url: `https://www.bookmyevent.ae/subscription-status.html?status=success&providerId=${providerId}`
     });
 
   } catch (error) {
@@ -398,68 +404,6 @@ exports.createSubscriptionPayment = async (req, res) => {
 /**
  * HANDLE PAYMENT RESPONSE (S2S Order Status Check)
  */
-// exports.handleJuspayResponse = async (req, res) => {
-//   try {
-//     const { orderId } = req.query;
-
-//     if (!orderId) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "orderId is required"
-//       });
-//     }
-
-//     console.log("🔍 Checking Juspay order status:", orderId);
-
-//     // 1️⃣ Fetch order status from Juspay
-//     const statusResponse = await juspay.order.status(orderId);
-
-//     console.log("💳 Order Status Response:", statusResponse);
-
-//     const status = statusResponse.status;
-
-//     // 2️⃣ Handle based on status
-//     if (status === "CHARGED") {
-//       console.log("✅ Payment successful for:", orderId);
-
-//       // TODO: Update your DB booking/subscription here
-
-//       return res.json({
-//         success: true,
-//         status: "success",
-//         order: statusResponse
-//       });
-//     }
-
-//     if (status === "PENDING_VBV" || status === "AUTHORIZING" || status === "PENDING") {
-//       console.log("⏳ Payment still pending:", orderId);
-
-//       return res.json({
-//         success: true,
-//         status: "pending",
-//         order: statusResponse
-//       });
-//     }
-
-//     console.log("❌ Payment failed:", orderId);
-
-//     return res.json({
-//       success: false,
-//       status: "failed",
-//       order: statusResponse
-//     });
-
-//   } catch (error) {
-//     console.error("❌ Error checking order status:", error.response?.data || error.message);
-
-//     return res.status(500).json({
-//       success: false,
-//       message: "Error checking order status",
-//       error: error.response?.data || error.message
-//     });
-//   }
-// };
-
 exports.handleJuspayResponse = async (req, res) => {
   try {
     const { orderId, bookingId } = req.query;

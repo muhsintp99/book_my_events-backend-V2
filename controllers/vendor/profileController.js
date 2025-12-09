@@ -1,6 +1,36 @@
 const Profile = require("../../models/vendor/Profile");
 const User = require("../../models/User");
 // Create a new profile
+
+const VendorProfile = require("../../models/vendor/vendorProfile");
+
+exports.getAllVendors = async (req, res) => {
+  try {
+    const vendors = await VendorProfile.find()
+      .populate({
+        path: "user",
+        select: "firstName lastName email phone role"
+      })
+      .populate({
+        path: "module",
+        select: "title moduleId icon"
+      })
+      .populate({
+        path: "zone",
+        select: "name city country"
+      });
+
+    return res.status(200).json({
+      success: true,
+      count: vendors.length,
+      data: vendors
+    });
+  } catch (error) {
+    console.error("Get all vendors error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.createProfile = async (req, res) => {
   try {
     const { userId, name, address, mobileNumber, socialLinks } = req.body;

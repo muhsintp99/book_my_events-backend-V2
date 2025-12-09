@@ -8,25 +8,31 @@ const upload = createUpload("profiles", {
   allowedTypes: ["image/jpeg", "image/png", "image/jpg"],
 });
 
-// Create a new profile
+/*
+========================================
+        PROFILE ROUTES (FIXED)
+========================================
+*/
+
+// Create Profile
 router.post("/", upload.single("profilePhoto"), profileController.createProfile);
 
-// Get all profiles
+// Get All Profiles
 router.get("/", profileController.getProfiles);
 
-router.put("/:id", upload.single("profilePhoto"), profileController.updateProfile);
+// Get ALL Vendors (NEW)
+router.get("/vendors/all", profileController.getAllVendors);
 
-
-// Get single profile
-router.get("/:id", profileController.getProfileById);
-
-// ✅ Get profile by Provider ID (userId)
+// Get Profile by Provider ID (userId) — MUST COME BEFORE /:id
 router.get("/provider/:providerId", profileController.getProfileByProviderId);
 
-// Update profile
+// Get Single Profile by Profile ID
+router.get("/:id", profileController.getProfileById);
+
+// Update Profile
 router.put("/:id", upload.single("profilePhoto"), profileController.updateProfile);
 
-// Delete profile
+// Delete Profile
 router.delete("/:id", profileController.deleteProfile);
 
 module.exports = router;
