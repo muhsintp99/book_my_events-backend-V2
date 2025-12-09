@@ -1231,6 +1231,7 @@ exports.createBooking = async (req, res) => {
         Number(pkg.offerPrice) ||
         Number(pkg.basePrice) ||
         0;
+      if (packagePrice < 0) packagePrice = 0;
     }
     // -------------------------
     // VENUE / OTHER MODULE PACKAGE PRICING
@@ -1258,19 +1259,18 @@ exports.createBooking = async (req, res) => {
         }
       }
     }
-
     // -------------------------
     // CALCULATE TOTAL PRICING
     // -------------------------
     let totalBeforeDiscount = pricingData.basePrice + packagePrice;
 
     if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
-  // Only package price should count for makeup modules
-  totalBeforeDiscount = packagePrice;
-} else {
-  // Venues and other modules
-  totalBeforeDiscount = pricingData.basePrice + packagePrice;
-}
+      // Only package price should count for makeup modules
+      totalBeforeDiscount = packagePrice;
+    } else {
+      // Venues and other modules
+      totalBeforeDiscount = pricingData.basePrice + packagePrice;
+    }
     const discountValue = pricingData.discount || 0;
     let afterDiscount = totalBeforeDiscount - discountValue;
     if (afterDiscount < 0) afterDiscount = 0;
@@ -1293,20 +1293,45 @@ exports.createBooking = async (req, res) => {
     const finalPrice = afterDiscount - couponDiscountValue;
 
     // -------------------------
-// ADVANCE BOOKING (Makeup Only)
-// -------------------------
-let advanceAmount = 0;
-let remainingAmount = finalPrice;
+    // ADVANCE BOOKING (Makeup Only)
+    // -------------------------
+    // let advanceAmount = 0;
+    // let remainingAmount = finalPrice;
 
-if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
-  const makeupAdvance = Number(serviceProvider.advanceBookingAmount) || 0;
+    // if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+    //   const makeupAdvance = Number(serviceProvider.advanceBookingAmount) || 0;
 
-  advanceAmount = makeupAdvance;
-  remainingAmount = finalPrice - advanceAmount;
+    //   advanceAmount = makeupAdvance;
+    //   remainingAmount = finalPrice - advanceAmount;
 
-  if (remainingAmount < 0) remainingAmount = 0;
-}
+    //   if (remainingAmount < 0) remainingAmount = 0;
+    // }
+    // =============================
+    // UNIVERSAL ADVANCE PAYMENT LOGIC
+    // =============================
+    let advanceAmount = 0;
+    let remainingAmount = finalPrice;
 
+    // 1️⃣ Venues → use advanceDeposit field
+    if (moduleType === "Venues") {
+      advanceAmount = Number(serviceProvider.advanceDeposit) || 0;
+    }
+
+    // 2️⃣ Makeup / Makeup Artist → use advanceBookingAmount
+    else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+      advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
+    }
+
+    // 3️⃣ Other modules → use their advanceBookingAmount field
+    else {
+      advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
+    }
+
+    // Prevent negative values
+    if (advanceAmount < 0) advanceAmount = 0;
+
+    remainingAmount = finalPrice - advanceAmount;
+    if (remainingAmount < 0) remainingAmount = 0;
 
     // -------------------------
     // CREATE BOOKING DOCUMENT
@@ -1314,7 +1339,11 @@ if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
     const bookingData = {
       moduleId,
       moduleType,
-      packageId,
+      // ⭐ KEY FIX: Only set packageId for non-makeup modules
+      packageId:
+        moduleType === "Makeup" || moduleType === "Makeup Artist"
+          ? null
+          : packageId,
       providerId: serviceProvider.provider || serviceProvider?.createdBy,
       userId: user._id,
       bookingDate,
@@ -1339,49 +1368,58 @@ if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
       couponDiscountValue,
       finalPrice,
       advanceAmount,
-remainingAmount,
+      remainingAmount,
 
-
-      paymentType: paymentType || null, // Add payment type
+      paymentType: paymentType || null,
     };
 
     // Add module-specific fields
     if (moduleType === "Venues") {
       bookingData.venueId = venueId;
       bookingData.numberOfGuests = numberOfGuests;
-    } else if (moduleType === "Makeup") {
+    } else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
       bookingData.makeupId = makeupId;
     }
 
     const booking = await Booking.create(bookingData);
 
     // Populate the booking
-    let populateFields = ["packageId", "userId", "moduleId"];
-    if (moduleType === "Venues") populateFields.push("venueId");
-    if (moduleType === "Makeup") populateFields.push("makeupId");
+    let populateFields = ["userId", "moduleId"];
 
-    const populated = await Booking.findById(booking._id)
-      .populate(populateFields)
-      .select(
-        "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount +discountValue +couponDiscountValue"
-      )
-      .lean();
+// ⭐ KEY FIX: Only populate packageId for non-makeup modules
+if (moduleType === "Venues") {
+  populateFields.push("venueId");
+  populateFields.push("packageId");
+} else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+  populateFields.push("makeupId");
+} else {
+  // Other modules
+  if (packageId) populateFields.push("packageId");
+}
 
-    // Add timeline info
-    const timeline = calculateTimeline(booking.bookingDate);
+const populated = await Booking.findById(booking._id)
+  .populate(populateFields)
+  .select(
+    "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount +discountValue +couponDiscountValue"
+  )
+  .lean();
 
-    return res.status(201).json({
-      success: true,
-      message: "Booking created successfully",
-      data: {
-        ...populated,
-        timeline,
-         pricing: {
-    packagePrice,
-    finalPrice,
-    advanceAmount,
-    remainingAmount
-  }
+// Add timeline info
+const timeline = calculateTimeline(booking.bookingDate);
+
+// ⭐ ENHANCED RESPONSE: Include makeup package details
+return res.status(201).json({
+  success: true,
+  message: "Booking created successfully",
+  data: {
+    ...populated,
+    timeline,
+    pricing: {
+      packagePrice,
+      finalPrice,
+      advanceAmount,
+      remainingAmount,
+    },
       },
       token,
     });
