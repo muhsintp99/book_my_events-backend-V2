@@ -224,105 +224,13 @@ exports.testConnection = async (req, res) => {
 /**
  * CREATE PAYMENT SESSION (SmartGateway Payment Page)
  */
-// exports.createSmartGatewayPayment = async (req, res) => {
-//   try {
-//     const { bookingId } = req.body;
-
-//     console.log(
-//       "\n===================== PAYMENT DEBUG LOG ====================="
-//     );
-
-//     // Fetch booking with venue populated
-//     const booking = await Booking.findById(bookingId)
-//       .populate("userId")
-//       .populate("venueId");
-
-//     if (!booking) {
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "Booking not found" });
-//     }
-
-//     // ⭐ GET ADVANCE FROM VENUE
-//     const advanceDeposit = booking.venueId?.advanceDeposit || 0;
-
-//     console.log("🔥 Venue Advance Deposit:", advanceDeposit);
-
-//     if (advanceDeposit <= 0) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Venue does not have an advance deposit amount",
-//       });
-//     }
-
-//     // ⭐ AMOUNT MUST BE IN RUPEES FOR PAYMENT PAGE
-//     const amountInRupees = Number(advanceDeposit).toFixed(2);
-
-//     console.log("🏦 FINAL ADVANCE AMOUNT SENT TO HDFC:", amountInRupees);
-
-//     const orderId = "order_" + Date.now();
-
-//     // Create Juspay Order
-//     const orderResponse = await juspay.order.create({
-//       order_id: orderId,
-//       amount: amountInRupees,
-//       currency: "INR",
-//       customer_id: booking.userId._id.toString(),
-//       customer_email: booking.userId.email,
-//       customer_phone: booking.userId.mobile || "9999999999",
-//       description: `Advance Payment ₹${amountInRupees}`,
-//     });
-
-//     // ⭐ FIXED: Use correct parameter name for session creation
-//     const session = await juspay.orderSession.create({
-//       order_id: orderId,
-//       amount: amountInRupees,
-//       customer_id: booking.userId._id.toString(),
-//       customer_email: booking.userId.email,
-//       customer_phone: booking.userId.mobile || "9999999999",
-//       payment_page_client_id: "hdfcmaster",
-//       action: "paymentPage",
-//       return_url: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`,
-//       description: `Advance Payment ${amountInRupees}`,
-//       first_name: booking.userId.firstName || "",
-//       last_name: booking.userId.lastName || ""
-//     });
-
-//     console.log("🎯 Payment Link:", session.payment_links?.web);
-//     console.log("🔗 Return URL in response:", session.returnUrl || session.return_url);
-
-//     // ⭐ Clone sdk_payload and remove returnUrl from payload
-//     const sdkPayload = JSON.parse(JSON.stringify(session.sdk_payload));
-//     if (sdkPayload?.payload?.returnUrl) {
-//       delete sdkPayload.payload.returnUrl;
-//     }
-
-//     return res.json({
-//       success: true,
-//       order_id: orderId,
-//       advanceAmount: amountInRupees,
-//       payment_links: session.payment_links,
-//       sdk_payload: sdkPayload, // ⭐ Modified payload without returnUrl
-//       return_url: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`
-//     });
-//   } catch (error) {
-//     console.error("❌ Payment Error:", error.response?.data || error.message);
-//     return res.status(500).json({
-//       success: false,
-//       error: error.response?.data || error.message,
-//     });
-//   }
-// };
-
-
-
 exports.createSmartGatewayPayment = async (req, res) => {
   try {
     const { bookingId } = req.body;
 
     console.log("\n===================== PAYMENT DEBUG LOG =====================");
 
-    // Fetch Booking with module info
+    // Fetch booking with module info
     const booking = await Booking.findById(bookingId)
       .populate("userId")
       .populate("venueId")
@@ -336,27 +244,54 @@ exports.createSmartGatewayPayment = async (req, res) => {
       });
     }
 
-    const moduleType = booking.moduleType; 
+    const moduleType = booking.moduleType;
     console.log("📌 Module Type:", moduleType);
 
-    // ⭐ UNIVERSAL ADVANCE AMOUNT (from booking document)
-    const advanceAmount = Number(booking.advanceAmount) || 0;
+    // -----------------------------
+    // 1️⃣ READ advanceAmount from booking (new logic)
+    // -----------------------------
+    let advanceAmount = Number(booking.advanceAmount) || 0;
 
-    console.log("🔥 Universal Advance Amount:", advanceAmount);
+    console.log("🔥 advanceAmount from Booking:", advanceAmount);
 
+    // -----------------------------
+    // 2️⃣ FALLBACK LOGIC (for old bookings that don't have advanceAmount)
+    // -----------------------------
+    if (advanceAmount <= 0) {
+      console.log("⚠️ advanceAmount missing — applying fallback logic");
+
+      if (moduleType === "Venues") {
+        advanceAmount = Number(booking.venueId?.advanceDeposit) || 0;
+      } 
+      else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+        advanceAmount = Number(booking.makeupId?.advanceBookingAmount) || 0;
+      } 
+      else {
+        // Any other module that uses advanceBookingAmount
+        advanceAmount = Number(booking.serviceProvider?.advanceBookingAmount) || 0;
+      }
+    }
+
+    console.log("✅ Final Computed Advance Amount:", advanceAmount);
+
+    // -----------------------------
+    // 3️⃣ Validate advance amount
+    // -----------------------------
     if (advanceAmount <= 0) {
       return res.status(400).json({
         success: false,
-        message: `${moduleType} does not have an advance amount configured`,
+        message: `No advance amount configured for ${moduleType}`,
       });
     }
 
     const amountInRupees = advanceAmount.toFixed(2);
     console.log("🏦 FINAL AMOUNT SENT TO HDFC:", amountInRupees);
 
-    // Create Juspay Order
     const orderId = "order_" + Date.now();
 
+    // -----------------------------
+    // 4️⃣ Create Juspay Order
+    // -----------------------------
     const orderResponse = await juspay.order.create({
       order_id: orderId,
       amount: amountInRupees,
@@ -367,7 +302,9 @@ exports.createSmartGatewayPayment = async (req, res) => {
       description: `Advance Payment ₹${amountInRupees}`,
     });
 
-    // Create Payment Session
+    // -----------------------------
+    // 5️⃣ Create Payment Session
+    // -----------------------------
     const session = await juspay.orderSession.create({
       order_id: orderId,
       action: "paymentPage",
@@ -383,16 +320,22 @@ exports.createSmartGatewayPayment = async (req, res) => {
     });
 
     console.log("🎯 Payment Page:", session.payment_links?.web);
-    console.log("🔗 Return URL:", session.return_url);
 
-    // Remove returnUrl from SDK payload
+    // -----------------------------
+    // 6️⃣ Clean SDK Payload
+    // -----------------------------
     const sdkPayload = JSON.parse(JSON.stringify(session.sdk_payload));
-    if (sdkPayload?.payload?.returnUrl) delete sdkPayload.payload.returnUrl;
+    if (sdkPayload?.payload?.returnUrl) {
+      delete sdkPayload.payload.returnUrl;
+    }
 
+    // -----------------------------
+    // 7️⃣ Final Response
+    // -----------------------------
     return res.json({
       success: true,
       order_id: orderId,
-      amount: amountInRupees,
+      advanceAmount: amountInRupees,
       payment_links: session.payment_links,
       sdk_payload: sdkPayload,
       return_url: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`,
