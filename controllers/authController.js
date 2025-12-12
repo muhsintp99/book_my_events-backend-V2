@@ -344,30 +344,6 @@
 //   }
 // };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // const User = require("../models/User");
 // const Subscription = require("../models/admin/Subscription");
 
@@ -996,11 +972,6 @@
 //   }
 // };
 
-
-
-
-
-
 const User = require("../models/User");
 const Subscription = require("../models/admin/Subscription");
 const { generateUserId } = require("../utils/generateId");
@@ -1038,24 +1009,21 @@ exports.register = async (req, res) => {
       module,
       zone,
       isFreeTrial,
-      subscriptionPlan
+      subscriptionPlan,
     } = req.body;
 
     const finalRole = req.body.role === "vendor" ? "vendor" : "user";
 
-
     // ❌ Prevent vendor fields for normal users
-if (finalRole === "user") {
-  req.body.storeName = undefined;
-  req.body.businessTIN = undefined;
-  req.body.tinExpireDate = undefined;
-  req.body.module = undefined;
-  req.body.zone = undefined;
-  req.body.subscriptionPlan = undefined;
-
-  // Remove uploaded vendor files
-  req.files = {};
-}
+    if (finalRole === "user") {
+      req.body.storeName = undefined;
+      req.body.businessTIN = undefined;
+      req.body.tinExpireDate = undefined;
+      req.body.module = undefined;
+      req.body.zone = undefined;
+      req.body.subscriptionPlan = undefined;
+      req.files = {};
+    }
 
     // Parse nested storeAddress from FormData
     const storeAddress = {
@@ -1090,9 +1058,9 @@ if (finalRole === "user") {
     if (existing) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({ 
-        success: false, 
-        message: "Email already registered" 
+      return res.status(400).json({
+        success: false,
+        message: "Email already registered",
       });
     }
 
@@ -1105,22 +1073,23 @@ if (finalRole === "user") {
         session.endSession();
         return res.status(400).json({
           success: false,
-          message: "Password is required and must be at least 6 characters for non-vendor roles",
+          message:
+            "Password is required and must be at least 6 characters for non-vendor roles",
         });
       }
       if (phone && !/^\+?[\d\s-]{10,}$/.test(phone)) {
         await session.abortTransaction();
         session.endSession();
-        return res.status(400).json({ 
-          success: false, 
-          message: "Invalid phone number format" 
+        return res.status(400).json({
+          success: false,
+          message: "Invalid phone number format",
         });
       }
     }
 
-const userId = await generateUserId(finalRole);
+    const userId = await generateUserId(finalRole);
     const refreshToken = crypto.randomBytes(32).toString("hex");
-    
+
     const user = await User.create(
       [
         {
@@ -1130,7 +1099,7 @@ const userId = await generateUserId(finalRole);
           email,
           password: userPassword,
           phone,
-role: finalRole,
+          role: finalRole,
           refreshToken,
         },
       ],
@@ -1140,7 +1109,31 @@ role: finalRole,
     let vendorProfile = null;
     if (role === "vendor") {
       const isFreeTrialBool = isFreeTrial === "true" || isFreeTrial === true;
-      
+
+      // ------------------ MODULE LOGIC FOR BIO & VENDOR TYPE ------------------
+      const ModuleModel = mongoose.model("Module");
+      const moduleData = await ModuleModel.findById(module);
+      const moduleName = moduleData?.title?.toLowerCase() || "";
+
+const isBioModule =
+  moduleName === "makeup artist" || moduleName === "photography";
+
+const isVendorTypeModule = moduleName === "makeup artist";
+
+      // Prepare bio fields
+      const bioSection = isBioModule
+        ? {
+            title: req.body.bioTitle || "",
+            subtitle: req.body.bioSubtitle || "",
+            description: req.body.bioDescription || "",
+          }
+        : undefined;
+
+      // Prepare vendorType field ONLY for makeup
+      const vendorTypeValue = isVendorTypeModule
+        ? req.body.vendorType || "individual"
+        : undefined;
+
       vendorProfile = await VendorProfile.create(
         [
           {
@@ -1162,13 +1155,17 @@ role: finalRole,
             businessTIN: businessTIN || "",
             tinExpireDate: tinExpireDate || null,
 
+            // ⭐ ADD BIO + VENDOR TYPE HERE
+            bio: bioSection,
+            vendorType: vendorTypeValue,
+
             // ⭐ SUBSCRIPTION FIELDS
             isFreeTrial: isFreeTrialBool,
             subscriptionPlan: isFreeTrialBool ? null : subscriptionPlan,
             subscriptionStatus: isFreeTrialBool ? "trial" : "pending_payment",
             trialStartDate: isFreeTrialBool ? new Date() : null,
             trialEndDate: isFreeTrialBool
-              ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days trial
+              ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
               : null,
 
             module: mongoose.Types.ObjectId.isValid(module)
@@ -1210,23 +1207,30 @@ role: finalRole,
 
     const token = generateJwtToken({ id: user[0]._id });
 
-    // ✅ ENHANCED RESPONSE FORMAT - Multiple ID formats for compatibility
+    // ✅ POPULATE vendorProfile to include bio and vendorType in response
+    if (vendorProfile) {
+      vendorProfile = await VendorProfile.findById(vendorProfile[0]._id)
+        .populate("module", "title")
+        .populate("zone", "name");
+    }
+
+    // ✅ ENHANCED RESPONSE FORMAT
     const responseData = {
       success: true,
       message: `User registered as ${role || "user"}`,
-      
+
       // ⭐ Provider ID in multiple formats
       providerId: user[0]._id.toString(),
       userId: user[0]._id.toString(),
       _id: user[0]._id.toString(),
       id: user[0]._id.toString(),
-      
+
       // Original fields
       user: user[0].toJSON(),
-      profile: vendorProfile ? vendorProfile[0].toJSON() : null,
+      profile: vendorProfile ? vendorProfile.toJSON() : null, // ✅ Now includes bio & vendorType
       token,
       refreshToken,
-      
+
       // Additional structured data
       data: {
         providerId: user[0]._id.toString(),
@@ -1237,19 +1241,21 @@ role: finalRole,
         firstName: user[0].firstName,
         lastName: user[0].lastName,
         role: user[0].role,
-        subscriptionStatus: vendorProfile ? vendorProfile[0].subscriptionStatus : null,
-        isFreeTrial: vendorProfile ? vendorProfile[0].isFreeTrial : false,
-        subscriptionPlan: vendorProfile ? vendorProfile[0].subscriptionPlan : null
-      }
+        subscriptionStatus: vendorProfile ? vendorProfile.subscriptionStatus : null,
+        isFreeTrial: vendorProfile ? vendorProfile.isFreeTrial : false,
+        subscriptionPlan: vendorProfile ? vendorProfile.subscriptionPlan : null,
+        // ✅ Include bio and vendorType in data object too
+        bio: vendorProfile?.bio || null,
+        vendorType: vendorProfile?.vendorType || null,
+      },
     };
 
     return res.status(201).json(responseData);
-    
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
     console.error("❌ Register Error:", err);
-    
+
     if (err.message === "Failed to generate unique userId after multiple attempts") {
       return res.status(500).json({
         success: false,
@@ -1257,7 +1263,7 @@ role: finalRole,
         error: err.message,
       });
     }
-    
+
     return res.status(500).json({
       success: false,
       message: "Registration failed",
@@ -1265,7 +1271,6 @@ role: finalRole,
     });
   }
 };
-
 // ------------------ LIST PROVIDERS ------------------
 exports.listMakeupVendors = async (req, res) => {
   try {
@@ -1274,15 +1279,18 @@ exports.listMakeupVendors = async (req, res) => {
     const vendors = await VendorProfile.find({ module: moduleId })
       .populate({
         path: "user",
-        select: "firstName lastName email phone role"
+        select: "firstName lastName email phone role",
       })
-      .select("storeName logo coverImage module user subscriptionStatus isFreeTrial");
+      .select(
+        "storeName logo coverImage module user subscriptionStatus isFreeTrial"
+      );
 
-    const API_BASE_URL = process.env.NODE_ENV === 'production'
-      ? 'https://api.bookmyevent.ae'
-      : 'http://localhost:5000';
+    const API_BASE_URL =
+      process.env.NODE_ENV === "production"
+        ? "https://api.bookmyevent.ae"
+        : "http://localhost:5000";
 
-    const formatted = vendors.map(v => ({
+    const formatted = vendors.map((v) => ({
       _id: v.user?._id,
       firstName: v.user?.firstName,
       lastName: v.user?.lastName,
@@ -1294,7 +1302,7 @@ exports.listMakeupVendors = async (req, res) => {
       vendorProfileId: v._id,
       module: v.module,
       subscriptionStatus: v.subscriptionStatus,
-      isFreeTrial: v.isFreeTrial
+      isFreeTrial: v.isFreeTrial,
     }));
 
     res.status(200).json({
@@ -1302,13 +1310,12 @@ exports.listMakeupVendors = async (req, res) => {
       count: formatted.length,
       data: formatted,
     });
-
   } catch (err) {
     console.error("❌ Makeup Vendor List Error:", err);
     res.status(500).json({
       success: false,
       message: "Failed to fetch makeup vendors",
-      error: err.message
+      error: err.message,
     });
   }
 };
@@ -1319,25 +1326,25 @@ exports.login = async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Provide email and password" 
+        message: "Provide email and password",
       });
     }
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: "Invalid credentials" 
+        message: "Invalid credentials",
       });
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: "Invalid credentials" 
+        message: "Invalid credentials",
       });
     }
 
@@ -1396,7 +1403,7 @@ exports.login = async (req, res) => {
           status: subscriptionData.status,
           autoRenew: subscriptionData.autoRenew,
           paymentId: subscriptionData.paymentId,
-          createdAt: subscriptionData.createdAt
+          createdAt: subscriptionData.createdAt,
         };
       }
     }
@@ -1415,13 +1422,12 @@ exports.login = async (req, res) => {
       subscription: subscriptionInfo,
       user: user.toJSON(),
     });
-    
   } catch (err) {
     console.error("❌ Login Error:", err);
-    return res.status(500).json({ 
+    return res.status(500).json({
       success: false,
-      message: "Login failed", 
-      error: err.message 
+      message: "Login failed",
+      error: err.message,
     });
   }
 };
@@ -1436,16 +1442,16 @@ exports.logout = async (req, res) => {
         await user.save();
       }
     }
-    res.json({ 
+    res.json({
       success: true,
-      message: "Logged out successfully" 
+      message: "Logged out successfully",
     });
   } catch (err) {
     console.error("❌ Logout Error:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Logout failed", 
-      error: err.message 
+      message: "Logout failed",
+      error: err.message,
     });
   }
 };
@@ -1455,17 +1461,17 @@ exports.refreshToken = async (req, res) => {
   try {
     const { refreshToken } = req.body;
     if (!refreshToken) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Refresh token is required" 
+        message: "Refresh token is required",
       });
     }
 
     const user = await User.findOne({ refreshToken });
     if (!user) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         success: false,
-        message: "Invalid refresh token" 
+        message: "Invalid refresh token",
       });
     }
 
@@ -1495,17 +1501,18 @@ exports.sendOtp = async (req, res) => {
   try {
     const { email } = req.body;
     const user = await User.findOne({ email });
-    
+
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "User not found" 
+        message: "User not found",
       });
     }
 
     const otp = generateOtp();
     user.otp = otp;
-    user.otpExpire = Date.now() + parseInt(process.env.OTP_EXPIRY_MINUTES || "10") * 60 * 1000;
+    user.otpExpire =
+      Date.now() + parseInt(process.env.OTP_EXPIRY_MINUTES || "10") * 60 * 1000;
     await user.save();
 
     try {
@@ -1514,16 +1521,16 @@ exports.sendOtp = async (req, res) => {
       console.error("❌ OTP email failed:", e.message);
     }
 
-    res.json({ 
+    res.json({
       success: true,
-      message: "OTP sent successfully" 
+      message: "OTP sent successfully",
     });
   } catch (err) {
     console.error("❌ Send OTP Error:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "Failed to send OTP", 
-      error: err.message 
+      message: "Failed to send OTP",
+      error: err.message,
     });
   }
 };
@@ -1537,11 +1544,11 @@ exports.verifyOtp = async (req, res) => {
       otp,
       otpExpire: { $gt: Date.now() },
     });
-    
+
     if (!user) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid or expired OTP" 
+        message: "Invalid or expired OTP",
       });
     }
 
@@ -1550,16 +1557,16 @@ exports.verifyOtp = async (req, res) => {
     user.otpExpire = undefined;
     await user.save();
 
-    res.json({ 
+    res.json({
       success: true,
-      message: "OTP verified successfully" 
+      message: "OTP verified successfully",
     });
   } catch (err) {
     console.error("❌ Verify OTP Error:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: "OTP verification failed", 
-      error: err.message 
+      message: "OTP verification failed",
+      error: err.message,
     });
   }
 };
@@ -1569,11 +1576,11 @@ exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
     const user = await User.findOne({ email });
-    
+
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "User not found" 
+        message: "User not found",
       });
     }
 
@@ -1584,17 +1591,19 @@ exports.forgotPassword = async (req, res) => {
     user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
     await user.save();
 
-    const resetURL = `${req.protocol}://${req.get("host")}/api/auth/reset-password/${resetToken}`;
-    
+    const resetURL = `${req.protocol}://${req.get(
+      "host"
+    )}/api/auth/reset-password/${resetToken}`;
+
     try {
       await sendEmail(email, "Password Reset", resetPasswordEmail(resetURL));
     } catch (e) {
       console.error("❌ Reset email failed:", e.message);
     }
 
-    res.json({ 
+    res.json({
       success: true,
-      message: "Reset email sent successfully" 
+      message: "Reset email sent successfully",
     });
   } catch (err) {
     console.error("❌ Forgot Password Error:", err);
@@ -1618,9 +1627,9 @@ exports.resetPassword = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid or expired token" 
+        message: "Invalid or expired token",
       });
     }
 
@@ -1634,9 +1643,9 @@ exports.resetPassword = async (req, res) => {
     }
 
     if (password !== confirmPassword) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Passwords do not match" 
+        message: "Passwords do not match",
       });
     }
 
@@ -1653,9 +1662,9 @@ exports.resetPassword = async (req, res) => {
     user.resetPasswordExpire = undefined;
     await user.save();
 
-    res.json({ 
-      success: true, 
-      message: "Password reset successful" 
+    res.json({
+      success: true,
+      message: "Password reset successful",
     });
   } catch (err) {
     console.error("❌ Reset Password Error:", err);

@@ -439,6 +439,19 @@ const vendorProfileSchema = new mongoose.Schema(
       transactionId: String
     }],
 
+
+    bio: {
+  title: { type: String, default: "" },
+  subtitle: { type: String, default: "" },
+  description: { type: String, default: "" }
+},
+
+vendorType: {
+  type: String,
+  enum: ["individual", "company"],
+  default: "individual"
+},
+
     // ----------------------- APPROVAL SYSTEM -----------------------
     status: {
       type: String,
