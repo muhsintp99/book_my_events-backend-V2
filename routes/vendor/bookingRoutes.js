@@ -134,6 +134,8 @@ router.get("/", ctrl.getAllBookings);
 /* ========================================================
    PROVIDER ROUTES
 ======================================================== */
+router.get("/user/:userId", ctrl.getBookingsByUser);
+
 router.get("/provider/:providerId", ctrl.getBookingsByProvider);
 router.get("/provider/:providerId/payment-status/:paymentStatus", ctrl.getBookingsByPaymentStatus);
 router.get("/provider/:providerId/upcoming", ctrl.getUpcomingBookings);

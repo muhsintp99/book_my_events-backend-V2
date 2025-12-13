@@ -1139,30 +1139,30 @@ exports.createBooking = async (req, res) => {
         );
         break;
 
-
-
-        case "Photography":
-       if (!photographyId) {
+      case "Photography":
+        if (!photographyId) {
           return res.status(400).json({
             success: false,
             message: "photographyId is required for Photography module",
           });
         }
-      serviceProvider = await Photography.findById(req.body.photographyId).lean();
-      if (!serviceProvider) {
-        return res.status(404).json({
-          success: false,
-          message: "Photography service not found",
-        });
-      }
+        serviceProvider = await Photography.findById(
+          req.body.photographyId
+        ).lean();
+        if (!serviceProvider) {
+          return res.status(404).json({
+            success: false,
+            message: "Photography service not found",
+          });
+        }
 
-     pricingData = {
-  basePrice: Number(serviceProvider.price) || 0,
-  perDayPrice: 0,
-  perHourCharge: 0,
-  perPersonCharge: 0,
-  discount: 0
-};
+        pricingData = {
+          basePrice: Number(serviceProvider.price) || 0,
+          perDayPrice: 0,
+          perHourCharge: 0,
+          perPersonCharge: 0,
+          discount: 0,
+        };
 
         break;
 
@@ -1245,7 +1245,7 @@ exports.createBooking = async (req, res) => {
     // -------------------------
     // PACKAGE PRICING
     // -------------------------
-      let pkg = null;
+    let pkg = null;
     let packagePrice = 0;
 
     if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
@@ -1257,10 +1257,9 @@ exports.createBooking = async (req, res) => {
         Number(pkg.basePrice) ||
         0;
       if (packagePrice < 0) packagePrice = 0;
-   } else if (moduleType === "Photography") {
-  pkg = serviceProvider;  
-  packagePrice = Number(pkg.price) || 0;
-
+    } else if (moduleType === "Photography") {
+      pkg = serviceProvider;
+      packagePrice = Number(pkg.price) || 0;
     } else {
       // Venues and other modules use separate package
       if (!packageId) {
@@ -1286,9 +1285,13 @@ exports.createBooking = async (req, res) => {
     // -------------------------
     // CALCULATE TOTAL PRICING
     // -------------------------
-   let totalBeforeDiscount = 0;
+    let totalBeforeDiscount = 0;
 
-    if (moduleType === "Makeup" || moduleType === "Makeup Artist" || moduleType === "Photography") {
+    if (
+      moduleType === "Makeup" ||
+      moduleType === "Makeup Artist" ||
+      moduleType === "Photography"
+    ) {
       // For Makeup and Photography, only package price counts
       totalBeforeDiscount = packagePrice;
     } else {
@@ -1362,12 +1365,12 @@ exports.createBooking = async (req, res) => {
     // CREATE BOOKING DOCUMENT
     // -------------------------
     const bookingData = {
-       moduleId,
+      moduleId,
       moduleType,
       packageId:
-  moduleType === "Makeup" || moduleType === "Makeup Artist"
-    ? null
-    : packageId,
+        moduleType === "Makeup" || moduleType === "Makeup Artist"
+          ? null
+          : packageId,
 
       providerId: serviceProvider.provider || serviceProvider?.createdBy,
       userId: user._id,
@@ -1418,13 +1421,9 @@ exports.createBooking = async (req, res) => {
       populateFields.push("venueId");
       populateFields.push("packageId");
     } else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
-  populateFields.push("makeupId");
-}
-
-else if (moduleType === "Photography") {
-  populateFields.push("photographyId");
-
-
+      populateFields.push("makeupId");
+    } else if (moduleType === "Photography") {
+      populateFields.push("photographyId");
     } else {
       // Other modules
       if (packageId) populateFields.push("packageId");
@@ -1459,6 +1458,38 @@ else if (moduleType === "Photography") {
   } catch (error) {
     console.error("Create Booking Error:", error);
     res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+
+// GET BOOKINGS BY USER ID
+exports.getBookingsByUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const bookings = await Booking.find({ userId })
+      .sort({ bookingDate: -1 })
+      .populate("venueId")
+      .populate("makeupId")
+      .populate("photographyId")
+      .populate("packageId")
+      .populate("moduleId")
+      .select(
+        "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount"
+      )
+      .lean();
+
+    return res.json({
+      success: true,
+      count: bookings.length,
+      data: bookings,
+    });
+  } catch (error) {
+    console.error("User bookings error:", error);
+    return res.status(500).json({
       success: false,
       message: error.message,
     });
