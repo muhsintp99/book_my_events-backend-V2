@@ -1530,28 +1530,68 @@ exports.getBookingsByPaymentStatus = async (req, res) => {
   try {
     const { providerId, paymentStatus } = req.params;
 
-    const bookings = await Booking.find({
-      providerId: providerId,
-      paymentStatus: { $regex: new RegExp(`^${paymentStatus}$`, "i") }, // case-insensitive
-    })
-      .populate("userId")
-      .sort({ createdAt: -1 });
+    // 🛑 VALIDATE providerId
+    if (
+      !providerId ||
+      providerId === "null" ||
+      !mongoose.Types.ObjectId.isValid(providerId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid providerId",
+      });
+    }
 
-    return res.status(200).json({
+    // 🛑 VALIDATE paymentStatus
+    const allowedStatuses = ["Advance", "Pending", "Paid"];
+    if (!allowedStatuses.includes(paymentStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment status",
+      });
+    }
+
+    const bookings = await Booking.find({
+      providerId: new mongoose.Types.ObjectId(providerId),
+      paymentStatus,
+    })
+      .sort({ bookingDate: -1 })
+      .populate("venueId")
+      .populate("makeupId")
+      .populate("packageId")
+      .populate("userId")
+      .populate("moduleId")
+      .select(
+        "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount"
+      )
+      .lean();
+
+    // Add timeline
+    const bookingsWithTimeline = bookings.map((booking) => ({
+      ...booking,
+      timeline: calculateTimeline(booking.bookingDate),
+    }));
+
+    const totalAmount = bookings.reduce(
+      (sum, b) => sum + (b.finalPrice || 0),
+      0
+    );
+
+    return res.json({
       success: true,
-      count: bookings.length,
-      bookings,
+      paymentStatus,
+      count: bookingsWithTimeline.length,
+      totalAmount,
+      data: bookingsWithTimeline,
     });
   } catch (error) {
-    console.error("Error fetching bookings by payment status:", error);
+    console.error("Payment status filter error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch payment status bookings",
-      error: error.message,
+      message: error.message,
     });
   }
 };
-
 // =======================================================
 // HELPER: CALCULATE VENUE PRICING
 // =======================================================
