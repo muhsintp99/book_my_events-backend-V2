@@ -150,9 +150,6 @@
 //   }
 // };
 
-
-
-
 //new
 // const fs = require("fs");
 // const path = require("path");
@@ -214,7 +211,7 @@
 //   module,
 //       createdBy: createdBy || null,
 //       image: req.file ? `/uploads/categories/${req.file.filename}` : null,
-//     };       
+//     };
 
 //     console.log("Category data to be created:", categoryData); // Debug log
 
@@ -342,8 +339,6 @@
 //     });
 //   }
 // };
-
-
 
 // // ✅ Get all Categories (populate brands + module)
 // exports.getCategories = async (req, res) => {
@@ -557,7 +552,6 @@
 //   }
 // };
 
-
 const fs = require("fs");
 const path = require("path");
 const Category = require("../../models/admin/category");
@@ -575,18 +569,13 @@ const deleteFileIfExists = (filePath) => {
   }
 };
 
-//* -----------------------------------------------------
-  //  CREATE CATEGORY (Parent or Subcategory)
+/* -----------------------------------------------------
+   CREATE CATEGORY (Parent or Subcategory)
+----------------------------------------------------- */
 exports.createCategory = async (req, res) => {
   try {
-    const {
-      title,
-      module,
-      parentCategory,
-      brands,
-      createdBy,
-      description,
-    } = req.body;
+    const { title, module, parentCategory, brands, createdBy, description } =
+      req.body;
 
     if (!title) return res.status(400).json({ error: "Title required" });
     if (!module) return res.status(400).json({ error: "Module required" });
@@ -601,29 +590,26 @@ exports.createCategory = async (req, res) => {
       image: req.file ? `/uploads/categories/${req.file.filename}` : null,
     };
 
-    // Create parent or subcategory
     const newCategory = await Category.create(categoryData);
 
-    // If this is a subcategory, update parent to include it
+    // If subcategory → push into parent
     if (parentCategory) {
       await Category.findByIdAndUpdate(parentCategory, {
-        $addToSet: { subCategories: newCategory._id },  // prevents duplicates
+        $addToSet: { subCategories: newCategory._id },
       });
     }
 
-   const populated = await Category.findById(newCategory._id)
-  .populate("module")
-  .populate({
-    path: "parentCategory",
-    select: "title _id subCategories",
-    populate: {
-      path: "subCategories",
-      select: "title _id image"
-    }
-  })
-  .populate("brands")
-  .lean();
-
+    const populated = await Category.findById(newCategory._id)
+      .populate("module")
+      .populate({
+        path: "parentCategory",
+        populate: {
+          path: "subCategories",
+          select: "title image",
+        },
+      })
+      .populate("brands")
+      .lean();
 
     res.status(201).json({
       success: true,
@@ -632,7 +618,6 @@ exports.createCategory = async (req, res) => {
         : "Category created successfully",
       category: populated,
     });
-
   } catch (err) {
     console.error("Create Category Error:", err);
     if (req.file?.path) deleteFileIfExists(req.file.path);
@@ -660,10 +645,8 @@ exports.updateCategory = async (req, res) => {
     } = req.body;
 
     const category = await Category.findById(req.params.id);
-
     if (!category) return res.status(404).json({ error: "Category not found" });
 
-    // Handle image replace
     if (req.file) {
       deleteFileIfExists(path.join(__dirname, `../../${category.image}`));
       category.image = `/uploads/categories/${req.file.filename}`;
@@ -677,21 +660,22 @@ exports.updateCategory = async (req, res) => {
     if (metaTitle) category.metaTitle = metaTitle;
     if (metaDescription) category.metaDescription = metaDescription;
     if (isActive !== undefined) category.isActive = isActive === "true";
-    if (isFeatured !== undefined) category.isFeatured = isFeatured === "true";
+    if (isFeatured !== undefined)
+      category.isFeatured = isFeatured === "true";
 
-    /* ---- Parent/Subcategory Relationship Update ---- */
-    if (parentCategory && parentCategory !== category.parentCategory?.toString()) {
-      
-      // Remove from old parent
+    // Parent change handling
+    if (
+      parentCategory &&
+      parentCategory !== category.parentCategory?.toString()
+    ) {
       if (category.parentCategory) {
         await Category.findByIdAndUpdate(category.parentCategory, {
           $pull: { subCategories: category._id },
         });
       }
 
-      // Add to new parent
       await Category.findByIdAndUpdate(parentCategory, {
-        $push: { subCategories: category._id },
+        $addToSet: { subCategories: category._id },
       });
 
       category.parentCategory = parentCategory;
@@ -699,29 +683,25 @@ exports.updateCategory = async (req, res) => {
 
     category.updatedBy = updatedBy || null;
     category.updatedAt = new Date();
-
     await category.save();
 
-   const populated = await Category.findById(newCategory._id)
-  .populate("module")
-  .populate({
-    path: "parentCategory",
-    select: "title _id subCategories",
-    populate: {
-      path: "subCategories",
-      select: "title _id image"
-    }
-  })
-  .populate("brands")
-  .lean();
-
+    const populated = await Category.findById(category._id)
+      .populate("module")
+      .populate({
+        path: "parentCategory",
+        populate: {
+          path: "subCategories",
+          select: "title image",
+        },
+      })
+      .populate("brands")
+      .lean();
 
     res.json({
       success: true,
       message: "Category updated successfully",
       category: populated,
     });
-
   } catch (err) {
     console.error("Update Category Error:", err);
     res.status(500).json({ error: err.message });
@@ -734,10 +714,8 @@ exports.updateCategory = async (req, res) => {
 exports.deleteCategory = async (req, res) => {
   try {
     const category = await Category.findById(req.params.id);
-
     if (!category) return res.status(404).json({ error: "Category not found" });
 
-    // Remove from parent
     if (category.parentCategory) {
       await Category.findByIdAndUpdate(category.parentCategory, {
         $pull: { subCategories: category._id },
@@ -749,9 +727,7 @@ exports.deleteCategory = async (req, res) => {
     }
 
     await category.deleteOne();
-
     res.json({ success: true, message: "Category deleted successfully" });
-
   } catch (err) {
     console.error("Delete Category Error:", err);
     res.status(500).json({ error: err.message });
@@ -771,7 +747,6 @@ exports.getCategories = async (req, res) => {
       .lean();
 
     res.json({ success: true, data: categories });
-
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -790,17 +765,49 @@ exports.getCategory = async (req, res) => {
       .lean();
 
     if (!category) return res.status(404).json({ error: "Category not found" });
-
     res.json({ success: true, data: category });
-
   } catch (err) {
     console.error("Get Category Error:", err);
     res.status(500).json({ error: err.message });
   }
 };
 
+
 /* -----------------------------------------------------
-   GET PARENT CATEGORIES BY MODULE
+   GET SUBCATEGORY WITH FULL PARENT TREE
+----------------------------------------------------- */
+exports.getSubCategoryWithParent = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const category = await Category.findById(id)
+      .populate("module")
+      .populate({
+        path: "parentCategory",
+        populate: {
+          path: "subCategories",
+          select: "title image",
+        },
+      })
+      .populate("brands")
+      .lean();
+
+    if (!category) {
+      return res.status(404).json({ error: "Category not found" });
+    }
+
+    res.json({
+      success: true,
+      data: category,
+    });
+  } catch (err) {
+    console.error("Get SubCategory With Parent Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* -----------------------------------------------------
+   GET PARENT CATEGORIES BY MODULE (WITH SUBCATEGORIES)
 ----------------------------------------------------- */
 exports.getCategoriesByModule = async (req, res) => {
   try {
@@ -811,10 +818,13 @@ exports.getCategoriesByModule = async (req, res) => {
       parentCategory: null,
     })
       .populate("module")
+      .populate({
+        path: "subCategories",
+        select: "title image isActive",
+      })
       .lean();
 
     res.json({ success: true, data: categories });
-
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -831,10 +841,10 @@ exports.getSubCategories = async (req, res) => {
       parentCategory: parentId,
     })
       .populate("module")
+      .populate("brands")
       .lean();
 
     res.json({ success: true, data: subcategories });
-
   } catch (err) {
     console.error("Get Subcategories Error:", err);
     res.status(500).json({ error: err.message });
@@ -847,19 +857,13 @@ exports.getSubCategories = async (req, res) => {
 exports.blockCategory = async (req, res) => {
   try {
     const category = await Category.findById(req.params.id);
-
     if (!category) return res.status(404).json({ error: "Category not found" });
 
     category.isActive = false;
     category.updatedAt = new Date();
-
     await category.save();
 
-    res.json({
-      success: true,
-      message: "Category blocked successfully",
-    });
-
+    res.json({ success: true, message: "Category blocked successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -871,19 +875,13 @@ exports.blockCategory = async (req, res) => {
 exports.reactivateCategory = async (req, res) => {
   try {
     const category = await Category.findById(req.params.id);
-
     if (!category) return res.status(404).json({ error: "Category not found" });
 
     category.isActive = true;
     category.updatedAt = new Date();
-
     await category.save();
 
-    res.json({
-      success: true,
-      message: "Category reactivated successfully",
-    });
-
+    res.json({ success: true, message: "Category reactivated successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
