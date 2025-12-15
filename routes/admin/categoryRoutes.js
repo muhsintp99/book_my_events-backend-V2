@@ -60,6 +60,7 @@ router.post('/', handleUpload, categoryController.createCategory);
 router.get('/modules/:moduleId', categoryController.getCategoriesByModule);
 
 router.get("/parent/:parentId", categoryController.getSubCategories);
+router.get('/with-parent/:id', categoryController.getSubCategoryWithParent);
 
 // Get all categories
 router.get('/', categoryController.getCategories);
