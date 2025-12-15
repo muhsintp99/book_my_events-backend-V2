@@ -260,6 +260,69 @@ exports.getUserSubscription = async (req, res) => {
   }
 };
 
+// --------------------------------------------------------
+// UPGRADE PLAN
+// --------------------------------------------------------
+exports.upgradePlan = async (req, res) => {
+  try {
+    const { userId, planId, moduleId, paymentId } = req.body;
+
+    if (!userId || !planId || !moduleId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId, planId and moduleId are required"
+      });
+    }
+
+    // 1️⃣ Cancel existing active subscription for this module
+    await Subscription.updateMany(
+      { userId, moduleId, status: "active" },
+      { status: "cancelled" }
+    );
+
+    // 2️⃣ Get plan from DB
+    const plan = await Plan.findById(planId);
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: "Plan not found"
+      });
+    }
+
+    // 3️⃣ Create new subscription
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + plan.durationInDays);
+
+    const subscription = await Subscription.create({
+      userId,
+      planId,
+      moduleId,
+      startDate,
+      endDate,
+      paymentId,
+      status: "active"
+    });
+
+    const populated = await Subscription.findById(subscription._id)
+      .populate("planId")
+      .populate("moduleId", "title icon");
+
+    return res.status(200).json({
+      success: true,
+      message: "Plan upgraded successfully",
+      subscription: populated
+    });
+
+  } catch (err) {
+    console.error("Upgrade error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
+
 
 // --------------------------------------------------------
 // CANCEL SUBSCRIPTION

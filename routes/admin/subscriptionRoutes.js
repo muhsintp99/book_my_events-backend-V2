@@ -4,12 +4,13 @@ const controller = require("../../controllers/admin/subscriptionController");
 
 // PLAN ROUTES
 router.get("/plan/module/:moduleId", controller.getPlansByModule);
-
+// routes/subscription.js
+router.post("/upgrade", controller.upgradePlan);
 router.post("/plan", controller.createPlan);
 router.get("/plan", controller.getPlans);
 router.delete("/plan/:id", controller.deletePlan);
-router.get("/plan/:id", controller.getSinglePlan);   // <-- NEW (fetch single plan)
-router.put("/plan/:id", controller.updatePlan);      // <-- NEW (update plan)
+router.get("/plan/:id", controller.getSinglePlan);   
+router.put("/plan/:id", controller.updatePlan);      
 // USER SUBSCRIPTION ROUTES
 router.post("/subscribe", controller.subscribeUser);
 router.get("/status/:userId", controller.getUserSubscription);
