@@ -1010,6 +1010,12 @@ exports.register = async (req, res) => {
       zone,
       isFreeTrial,
       subscriptionPlan,
+       accountHolderName,
+  bankName,
+  accountNumber,
+  ifscCode,
+  branchName,
+  upiId
     } = req.body;
 
     const finalRole = req.body.role === "vendor" ? "vendor" : "user";
@@ -1026,13 +1032,52 @@ exports.register = async (req, res) => {
     }
 
     // Parse nested storeAddress from FormData
-    const storeAddress = {
-      street: req.body["storeAddress[street]"] || "",
-      city: req.body["storeAddress[city]"] || "",
-      state: req.body["storeAddress[state]"] || "",
-      zipCode: req.body["storeAddress[zipCode]"] || "",
-      fullAddress: req.body["storeAddress[fullAddress]"] || "",
-    };
+    // const storeAddress = {
+    //   street: req.body["storeAddress[street]"] || "",
+    //   city: req.body["storeAddress[city]"] || "",
+    //   state: req.body["storeAddress[state]"] || "",
+    //   zipCode: req.body["storeAddress[zipCode]"] || "",
+    //   fullAddress: req.body["storeAddress[fullAddress]"] || "",
+    // };
+    let storeAddress = {
+  street: "",
+  city: "",
+  state: "",
+  zipCode: "",
+  fullAddress: ""
+};
+
+if (req.body.storeAddress) {
+  try {
+    storeAddress = JSON.parse(req.body.storeAddress);
+  } catch (err) {
+    console.error("Invalid storeAddress JSON", err);
+  }
+}
+
+
+      // ✅ BANK DETAILS OBJECT
+      // const bankDetails = {
+      //   accountHolderName: accountHolderName || "",
+      //   bankName: bankName || "",
+      //   accountNumber: accountNumber || "",
+      //   ifscCode: ifscCode || "",
+      //   branchName: branchName || "",
+      //   upiId: upiId || ""
+      // };
+
+      const bankDetails =
+  finalRole === "vendor"
+    ? {
+        accountHolderName: accountHolderName || "",
+        bankName: bankName || "",
+        accountNumber: accountNumber || "",
+        ifscCode: ifscCode || "",
+        branchName: branchName || "",
+        upiId: upiId || ""
+      }
+    : undefined;
+
 
     // Basic validation
     if (!firstName || !lastName || !email) {
@@ -1155,6 +1200,8 @@ const isVendorTypeModule = moduleName === "makeup artist";
             businessTIN: businessTIN || "",
             tinExpireDate: tinExpireDate || null,
 
+                      bankDetails,
+
             // ⭐ ADD BIO + VENDOR TYPE HERE
             bio: bioSection,
             vendorType: vendorTypeValue,
@@ -1247,6 +1294,9 @@ const isVendorTypeModule = moduleName === "makeup artist";
         // ✅ Include bio and vendorType in data object too
         bio: vendorProfile?.bio || null,
         vendorType: vendorProfile?.vendorType || null,
+
+          bankDetails: vendorProfile?.bankDetails || null
+
       },
     };
 

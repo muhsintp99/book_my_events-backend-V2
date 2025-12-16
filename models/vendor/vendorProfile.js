@@ -319,6 +319,22 @@ const vendorProfileSchema = new mongoose.Schema(
     coverImage: { type: String, trim: true, default: "" },
     tinCertificate: { type: String, trim: true, default: "" },
 
+
+    // ----------------------- BANK DETAILS -----------------------
+bankDetails: {
+  accountHolderName: { type: String, default: '' },
+  accountNumber: { type: String, default: '' },
+  ifscCode: { type: String, default: '' },
+  bankName: { type: String, default: '' },
+  branchName: { type: String, default: '' },
+  accountType: {
+    type: String,
+    enum: ['savings', 'current'],
+    default: 'savings'
+  },
+  upiId: { type: String, default: '' }
+},
+
     // ----------------------- OWNER DETAILS -----------------------
     ownerFirstName: {
       type: String,
