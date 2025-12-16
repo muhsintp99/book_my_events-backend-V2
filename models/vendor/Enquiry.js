@@ -2,6 +2,18 @@ const mongoose = require("mongoose");
 
 const enquirySchema = new mongoose.Schema(
   {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    vendorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
     moduleId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Module",
@@ -10,13 +22,7 @@ const enquirySchema = new mongoose.Schema(
 
     packageId: {
       type: mongoose.Schema.Types.ObjectId,
-      required: true, // 👈 generic package id
-    },
-
-    vendorId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
+      required: true, // generic package id
     },
 
     bookingDate: Date,
