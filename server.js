@@ -336,6 +336,9 @@ app.use("/api/portfolio", require("./routes/vendor/portfolioRoutes"));
 app.use("/api/photography-packages", require("./routes/vendor/photographyPackageRoutes"));
 app.use("/api/subscription", require("./routes/admin/subscriptionRoutes"));
 
+app.use("/api/enquiries", require("./routes/vendor/enquiryRoutes"));
+
+
 /* -------------------------------------------
   GLOBAL ERROR HANDLER
 --------------------------------------- */
