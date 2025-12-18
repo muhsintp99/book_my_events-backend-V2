@@ -19,7 +19,8 @@
     "mongoose": "^7.0.0",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.6",
-    "sanitize-filename": "^1.6.3"
+    "sanitize-filename": "^1.6.3",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"
