@@ -338,6 +338,7 @@ app.use("/api/subscription", require("./routes/admin/subscriptionRoutes"));
 
 app.use("/api/enquiries", require("./routes/vendor/enquiryRoutes"));
 
+app.use("/api/availability", require("./routes/vendor/availabilityRoutes"));
 
 /* -------------------------------------------
   GLOBAL ERROR HANDLER
