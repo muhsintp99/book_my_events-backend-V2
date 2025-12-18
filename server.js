@@ -214,103 +214,320 @@
 
 
 
-  const express = require("express");
-  const cors = require("cors");
-  require("dotenv").config();
-  const path = require("path");
-  const subscriptionRoutes = require("./routes/admin/subscriptionRoutes");
 
-// DB Connection
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//   const express = require("express");
+//   const cors = require("cors");
+//   require("dotenv").config();
+//   const path = require("path");
+//   const subscriptionRoutes = require("./routes/admin/subscriptionRoutes");
+
+// // DB Connection
+// const connectDB = require("./config/db");
+// connectDB();
+
+// // Load essential models
+// require("./models/vendor/Profile");
+// require("./models/User");
+
+// const app = express();
+
+// /* -------------------------------------------
+//   CORS CONFIGURATION (Local + Production)
+// -------------------------------------------- */
+
+// const allowedOrigins = [
+//   // Local Dev
+//   "http://localhost:5000",
+//   "http://localhost:5001",
+//   "http://localhost:5002",
+//   "http://localhost:5173",
+//   "http://127.0.0.1:5500",
+
+//   // Production Dashboard
+//   "https://vendor.bookmyevent.ae",
+//   "https://dashboard.bookmyevent.ae",
+
+//   // Main Website
+//   "https://www.bookmyevent.ae",
+//   "https://bookmyevent.ae",
+
+//   // API Domain (self)
+//   "https://api.bookmyevent.ae",
+
+//   //payment 
+//   "https://smartgateway.hdfcuat.bank.in",
+//   "https://securepayments.hdfcbank.com",
+//   "https://paynetzuat.hdfcbank.com",
+//   "https://paynet.hdfcbank.com" 
+// ];
+
+// // Enable wildcard for *.bookmyevent.ae ONLY — all Vercel removed
+// const originCheck = (origin, callback) => {
+//   if (!origin) return callback(null, true); // allow mobile apps & same-origin
+
+//   const allowed = allowedOrigins.includes(origin);
+
+//   const wildcardMatch = /\.bookmyevent\.ae$/.test(origin);
+
+//   if (allowed || wildcardMatch) {
+//     callback(null, true);
+//   } else {
+//     console.log("❌ CORS blocked origin:", origin);
+//     callback(new Error("CORS not allowed from this origin: " + origin));
+//   }
+// };
+
+// app.use(
+//   cors({
+//     origin: originCheck,
+//     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+//     allowedHeaders: ["Content-Type", "Authorization"],
+//     credentials: true,
+//   })
+// );
+
+// // Preflight
+// app.options("*", cors());
+
+
+// /* -------------------------------------------
+//   STANDARD MIDDLEWARES
+// -------------------------------------------- */
+// app.use(express.json());
+// app.use(express.urlencoded({ extended: true }));
+
+// /* -------------------------------------------
+//   STATIC FILES
+// -------------------------------------------- */
+// app.use("/uploads", express.static(path.join(__dirname, "Uploads")));
+
+// /* -------------------------------------------
+//   ROUTES
+// -------------------------------------------- */
+// app.get("/", (req, res) => res.send("BookMyEvent API Running 🚀"));
+
+// // Public Routes
+// app.use("/api/auth", require("./routes/authRoutes"));
+// app.use("/api/users", require("./routes/userRoutes"));
+// app.use("/api/delete-user", require("./routes/userDeleteRoutes"));
+
+// // Admin Routes
+// app.use("/api/modules", require("./routes/admin/moduleRoutes"));
+// app.use("/api/secondary-modules", require("./routes/admin/secondaryModuleRoutes"));
+// app.use("/api/categories", require("./routes/admin/categoryRoutes"));
+// app.use("/api/vehicle-categories", require("./routes/admin/vehiclecategoryRoutes"));
+// app.use("/api/brands", require("./routes/admin/brandRoutes"));
+// app.use("/api/coupons", require("./routes/admin/couponsRouters"));
+// app.use("/api/banners", require("./routes/admin/bannerRoutes"));
+// app.use("/api/vehicle-banners", require("./routes/admin/vehicleBannerRoutes"));
+// app.use("/api/zones", require("./routes/admin/zoneRoutes"));
+
+// // Vendor Routes
+// app.use("/api/vendorprofiles", require("./routes/vendor/vendorProfileRoutes"));
+// app.use("/api/reviews", require("./routes/vendor/reviewRouters"));
+// app.use("/api/venues", require("./routes/vendor/venueRoutes"));
+// app.use("/api/packages", require("./routes/admin/packageRoutes"));
+// app.use("/api/renters", require("./routes/vendor/renterRoutes"));
+// app.use("/api/vehicles", require("./routes/vendor/vehicleRouter"));
+// app.use("/api/venuecoupons", require("./routes/vendor/venueCouponRoutes"));
+// app.use("/api/catering", require("./routes/vendor/cateringRoutes"));
+// app.use("/api/profile", require("./routes/vendor/profileRoutes"));
+// app.use("/api/bookings", require("./routes/vendor/bookingRoutes"));
+// app.use("/api/payment", require("./routes/payment.routes"));
+
+
+// // app.use("/api/payment", require("./routes/payment"));
+
+// app.use("/api/vehicle-attributes", require("./routes/admin/vehicleAttributeRoutes"));
+// app.use("/api/makeup-packages", require("./routes/admin/makeupPackageRoutes"));
+// app.use("/api/makeup-types", require("./routes/admin/makeupTypeRoutes"));
+// app.use("/api/portfolio", require("./routes/vendor/portfolioRoutes"));
+// app.use("/api/photography-packages", require("./routes/vendor/photographyPackageRoutes"));
+// app.use("/api/subscription", require("./routes/admin/subscriptionRoutes"));
+
+// app.use("/api/enquiries", require("./routes/vendor/enquiryRoutes"));
+
+// app.use("/api/availability", require("./routes/vendor/availabilityRoutes"));
+
+// /* -------------------------------------------
+//   GLOBAL ERROR HANDLER
+// --------------------------------------- */
+// app.use((err, req, res, next) => {
+//   console.error("❌ Error:", err.message);
+//   res.status(err.status || 500).json({
+//     success: false,
+//     message: err.message || "Internal Server Error",
+//   });
+// });
+
+// /* -------------------------------------------
+//   START SERVER
+// -------------------------------------------- */
+// const PORT = process.env.PORT || 5000;
+// app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/**********************************************************
+ * IMPORTS
+ **********************************************************/
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+const cors = require("cors");
+require("dotenv").config();
+const path = require("path");
+const subscriptionRoutes = require("./routes/admin/subscriptionRoutes");
+
+/**********************************************************
+ * DB CONNECTION
+ **********************************************************/
 const connectDB = require("./config/db");
 connectDB();
 
-// Load essential models
+/**********************************************************
+ * LOAD MODELS
+ **********************************************************/
 require("./models/vendor/Profile");
 require("./models/User");
 
+/**********************************************************
+ * APP & HTTP SERVER
+ **********************************************************/
 const app = express();
+const server = http.createServer(app);
 
-/* -------------------------------------------
-  CORS CONFIGURATION (Local + Production)
--------------------------------------------- */
-
+/**********************************************************
+ * CORS CONFIGURATION
+ **********************************************************/
 const allowedOrigins = [
-  // Local Dev
+  // Local
   "http://localhost:5000",
   "http://localhost:5001",
   "http://localhost:5002",
   "http://localhost:5173",
   "http://127.0.0.1:5500",
 
-  // Production Dashboard
+  // Dashboards
   "https://vendor.bookmyevent.ae",
   "https://dashboard.bookmyevent.ae",
 
-  // Main Website
+  // Website
   "https://www.bookmyevent.ae",
   "https://bookmyevent.ae",
 
-  // API Domain (self)
+  // API
   "https://api.bookmyevent.ae",
 
-  //payment 
+  // Payments
   "https://smartgateway.hdfcuat.bank.in",
   "https://securepayments.hdfcbank.com",
   "https://paynetzuat.hdfcbank.com",
-  "https://paynet.hdfcbank.com" 
+  "https://paynet.hdfcbank.com"
 ];
 
-// Enable wildcard for *.bookmyevent.ae ONLY — all Vercel removed
 const originCheck = (origin, callback) => {
-  if (!origin) return callback(null, true); // allow mobile apps & same-origin
+  if (!origin) return callback(null, true);
 
-  const allowed = allowedOrigins.includes(origin);
+  const allowed =
+    allowedOrigins.includes(origin) ||
+    /\.bookmyevent\.ae$/.test(origin);
 
-  const wildcardMatch = /\.bookmyevent\.ae$/.test(origin);
-
-  if (allowed || wildcardMatch) {
-    callback(null, true);
-  } else {
-    console.log("❌ CORS blocked origin:", origin);
-    callback(new Error("CORS not allowed from this origin: " + origin));
-  }
+  allowed
+    ? callback(null, true)
+    : callback(new Error("CORS not allowed"));
 };
 
 app.use(
   cors({
     origin: originCheck,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
   })
 );
 
-// Preflight
 app.options("*", cors());
 
-
-/* -------------------------------------------
-  STANDARD MIDDLEWARES
--------------------------------------------- */
+/**********************************************************
+ * MIDDLEWARES
+ **********************************************************/
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/* -------------------------------------------
-  STATIC FILES
--------------------------------------------- */
+/**********************************************************
+ * STATIC FILES
+ **********************************************************/
 app.use("/uploads", express.static(path.join(__dirname, "Uploads")));
 
-/* -------------------------------------------
-  ROUTES
--------------------------------------------- */
-app.get("/", (req, res) => res.send("BookMyEvent API Running 🚀"));
+/**********************************************************
+ * ROUTES
+ **********************************************************/
+app.get("/", (req, res) => {
+  res.send("BookMyEvent API Running 🚀");
+});
 
-// Public Routes
+// ===== Public =====
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/delete-user", require("./routes/userDeleteRoutes"));
 
-// Admin Routes
+// ===== Admin =====
 app.use("/api/modules", require("./routes/admin/moduleRoutes"));
 app.use("/api/secondary-modules", require("./routes/admin/secondaryModuleRoutes"));
 app.use("/api/categories", require("./routes/admin/categoryRoutes"));
@@ -320,12 +537,16 @@ app.use("/api/coupons", require("./routes/admin/couponsRouters"));
 app.use("/api/banners", require("./routes/admin/bannerRoutes"));
 app.use("/api/vehicle-banners", require("./routes/admin/vehicleBannerRoutes"));
 app.use("/api/zones", require("./routes/admin/zoneRoutes"));
+app.use("/api/subscription", require("./routes/admin/subscriptionRoutes"));
+app.use("/api/vehicle-attributes", require("./routes/admin/vehicleAttributeRoutes"));
+app.use("/api/makeup-packages", require("./routes/admin/makeupPackageRoutes"));
+app.use("/api/makeup-types", require("./routes/admin/makeupTypeRoutes"));
+app.use("/api/packages", require("./routes/admin/packageRoutes"));
 
-// Vendor Routes
+// ===== Vendor =====
 app.use("/api/vendorprofiles", require("./routes/vendor/vendorProfileRoutes"));
 app.use("/api/reviews", require("./routes/vendor/reviewRouters"));
 app.use("/api/venues", require("./routes/vendor/venueRoutes"));
-app.use("/api/packages", require("./routes/admin/packageRoutes"));
 app.use("/api/renters", require("./routes/vendor/renterRoutes"));
 app.use("/api/vehicles", require("./routes/vendor/vehicleRouter"));
 app.use("/api/venuecoupons", require("./routes/vendor/venueCouponRoutes"));
@@ -333,34 +554,52 @@ app.use("/api/catering", require("./routes/vendor/cateringRoutes"));
 app.use("/api/profile", require("./routes/vendor/profileRoutes"));
 app.use("/api/bookings", require("./routes/vendor/bookingRoutes"));
 app.use("/api/payment", require("./routes/payment.routes"));
-
-
-// app.use("/api/payment", require("./routes/payment"));
-
-app.use("/api/vehicle-attributes", require("./routes/admin/vehicleAttributeRoutes"));
-app.use("/api/makeup-packages", require("./routes/admin/makeupPackageRoutes"));
-app.use("/api/makeup-types", require("./routes/admin/makeupTypeRoutes"));
 app.use("/api/portfolio", require("./routes/vendor/portfolioRoutes"));
 app.use("/api/photography-packages", require("./routes/vendor/photographyPackageRoutes"));
-app.use("/api/subscription", require("./routes/admin/subscriptionRoutes"));
-
 app.use("/api/enquiries", require("./routes/vendor/enquiryRoutes"));
-
 app.use("/api/availability", require("./routes/vendor/availabilityRoutes"));
 
-/* -------------------------------------------
-  GLOBAL ERROR HANDLER
---------------------------------------- */
-app.use((err, req, res, next) => {
-  console.error("❌ Error:", err.message);
-  res.status(err.status || 500).json({
-    success: false,
-    message: err.message || "Internal Server Error",
+/**********************************************************
+ * SOCKET.IO (LIVE CHAT)
+ **********************************************************/
+const io = new Server(server, {
+  cors: {
+    origin: originCheck,
+    credentials: true
+  }
+});
+
+io.on("connection", (socket) => {
+  console.log("🟢 Socket connected:", socket.id);
+
+  socket.on("join_enquiry", ({ enquiryId }) => {
+    socket.join(enquiryId);
+  });
+
+  socket.on("send_message", (data) => {
+    io.to(data.enquiryId).emit("receive_message", data);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("🔴 Socket disconnected:", socket.id);
   });
 });
 
-/* -------------------------------------------
-  START SERVER
--------------------------------------------- */
+/**********************************************************
+ * GLOBAL ERROR HANDLER
+ **********************************************************/
+app.use((err, req, res, next) => {
+  console.error("❌ Error:", err.message);
+  res.status(500).json({
+    success: false,
+    message: err.message || "Internal Server Error"
+  });
+});
+
+/**********************************************************
+ * START SERVER
+ **********************************************************/
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+server.listen(PORT, () => {
+  console.log(`✅ Server + Socket.IO running on port ${PORT}`);
+});
