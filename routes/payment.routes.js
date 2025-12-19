@@ -27,35 +27,5 @@ router.post("/create-subscription-payment", controller.createSubscriptionPayment
 router.get("/handle-response", controller.handleJuspayResponse);
 
 
-// routes/paymentRoutes.js
-router.post("/subscription-return", async (req, res) => {
-  try {
-    const { order_id } = req.body;
-
-    if (!order_id) {
-      return res.redirect(
-        "https://www.bookmyevent.ae/subscription-status.html?status=failed"
-      );
-    }
-
-    const order = await juspay.order.status(order_id);
-
-    if (order.status === "CHARGED") {
-      // ✅ activate subscription here if not already done
-      return res.redirect(
-        `https://www.bookmyevent.ae/subscription-status.html?status=success&orderId=${order_id}`
-      );
-    }
-
-    return res.redirect(
-      `https://www.bookmyevent.ae/subscription-status.html?status=failed&orderId=${order_id}`
-    );
-  } catch (err) {
-    console.error("Return URL error:", err);
-    return res.redirect(
-      "https://www.bookmyevent.ae/subscription-status.html?status=failed"
-    );
-  }
-});
 
 module.exports = router;

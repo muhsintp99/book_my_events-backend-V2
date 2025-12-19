@@ -710,8 +710,7 @@ exports.createSubscriptionPayment = async (req, res) => {
     const amountInRupees = Number(amount).toFixed(2);
     
     // ✅ FIX: Construct return URL
-const returnUrl = "https://api.bookmyevent.ae/api/payments/subscription-return";
-
+    const returnUrl = `https://www.bookmyevent.ae/subscription-status.html?status=success&providerId=${providerId}`;
 
     // Create pending subscription
     await Subscription.create({
@@ -747,6 +746,8 @@ const returnUrl = "https://api.bookmyevent.ae/api/payments/subscription-return";
       customer_phone: customerPhone || "9999999999",
       return_url: returnUrl, // ✅ SAME RETURN URL
       redirect: true, // ✅ ENABLE AUTO-REDIRECT
+        analytics: false
+
     });
 
     return res.json({
