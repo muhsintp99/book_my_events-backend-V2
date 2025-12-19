@@ -354,89 +354,206 @@ advanceAmount = Number(booking.photographyId?.advanceBookingAmount || 0);
   }
 };
 
+
+exports.juspayWebhook = async (req, res) => {
+  try {
+    console.log("🔔 JUSPAY WEBHOOK:", req.body);
+
+    const { order_id, status } = req.body;
+    if (!order_id) return res.sendStatus(200);
+
+    // 🔍 Find subscription by paymentId
+    const subscription = await Subscription.findOne({ paymentId: order_id });
+
+    if (!subscription) return res.sendStatus(200);
+
+    if (status === "CHARGED") {
+      const plan = await Plan.findById(subscription.planId);
+
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + plan.durationInDays);
+
+      subscription.startDate = startDate;
+      subscription.endDate = endDate;
+      subscription.status = "active";
+
+      await subscription.save();
+    }
+
+    if (status === "FAILED") {
+      subscription.status = "cancelled";
+      await subscription.save();
+    }
+
+    return res.sendStatus(200);
+  } catch (err) {
+    console.error("❌ WEBHOOK ERROR:", err);
+    return res.sendStatus(200);
+  }
+};
+
+
 /**
  * CREATE PAYMENT SESSION FOR SUBSCRIPTION
  */
+// exports.createSubscriptionPayment = async (req, res) => {
+//   try {
+//     const { providerId, planId, amount, customerEmail, customerPhone } = req.body;
+
+//     // Validate inputs
+//     if (!providerId || !planId || !amount) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Missing required fields: providerId, planId, amount",
+//       });
+//     }
+
+//     const orderId = "subscription_" + Date.now();
+//     const amountInRupees = Number(amount).toFixed(2);
+
+//     console.log("📝 Creating subscription payment order:", {
+//       orderId,
+//       amount: amountInRupees,
+//       providerId,
+//       planId,
+//     });
+
+//     // 1️⃣ Create Order
+//     const orderResponse = await juspay.order.create({
+//       order_id: orderId,
+//       amount: amountInRupees,
+//       currency: "INR",
+//       customer_id: providerId,
+//       customer_email: customerEmail || "provider@bookmyevent.ae",
+//       customer_phone: customerPhone || "9999999999",
+//       description: `Subscription Payment - Plan ${planId}`,
+//       metadata: {
+//         providerId,
+//         planId,
+//         type: "subscription",
+//       },
+//     });
+
+//     console.log("✅ Order created:", orderResponse);
+
+//     // 2️⃣ Create Session → Payment Page URL
+//     const session = await juspay.orderSession.create({
+//       order_id: orderId,
+//       amount: amountInRupees,
+//       action: "paymentPage",
+//       payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
+//       return_url: `https://www.bookmyevent.ae/subscription-status.html?status=success&providerId=${providerId}`,
+//       currency: "INR",
+//       customer_id: providerId,
+//       customer_email: customerEmail || "provider@bookmyevent.ae",
+//       customer_phone: customerPhone || "9999999999",
+//     });
+
+//     console.log("✅ Payment session created:", session);
+
+//     // ⭐ Clone sdk_payload and remove returnUrl from payload
+//     const sdkPayload = JSON.parse(JSON.stringify(session.sdk_payload));
+//     if (sdkPayload?.payload?.returnUrl) {
+//       delete sdkPayload.payload.returnUrl;
+//     }
+
+//     return res.json({
+//       success: true,
+//       order_id: session.order_id,
+//       status: session.status,
+//       payment_links: {
+//         web: session.payment_links?.web,
+//         expiry: session.payment_links?.expiry,
+//       },
+//       sdk_payload: sdkPayload, // ⭐ Modified payload without returnUrl
+//       return_url: `https://www.bookmyevent.ae/subscription-status.html?status=success&providerId=${providerId}`
+//     });
+
+//   } catch (error) {
+//     console.error("❌ Subscription Payment Error:", error);
+//     console.error("❌ Error details:", error.response?.data || error.message);
+
+//     return res.status(500).json({
+//       success: false,
+//       error: error.response?.data || error.message,
+//     });
+//   }
+// };
+
+
+
+
+
+
 exports.createSubscriptionPayment = async (req, res) => {
   try {
     const { providerId, planId, amount, customerEmail, customerPhone } = req.body;
 
-    // Validate inputs
     if (!providerId || !planId || !amount) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields: providerId, planId, amount",
+        message: "Missing required fields"
+      });
+    }
+
+    // ✅ 1️⃣ Get plan
+    const plan = await Plan.findById(planId);
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: "Plan not found"
       });
     }
 
     const orderId = "subscription_" + Date.now();
     const amountInRupees = Number(amount).toFixed(2);
 
-    console.log("📝 Creating subscription payment order:", {
-      orderId,
-      amount: amountInRupees,
-      providerId,
-      planId,
+    // ✅ 2️⃣ CREATE PENDING SUBSCRIPTION (CRITICAL)
+    await Subscription.create({
+      userId: providerId,
+      planId: plan._id,
+      moduleId: plan.moduleId,
+      startDate: new Date(),        // temp
+      endDate: new Date(),          // temp
+      paymentId: orderId,           // 🔥 LINK TO PAYMENT
+      status: "trial"               // 🔥 NOT ACTIVE YET
     });
 
-    // 1️⃣ Create Order
-    const orderResponse = await juspay.order.create({
+    // ✅ 3️⃣ Create Juspay Order
+    await juspay.order.create({
       order_id: orderId,
       amount: amountInRupees,
       currency: "INR",
       customer_id: providerId,
-      customer_email: customerEmail || "provider@bookmyevent.ae",
+      customer_email: customerEmail,
       customer_phone: customerPhone || "9999999999",
-      description: `Subscription Payment - Plan ${planId}`,
-      metadata: {
-        providerId,
-        planId,
-        type: "subscription",
-      },
+      description: `Subscription Payment - ${plan.name}`
     });
 
-    console.log("✅ Order created:", orderResponse);
-
-    // 2️⃣ Create Session → Payment Page URL
+    // ✅ 4️⃣ Create Payment Session
     const session = await juspay.orderSession.create({
       order_id: orderId,
       amount: amountInRupees,
       action: "paymentPage",
       payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
-      return_url: `https://www.bookmyevent.ae/subscription-status.html?status=success&providerId=${providerId}`,
-      currency: "INR",
       customer_id: providerId,
-      customer_email: customerEmail || "provider@bookmyevent.ae",
+      customer_email: customerEmail,
       customer_phone: customerPhone || "9999999999",
+      return_url: `https://www.bookmyevent.ae/subscription-status.html`
     });
-
-    console.log("✅ Payment session created:", session);
-
-    // ⭐ Clone sdk_payload and remove returnUrl from payload
-    const sdkPayload = JSON.parse(JSON.stringify(session.sdk_payload));
-    if (sdkPayload?.payload?.returnUrl) {
-      delete sdkPayload.payload.returnUrl;
-    }
 
     return res.json({
       success: true,
-      order_id: session.order_id,
-      status: session.status,
-      payment_links: {
-        web: session.payment_links?.web,
-        expiry: session.payment_links?.expiry,
-      },
-      sdk_payload: sdkPayload, // ⭐ Modified payload without returnUrl
-      return_url: `https://www.bookmyevent.ae/subscription-status.html?status=success&providerId=${providerId}`
+      order_id: orderId,
+      payment_links: session.payment_links
     });
 
   } catch (error) {
-    console.error("❌ Subscription Payment Error:", error);
-    console.error("❌ Error details:", error.response?.data || error.message);
-
+    console.error("❌ Subscription payment error:", error);
     return res.status(500).json({
       success: false,
-      error: error.response?.data || error.message,
+      message: error.message
     });
   }
 };

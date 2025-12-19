@@ -572,18 +572,50 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log("🟢 Socket connected:", socket.id);
 
-  socket.on("join_enquiry", ({ enquiryId }) => {
-    socket.join(enquiryId);
+  socket.on("join_enquiry", async ({ enquiryId, vendorId }) => {
+    try {
+      const Enquiry = require("./models/vendor/Enquiry");
+
+      const enquiry = await Enquiry.findById(enquiryId).select("vendorId");
+
+      if (!enquiry) {
+        return socket.emit("error", "Enquiry not found");
+      }
+
+      // 🔐 Allow only owner vendor
+      if (String(enquiry.vendorId) !== String(vendorId)) {
+        console.log("❌ Unauthorized vendor tried to join chat");
+        return socket.emit("error", "Unauthorized");
+      }
+
+      socket.join(enquiryId);
+      console.log("✅ Vendor joined enquiry room:", enquiryId);
+    } catch (err) {
+      console.error("Socket join error:", err);
+    }
   });
 
-  socket.on("send_message", (data) => {
-    io.to(data.enquiryId).emit("receive_message", data);
+  socket.on("send_message", async (data) => {
+    try {
+      const Enquiry = require("./models/vendor/Enquiry");
+
+      const enquiry = await Enquiry.findById(data.enquiryId).select("vendorId");
+
+      if (!enquiry) return;
+
+      // 🔐 Ensure only owner vendor sends messages
+      if (String(enquiry.vendorId) !== String(data.senderId)) return;
+
+      io.to(data.enquiryId).emit("receive_message", data);
+    } catch (err) {
+      console.error("Socket message error:", err);
+    }
   });
 
   socket.on("disconnect", () => {
     console.log("🔴 Socket disconnected:", socket.id);
   });
-});
+});   
 
 /**********************************************************
  * GLOBAL ERROR HANDLER

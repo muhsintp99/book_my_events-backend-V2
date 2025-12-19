@@ -1,4 +1,7 @@
 const Portfolio = require("../../models/vendor/Portfolio");
+const Subscription = require("../../models/admin/Subscription");
+const Plan = require("../../models/admin/Plan");
+
 const fs = require("fs");
 const path = require("path");
 
@@ -44,43 +47,161 @@ const extractVideoLink = (input) => {
   return input;
 };
 
-
 // ========================================================
 // ⭐ CREATE PORTFOLIO WORK
 // ========================================================
+// exports.createPortfolio = async (req, res) => {
+//   try {
+//     const { providerId, workTitle, description, tags, module, videoLinks } = req.body;
+
+//     if (!providerId)
+//       return res.status(400).json({ success: false, message: "Provider ID is required" });
+
+//     if (!module)
+//       return res.status(400).json({ success: false, message: "Module is required" });
+
+//     const parsedTags = parseTags(tags);
+//     const media = [];
+
+//     // IMAGES
+//     if (req.files?.images) {
+//       const imgs = req.files.images.map((f) => `uploads/portfolio/${f.filename}`);
+//       if (imgs.length > 0) {
+//         media.push({
+//           type: "image",
+//           images: imgs,
+//           isFeatured: false
+//         });
+//       }
+//     }
+
+//     // VIDEOS
+//     if (req.files?.videos) {
+//       const vids = req.files.videos.map((f) => `uploads/portfolio/${f.filename}`);
+//       if (vids.length > 0) {
+//         media.push({
+//           type: "video",
+//           videos: vids,
+//           isFeatured: false
+//         });
+//       }
+//     }
+
+//     // VIDEO LINKS
+//     if (videoLinks) {
+//       let parsed = [];
+//       try {
+//         parsed = JSON.parse(videoLinks);
+//       } catch {
+//         parsed = [videoLinks];
+//       }
+
+//       const links = parsed.map((l) => extractVideoLink(l));
+
+//       if (links.length > 0) {
+//         media.push({
+//           type: "videoLink",
+//           videoLinks: links,
+//           isFeatured: false
+//         });
+//       }
+//     }
+
+//     const newPortfolio = await Portfolio.create({
+//       provider: providerId,
+//       module,
+//       workTitle,
+//       description,
+//       tags: parsedTags,
+//       media
+//     });
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Portfolio created",
+//       data: newPortfolio
+//     });
+
+//   } catch (err) {
+//     console.error("❌ Create Portfolio Error:", err);
+//     res.status(500).json({
+//       success: false,
+//       message: err.message
+//     });
+//   }
+// };
+
 exports.createPortfolio = async (req, res) => {
   try {
-    const { providerId, workTitle, description, tags, module, videoLinks } = req.body;
+    const { providerId, workTitle, description, tags, module, videoLinks } =
+      req.body;
 
     if (!providerId)
-      return res.status(400).json({ success: false, message: "Provider ID is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Provider ID is required" });
 
     if (!module)
-      return res.status(400).json({ success: false, message: "Module is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Module is required" });
 
+    // -------------------------------------------------
+    // 🔐 SUBSCRIPTION CHECK (BLOCK FREE PLAN)
+    // -------------------------------------------------
+    const activeSubscription = await Subscription.findOne({
+      userId: providerId,
+      moduleId: module,
+      status: "active",
+    }).populate("planId");
+
+    if (!activeSubscription) {
+      return res.status(403).json({
+        success: false,
+        message: "You need an active subscription to create portfolio",
+      });
+    }
+
+    const plan = activeSubscription.planId;
+
+    // If FREE plan → block
+    if (!plan || plan.price === 0 || plan.planType === "free") {
+      return res.status(403).json({
+        success: false,
+        message: "Upgrade your plan to add portfolio works",
+      });
+    }
+
+    // -------------------------------------------------
+    // CONTINUE NORMAL PORTFOLIO CREATION
+    // -------------------------------------------------
     const parsedTags = parseTags(tags);
     const media = [];
 
     // IMAGES
     if (req.files?.images) {
-      const imgs = req.files.images.map((f) => `uploads/portfolio/${f.filename}`);
+      const imgs = req.files.images.map(
+        (f) => `uploads/portfolio/${f.filename}`
+      );
       if (imgs.length > 0) {
         media.push({
           type: "image",
           images: imgs,
-          isFeatured: false
+          isFeatured: false,
         });
       }
     }
 
     // VIDEOS
     if (req.files?.videos) {
-      const vids = req.files.videos.map((f) => `uploads/portfolio/${f.filename}`);
+      const vids = req.files.videos.map(
+        (f) => `uploads/portfolio/${f.filename}`
+      );
       if (vids.length > 0) {
         media.push({
           type: "video",
           videos: vids,
-          isFeatured: false
+          isFeatured: false,
         });
       }
     }
@@ -100,7 +221,7 @@ exports.createPortfolio = async (req, res) => {
         media.push({
           type: "videoLink",
           videoLinks: links,
-          isFeatured: false
+          isFeatured: false,
         });
       }
     }
@@ -111,20 +232,19 @@ exports.createPortfolio = async (req, res) => {
       workTitle,
       description,
       tags: parsedTags,
-      media
+      media,
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
-      message: "Portfolio created",
-      data: newPortfolio
+      message: "Portfolio created successfully",
+      data: newPortfolio,
     });
-
   } catch (err) {
     console.error("❌ Create Portfolio Error:", err);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: err.message
+      message: err.message,
     });
   }
 };
@@ -141,14 +261,13 @@ exports.getAllPortfolio = async (req, res) => {
     res.json({
       success: true,
       count: portfolio.length,
-      data: portfolio
+      data: portfolio,
     });
   } catch (err) {
     console.error("❌ Get All Portfolio Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 
 // ========================================================
 // ⭐ GET PORTFOLIO BY PROVIDER
@@ -162,7 +281,7 @@ exports.getPortfolioByProvider = async (req, res) => {
     res.json({
       success: true,
       count: portfolio.length,
-      data: portfolio
+      data: portfolio,
     });
   } catch (err) {
     console.error("❌ Get Portfolio Error:", err);
@@ -182,7 +301,7 @@ exports.getPortfolioByModule = async (req, res) => {
     res.json({
       success: true,
       count: portfolio.length,
-      data: portfolio
+      data: portfolio,
     });
   } catch (err) {
     console.error("❌ Get Portfolio Module Error:", err);
@@ -195,17 +314,19 @@ exports.getPortfolioByModule = async (req, res) => {
 // ========================================================
 exports.getPortfolioById = async (req, res) => {
   try {
-    const item = await Portfolio.findById(req.params.id).populate("module", "title");
+    const item = await Portfolio.findById(req.params.id).populate(
+      "module",
+      "title"
+    );
 
     if (!item) {
       return res.status(404).json({
         success: false,
-        message: "Portfolio not found"
+        message: "Portfolio not found",
       });
     }
 
     res.json({ success: true, data: item });
-
   } catch (err) {
     console.error("❌ Get Portfolio Error:", err);
     res.status(500).json({ success: false, message: err.message });
@@ -220,7 +341,9 @@ exports.updatePortfolio = async (req, res) => {
     const portfolio = await Portfolio.findById(req.params.id);
 
     if (!portfolio)
-      return res.status(404).json({ success: false, message: "Portfolio not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Portfolio not found" });
 
     const { workTitle, description, tags, videoLinks } = req.body;
 
@@ -232,13 +355,17 @@ exports.updatePortfolio = async (req, res) => {
 
     // New images
     if (req.files?.images) {
-      const imgs = req.files.images.map((f) => `uploads/portfolio/${f.filename}`);
+      const imgs = req.files.images.map(
+        (f) => `uploads/portfolio/${f.filename}`
+      );
       media.push({ type: "image", images: imgs, isFeatured: false });
     }
 
     // New videos
     if (req.files?.videos) {
-      const vids = req.files.videos.map((f) => `uploads/portfolio/${f.filename}`);
+      const vids = req.files.videos.map(
+        (f) => `uploads/portfolio/${f.filename}`
+      );
       media.push({ type: "video", videos: vids, isFeatured: false });
     }
 
@@ -264,9 +391,8 @@ exports.updatePortfolio = async (req, res) => {
     res.json({
       success: true,
       message: "Portfolio updated successfully",
-      data: portfolio
+      data: portfolio,
     });
-
   } catch (err) {
     console.error("❌ Update Portfolio Error:", err);
     res.status(500).json({ success: false, message: err.message });
@@ -283,7 +409,7 @@ exports.deletePortfolio = async (req, res) => {
     if (!portfolio)
       return res.status(404).json({
         success: false,
-        message: "Portfolio not found"
+        message: "Portfolio not found",
       });
 
     // Delete all files associated
@@ -305,9 +431,8 @@ exports.deletePortfolio = async (req, res) => {
 
     res.json({
       success: true,
-      message: "Portfolio deleted successfully"
+      message: "Portfolio deleted successfully",
     });
-
   } catch (err) {
     console.error("❌ Delete Portfolio Error:", err);
     res.status(500).json({ success: false, message: err.message });
@@ -324,12 +449,16 @@ exports.toggleFeaturedMedia = async (req, res) => {
     const portfolio = await Portfolio.findById(workId);
 
     if (!portfolio)
-      return res.status(404).json({ success: false, message: "Portfolio not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Portfolio not found" });
 
     const mediaItem = portfolio.media[mediaIndex];
 
     if (!mediaItem)
-      return res.status(400).json({ success: false, message: "Invalid media index" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid media index" });
 
     mediaItem.isFeatured = !mediaItem.isFeatured;
     await portfolio.save();
@@ -337,9 +466,8 @@ exports.toggleFeaturedMedia = async (req, res) => {
     res.json({
       success: true,
       message: "Featured status toggled",
-      data: portfolio
+      data: portfolio,
     });
-
   } catch (err) {
     console.error("❌ Toggle Featured Error:", err);
     res.status(500).json({ success: false, message: err.message });
