@@ -1405,73 +1405,181 @@ exports.login = async (req, res) => {
     await user.save();
 
     // GET VENDOR PROFILE (IF VENDOR)
-    let vendorProfile = null;
-    if (user.role === "vendor") {
-      vendorProfile = await VendorProfile.findOne({ user: user._id }).populate([
-        {
-          path: "module",
-          select: "moduleId title icon categories isActive",
-          populate: {
-            path: "categories",
-            select: "title description isActive",
-          },
-        },
-        {
-          path: "zone",
-          select: "name description city country isActive",
-        },
-      ]);
-    }
+    // let vendorProfile = null;
+    // if (user.role === "vendor") {
+    //   vendorProfile = await VendorProfile.findOne({ user: user._id }).populate([
+    //     {
+    //       path: "module",
+    //       select: "moduleId title icon categories isActive",
+    //       populate: {
+    //         path: "categories",
+    //         select: "title description isActive",
+    //       },
+    //     },
+    //     {
+    //       path: "zone",
+    //       select: "name description city country isActive",
+    //     },
+    //   ]);
+    // }
 
-    // SUBSCRIPTION INFO
-    let subscriptionInfo = {
-      isSubscribed: false,
-      plan: null,
-      expiresOn: null,
-      status: "none",
+    // // SUBSCRIPTION INFO
+    // let subscriptionInfo = {
+    //   isSubscribed: false,
+    //   plan: null,
+    //   expiresOn: null,
+    //   status: "none",
+    // };
+
+    // // FETCH SUBSCRIPTION DETAILS (ONLY FOR VENDORS)
+    // if (user.role === "vendor") {
+    //   const subscriptionData = await Subscription.findOne({ userId: user._id })
+    //     .populate("planId")
+    //     .populate("moduleId")
+    //     .sort({ createdAt: -1 });
+
+    //   if (subscriptionData) {
+    //     subscriptionInfo = {
+    //       isSubscribed:
+    //         subscriptionData.status === "active" ||
+    //         subscriptionData.status === "trial",
+
+    //       plan: subscriptionData.planId || null,
+    //       module: subscriptionData.moduleId || null,
+
+    //       startDate: subscriptionData.startDate,
+    //       endDate: subscriptionData.endDate,
+
+    //       status: subscriptionData.status,
+    //       autoRenew: subscriptionData.autoRenew,
+    //       paymentId: subscriptionData.paymentId,
+    //       createdAt: subscriptionData.createdAt,
+    //     };
+    //   }
+    // }
+
+
+
+
+    // GET VENDOR PROFILE (IF VENDOR)
+let vendorProfile = null;
+if (user.role === "vendor") {
+  vendorProfile = await VendorProfile.findOne({ user: user._id }).populate([
+    {
+      path: "module",
+      select: "moduleId title icon categories isActive",
+      populate: {
+        path: "categories",
+        select: "title description isActive",
+      },
+    },
+    {
+      path: "zone",
+      select: "name description city country isActive",
+    },
+  ]);
+}
+
+/* =====================================================
+   🔥 ADD THIS BLOCK RIGHT HERE (EXACT PLACE)
+===================================================== */
+
+// ================= SUBSCRIPTION + UPGRADE DETAILS =================
+let upgradeDetails = {
+  isSubscribed: false,
+  status: "none",
+  plan: null,
+  module: null,
+  billing: null,
+  access: {
+    canAccess: false,
+    isTrial: false,
+    isExpired: false,
+    daysLeft: 0
+  }
+};
+
+if (user.role === "vendor") {
+  const subscription = await Subscription.findOne({ userId: user._id })
+    .populate("planId")
+    .populate("moduleId")
+    .sort({ createdAt: -1 });
+
+  if (subscription) {
+    const now = new Date();
+    const isExpired = subscription.endDate < now;
+    const daysLeft = Math.max(
+      0,
+      Math.ceil((subscription.endDate - now) / (1000 * 60 * 60 * 24))
+    );
+
+    upgradeDetails = {
+      isSubscribed: ["active", "trial"].includes(subscription.status),
+      status: subscription.status,
+
+      plan: subscription.planId,
+      module: subscription.moduleId,
+
+      billing: {
+        startDate: subscription.startDate,
+        endDate: subscription.endDate,
+        paymentId: subscription.paymentId,
+        autoRenew: subscription.autoRenew
+      },
+
+      access: {
+        canAccess: subscription.status === "active" && !isExpired,
+        isTrial: subscription.status === "trial",
+        isExpired,
+        daysLeft
+      }
     };
 
-    // FETCH SUBSCRIPTION DETAILS (ONLY FOR VENDORS)
-    if (user.role === "vendor") {
-      const subscriptionData = await Subscription.findOne({ userId: user._id })
-        .populate("planId")
-        .populate("moduleId")
-        .sort({ createdAt: -1 });
+    // 🔥 SYNC INTO VENDOR PROFILE
+    if (vendorProfile) {
+      vendorProfile.subscriptionPlan = subscription.planId?._id;
+      vendorProfile.subscriptionStatus = subscription.status;
+      vendorProfile.subscriptionStartDate = subscription.startDate;
+      vendorProfile.subscriptionEndDate = subscription.endDate;
+      vendorProfile.lastPaymentDate = subscription.createdAt;
+      vendorProfile.isFreeTrial = subscription.status === "trial";
 
-      if (subscriptionData) {
-        subscriptionInfo = {
-          isSubscribed:
-            subscriptionData.status === "active" ||
-            subscriptionData.status === "trial",
-
-          plan: subscriptionData.planId || null,
-          module: subscriptionData.moduleId || null,
-
-          startDate: subscriptionData.startDate,
-          endDate: subscriptionData.endDate,
-
-          status: subscriptionData.status,
-          autoRenew: subscriptionData.autoRenew,
-          paymentId: subscriptionData.paymentId,
-          createdAt: subscriptionData.createdAt,
-        };
-      }
+      await vendorProfile.save();
     }
+  }
+}
+
 
     // Create JWT token
     const token = generateJwtToken({ id: user._id });
 
+    // return res.json({
+    //   success: true,
+    //   message: "Logged in successfully",
+    //   vendorId: user._id,
+    //   name: `${user.firstName} ${user.lastName}`,
+    //   token,
+    //   refreshToken,
+    //   profile: vendorProfile,
+    //   subscription: subscriptionInfo,
+    //   user: user.toJSON(),
+    // });
+
     return res.json({
-      success: true,
-      message: "Logged in successfully",
-      vendorId: user._id,
-      name: `${user.firstName} ${user.lastName}`,
-      token,
-      refreshToken,
-      profile: vendorProfile,
-      subscription: subscriptionInfo,
-      user: user.toJSON(),
-    });
+  success: true,
+  message: "Logged in successfully",
+
+  vendorId: user._id,
+  name: `${user.firstName} ${user.lastName}`,
+
+  token,
+  refreshToken,
+
+  profile: vendorProfile,
+  upgrade: upgradeDetails, // 🔥 FULL UPGRADE DETAILS
+  user: user.toJSON(),
+});
+
   } catch (err) {
     console.error("❌ Login Error:", err);
     return res.status(500).json({
