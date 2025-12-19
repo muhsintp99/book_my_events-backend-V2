@@ -972,6 +972,43 @@
 //   }
 // };
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // const User = require("../models/User");
 // const Subscription = require("../models/admin/Subscription");
 // const { generateUserId } = require("../utils/generateId");
@@ -1055,6 +1092,7 @@
 //   }
 // }
 
+
 //       // ✅ BANK DETAILS OBJECT
 //       // const bankDetails = {
 //       //   accountHolderName: accountHolderName || "",
@@ -1076,6 +1114,7 @@
 //         upiId: upiId || ""
 //       }
 //     : undefined;
+
 
 //     // Basic validation
 //     if (!firstName || !lastName || !email) {
@@ -1219,6 +1258,7 @@
 // subscriptionStartDate: null,
 // subscriptionEndDate: null,
 // lastPaymentDate: null,
+
 
 //             module: mongoose.Types.ObjectId.isValid(module)
 //               ? new mongoose.Types.ObjectId(module)
@@ -1463,6 +1503,9 @@
 //     //   }
 //     // }
 
+
+
+
 //     // GET VENDOR PROFILE (IF VENDOR)
 // let vendorProfile = null;
 // if (user.role === "vendor") {
@@ -1536,6 +1579,7 @@
 //   }
 // };
 
+
 //     // 🔥 SYNC INTO VENDOR PROFILE
 //     if (vendorProfile) {
 //       vendorProfile.subscriptionPlan = subscription.planId?._id;
@@ -1549,6 +1593,7 @@
 //     }
 //   }
 // }
+
 
 //     // Create JWT token
 //     const token = generateJwtToken({ id: user._id });
@@ -1836,6 +1881,39 @@
 
 // module.exports = exports;
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const User = require("../models/User");
 const Subscription = require("../models/admin/Subscription");
 const { generateUserId } = require("../utils/generateId");
@@ -1854,22 +1932,6 @@ const {
 const crypto = require("crypto");
 const VendorProfile = require("../models/vendor/vendorProfile");
 const mongoose = require("mongoose");
-
-function getUpgradeStatus(subscription) {
-  if (!subscription) return "none";
-
-  const now = new Date();
-  const isExpired = subscription.endDate && subscription.endDate < now;
-
-  if (subscription.status === "active" && !isExpired) return "complete";
-  if (subscription.status === "trial" && !isExpired) return "trial";
-  if (isExpired) return "expired";
-  if (subscription.status === "pending_payment") return "pending";
-  if (subscription.status === "cancelled") return "cancelled";
-  if (subscription.status === "suspended") return "suspended";
-
-  return "none";
-}
 
 // ------------------ REGISTER ------------------
 exports.register = async (req, res) => {
@@ -1894,7 +1956,7 @@ exports.register = async (req, res) => {
       accountNumber,
       ifscCode,
       branchName,
-      upiId,
+      upiId
     } = req.body;
 
     const finalRole = req.body.role === "vendor" ? "vendor" : "user";
@@ -1916,7 +1978,7 @@ exports.register = async (req, res) => {
       city: "",
       state: "",
       zipCode: "",
-      fullAddress: "",
+      fullAddress: ""
     };
 
     if (req.body.storeAddress) {
@@ -1928,17 +1990,16 @@ exports.register = async (req, res) => {
     }
 
     // Bank details
-    const bankDetails =
-      finalRole === "vendor"
-        ? {
-            accountHolderName: accountHolderName || "",
-            bankName: bankName || "",
-            accountNumber: accountNumber || "",
-            ifscCode: ifscCode || "",
-            branchName: branchName || "",
-            upiId: upiId || "",
-          }
-        : undefined;
+    const bankDetails = finalRole === "vendor"
+      ? {
+          accountHolderName: accountHolderName || "",
+          bankName: bankName || "",
+          accountNumber: accountNumber || "",
+          ifscCode: ifscCode || "",
+          branchName: branchName || "",
+          upiId: upiId || ""
+        }
+      : undefined;
 
     // Basic validation
     if (!firstName || !lastName || !email) {
@@ -1979,8 +2040,7 @@ exports.register = async (req, res) => {
         session.endSession();
         return res.status(400).json({
           success: false,
-          message:
-            "Password is required and must be at least 6 characters for non-vendor roles",
+          message: "Password is required and must be at least 6 characters for non-vendor roles",
         });
       }
       if (phone && !/^\+?[\d\s-]{10,}$/.test(phone)) {
@@ -2018,8 +2078,7 @@ exports.register = async (req, res) => {
       const moduleData = await ModuleModel.findById(module);
       const moduleName = moduleData?.title?.toLowerCase() || "";
 
-      const isBioModule =
-        moduleName === "makeup artist" || moduleName === "photography";
+      const isBioModule = moduleName === "makeup artist" || moduleName === "photography";
       const isVendorTypeModule = moduleName === "makeup artist";
 
       const bioSection = isBioModule
@@ -2126,14 +2185,12 @@ exports.register = async (req, res) => {
         firstName: user[0].firstName,
         lastName: user[0].lastName,
         role: user[0].role,
-        subscriptionStatus: vendorProfile
-          ? vendorProfile.subscriptionStatus
-          : null,
+        subscriptionStatus: vendorProfile ? vendorProfile.subscriptionStatus : null,
         isFreeTrial: vendorProfile ? vendorProfile.isFreeTrial : false,
         subscriptionPlan: vendorProfile ? vendorProfile.subscriptionPlan : null,
         bio: vendorProfile?.bio || null,
         vendorType: vendorProfile?.vendorType || null,
-        bankDetails: vendorProfile?.bankDetails || null,
+        bankDetails: vendorProfile?.bankDetails || null
       },
     };
 
@@ -2143,9 +2200,7 @@ exports.register = async (req, res) => {
     session.endSession();
     console.error("❌ Register Error:", err);
 
-    if (
-      err.message === "Failed to generate unique userId after multiple attempts"
-    ) {
+    if (err.message === "Failed to generate unique userId after multiple attempts") {
       return res.status(500).json({
         success: false,
         message: "Registration failed due to userId generation issue",
@@ -2270,8 +2325,8 @@ exports.login = async (req, res) => {
       access: {
         canAccess: false,
         isExpired: false,
-        daysLeft: 0,
-      },
+        daysLeft: 0
+      }
     };
 
     if (user.role === "vendor") {
@@ -2279,52 +2334,44 @@ exports.login = async (req, res) => {
         .populate("planId")
         .populate("moduleId")
         .sort({ createdAt: -1 });
-if (subscription) {
-  const now = new Date();
-  const isExpired = subscription.endDate && subscription.endDate < now;
-  const daysLeft = subscription.endDate
-    ? Math.max(
-        0,
-        Math.ceil((subscription.endDate - now) / (1000 * 60 * 60 * 24))
-      )
-    : 0;
 
-  // ✅ DEFINE THIS (YOU MISSED THIS)
-  const upgradeStatus = getUpgradeStatus(subscription);
+      if (subscription) {
+        const now = new Date();
+        const isExpired = subscription.endDate < now;
+        const daysLeft = Math.max(
+          0,
+          Math.ceil((subscription.endDate - now) / (1000 * 60 * 60 * 24))
+        );
 
-  upgradeDetails = {
-    isSubscribed: upgradeStatus === "complete", // ✅ FIXED
-    status: upgradeStatus,                      // ✅ UI STATUS
-    rawStatus: subscription.status,             // ✅ DEBUG ONLY
-    plan: subscription.planId,
-    module: subscription.moduleId,
-    billing: {
-      startDate: subscription.startDate,
-      endDate: subscription.endDate,
-      paymentId: subscription.paymentId,
-      autoRenew: subscription.autoRenew
-    },
-    access: {
-      canAccess: upgradeStatus === "complete",
-      isExpired,
-      daysLeft
-    }
-  };
+        upgradeDetails = {
+          isSubscribed: subscription.status === "active",
+          status: subscription.status,
+          plan: subscription.planId,
+          module: subscription.moduleId,
+          billing: {
+            startDate: subscription.startDate,
+            endDate: subscription.endDate,
+            paymentId: subscription.paymentId,
+            autoRenew: subscription.autoRenew
+          },
+          access: {
+            canAccess: subscription.status === "active" && !isExpired,
+            isExpired,
+            daysLeft
+          }
+        };
 
-  // ✅ SAFE SYNC TO VENDOR PROFILE
-  if (vendorProfile) {
-    vendorProfile.subscriptionPlan = subscription.planId?._id;
-    vendorProfile.subscriptionStatus = subscription.status;
-    vendorProfile.subscriptionStartDate = subscription.startDate;
-    vendorProfile.subscriptionEndDate = subscription.endDate;
-    vendorProfile.lastPaymentDate = subscription.createdAt;
-    vendorProfile.isFreeTrial =
-      subscription.status === "trial" && !isExpired;
+        if (vendorProfile) {
+          vendorProfile.subscriptionPlan = subscription.planId?._id;
+          vendorProfile.subscriptionStatus = subscription.status;
+          vendorProfile.subscriptionStartDate = subscription.startDate;
+          vendorProfile.subscriptionEndDate = subscription.endDate;
+          vendorProfile.lastPaymentDate = subscription.createdAt;
+          vendorProfile.isFreeTrial = subscription.status === "trial";
 
-    await vendorProfile.save();
-  }
-}
-
+          await vendorProfile.save();
+        }
+      }
     }
 
     const token = generateJwtToken({ id: user._id });

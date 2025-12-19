@@ -313,29 +313,33 @@ advanceAmount = Number(booking.photographyId?.advanceBookingAmount || 0);
     // 5️⃣ Create Payment Session
     // -----------------------------
     const session = await juspay.orderSession.create({
-      order_id: orderId,
-      action: "paymentPage",
-      amount: amountInRupees,
-      customer_id: booking.userId._id.toString(),
-      customer_email: booking.userId.email,
-      customer_phone: booking.userId.mobile || "9999999999",
-      payment_page_client_id: "hdfcmaster",
-      return_url: `https://www.bookmyevent.ae/payment-success.html`,
-      redirect:true,
-      description: `Advance Payment ${amountInRupees}`,
-      first_name: booking.userId.firstName || "",
-      last_name: booking.userId.lastName || "",
-    });
+  order_id: orderId,
+  action: "paymentPage",
+  amount: amountInRupees,
+  customer_id: booking.userId._id.toString(),
+  customer_email: booking.userId.email,
+  customer_phone: booking.userId.mobile || "9999999999",
+  payment_page_client_id: "hdfcmaster",
+
+  // ✅ MUST STAY
+  return_url: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`,
+  redirect: true,
+
+  description: `Advance Payment ${amountInRupees}`,
+  first_name: booking.userId.firstName || "",
+  last_name: booking.userId.lastName || "",
+});
+
 
     console.log("🎯 Payment Page:", session.payment_links?.web);
 
     // -----------------------------
     // 6️⃣ Clean SDK Payload
     // -----------------------------
-    const sdkPayload = JSON.parse(JSON.stringify(session.sdk_payload));
-    if (sdkPayload?.payload?.returnUrl) {
-      delete sdkPayload.payload.returnUrl;
-    }
+    // const sdkPayload = JSON.parse(JSON.stringify(session.sdk_payload));
+    // if (sdkPayload?.payload?.returnUrl) {
+    //   delete sdkPayload.payload.returnUrl;
+    // }
 
     // -----------------------------
     // 7️⃣ Final Response
@@ -552,7 +556,9 @@ exports.createSubscriptionPayment = async (req, res) => {
     return res.json({
       success: true,
       order_id: orderId,
-      payment_links: session.payment_links
+      payment_links: session.payment_links,
+        sdk_payload: session.sdk_payload // ✅ DO NOT TOUCH
+
     });
 
   } catch (error) {
