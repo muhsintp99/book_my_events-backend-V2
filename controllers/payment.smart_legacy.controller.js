@@ -710,7 +710,7 @@ exports.createSubscriptionPayment = async (req, res) => {
     const amountInRupees = Number(amount).toFixed(2);
     
     // ✅ FIX: Construct return URL
-    const returnUrl =`https://bookmyevent.ae/payment-success/index.html?bookingId=${bookingId}`;
+    const returnUrl = `https://www.bookmyevent.ae/subscription-status.html?status=success&providerId=${providerId}`;
 
     // Create pending subscription
     await Subscription.create({
