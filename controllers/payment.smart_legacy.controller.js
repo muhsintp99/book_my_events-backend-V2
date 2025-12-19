@@ -321,6 +321,7 @@ advanceAmount = Number(booking.photographyId?.advanceBookingAmount || 0);
       customer_phone: booking.userId.mobile || "9999999999",
       payment_page_client_id: "hdfcmaster",
       return_url: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`,
+      redirect:true,
       description: `Advance Payment ${amountInRupees}`,
       first_name: booking.userId.firstName || "",
       last_name: booking.userId.lastName || "",
@@ -543,7 +544,9 @@ exports.createSubscriptionPayment = async (req, res) => {
       customer_id: providerId,
       customer_email: customerEmail,
       customer_phone: customerPhone || "9999999999",
-      return_url: `https://www.bookmyevent.ae/subscription-status.html`
+      return_url: `https://www.bookmyevent.ae/subscription-status.html`,
+       redirect:true,
+
     });
 
     return res.json({
