@@ -861,6 +861,133 @@ exports.juspayWebhook = async (req, res) => {
     return res.sendStatus(200);
   }
 };
+/**
+ * CREATE PAYMENT SESSION FOR SUBSCRIPTION
+ */
+exports.createSubscriptionPayment = async (req, res) => {
+  try {
+    const { providerId, planId, amount, customerEmail, customerPhone } = req.body;
+
+    if (!providerId || !planId || !amount) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields"
+      });
+    }
+
+    const plan = await Plan.findById(planId);
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: "Plan not found"
+      });
+    }
+
+    const orderId = "subscription_" + Date.now();
+    const amountInRupees = Number(amount).toFixed(2);
+    
+    // ✅ FIX: Construct return URL
+    const returnUrl = `https://www.bookmyevent.ae/subscription-status.html?status=success&providerId=${providerId}`;
+
+    // Create pending subscription
+    await Subscription.create({
+      userId: providerId,
+      planId: plan._id,
+      moduleId: plan.moduleId,
+      startDate: new Date(),
+      endDate: new Date(),
+      paymentId: orderId,
+      status: "trial"
+    });
+
+    // Create Juspay Order
+    await juspay.order.create({
+      order_id: orderId,
+      amount: amountInRupees,
+      currency: "INR",
+      customer_id: providerId,
+      customer_email: customerEmail,
+      customer_phone: customerPhone || "9999999999",
+      description: `Subscription Payment - ${plan.name}`,
+      return_url: returnUrl, // ✅ ADD RETURN URL
+    });
+
+    // Create Payment Session
+    const session = await juspay.orderSession.create({
+      order_id: orderId,
+      amount: amountInRupees,
+      action: "paymentPage",
+      payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
+      customer_id: providerId,
+      customer_email: customerEmail,
+      customer_phone: customerPhone || "9999999999",
+      return_url: returnUrl, // ✅ SAME RETURN URL
+      redirect: true, // ✅ ENABLE AUTO-REDIRECT
+    });
+
+    return res.json({
+      success: true,
+      order_id: orderId,
+      payment_links: session.payment_links,
+      return_url: returnUrl, // ✅ CONSISTENT RETURN URL
+    });
+
+  } catch (error) {
+    console.error("❌ Subscription payment error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * HANDLE PAYMENT RESPONSE (S2S Order Status Check)
+ */
+exports.handleJuspayResponse = async (req, res) => {
+  try {
+    const { orderId, bookingId } = req.query;
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        message: "orderId is required",
+      });
+    }
+
+    // Get status from Juspay
+    const order = await juspay.order.status(orderId);
+    const status = order.status;
+
+    let bookingStatus = "pending";
+
+    if (status === "CHARGED") bookingStatus = "completed";
+    else if (["PENDING", "PENDING_VBV", "AUTHORIZING", "NEW"].includes(status))
+      bookingStatus = "pending";
+    else bookingStatus = "failed";
+
+    // Update booking in database
+    if (bookingId) {
+      await Booking.findByIdAndUpdate(bookingId, {
+        paymentStatus: bookingStatus,
+        paymentOrderId: orderId,
+        paidAmount: order.amount,
+      });
+    }
+
+    return res.json({
+      success: bookingStatus === "completed",
+      orderId: order.order_id,
+      amount: order.amount,
+      status: bookingStatus,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error checking payment status",
+    });
+  }
+};
 
 
 

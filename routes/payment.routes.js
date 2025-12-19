@@ -42,5 +42,6 @@ router.post("/create-payment-session", controller.createSmartGatewayPayment);
 
 // Juspay webhook
 router.post("/juspay-webhook", controller.juspayWebhook);
+router.get("/verify-payment", controller.handleJuspayResponse);
 
 module.exports = router;
