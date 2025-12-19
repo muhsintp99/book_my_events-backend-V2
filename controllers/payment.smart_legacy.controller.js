@@ -349,7 +349,8 @@ advanceAmount = Number(booking.photographyId?.advanceBookingAmount || 0);
       order_id: orderId,
       advanceAmount: amountInRupees,
       payment_links: session.payment_links,
-      sdk_payload: sdkPayload,
+        sdk_payload: session.sdk_payload, // ✅ FIXED
+
       return_url: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`,
     });
 
