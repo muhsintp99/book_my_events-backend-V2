@@ -320,7 +320,7 @@ advanceAmount = Number(booking.photographyId?.advanceBookingAmount || 0);
       customer_email: booking.userId.email,
       customer_phone: booking.userId.mobile || "9999999999",
       payment_page_client_id: "hdfcmaster",
-      return_url: `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`,
+      return_url: `https://www.bookmyevent.ae/payment-success.html`,
       redirect:true,
       description: `Advance Payment ${amountInRupees}`,
       first_name: booking.userId.firstName || "",
