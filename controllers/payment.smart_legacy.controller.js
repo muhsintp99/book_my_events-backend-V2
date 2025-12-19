@@ -173,6 +173,9 @@
 const { Juspay, APIError } = require("expresscheckout-nodejs");
 const Booking = require("../models/vendor/Booking");
 const config = require("../config/smartgateway_config.json");
+const Subscription = require("../models/admin/Subscription");
+const Plan = require("../models/admin/Plan");
+
 
 // Initialize SmartGateway with BASIC Authentication (API Key)
 const juspay = new Juspay({
