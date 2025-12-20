@@ -1,10 +1,8 @@
-
 // const { Juspay, APIError } = require("expresscheckout-nodejs");
 // const Booking = require("../models/vendor/Booking");
 // const config = require("../config/smartgateway_config.json");
 // const Subscription = require("../models/admin/Subscription");
 // const Plan = require("../models/admin/Plan");
-
 
 // // Initialize SmartGateway with BASIC Authentication (API Key)
 // const juspay = new Juspay({
@@ -68,7 +66,7 @@
 //       .populate("venueId")
 //       .populate("makeupId")
 //       .populate("moduleId")
-//       .populate("photographyId") 
+//       .populate("photographyId")
 
 //     if (!booking) {
 //       return res.status(404).json({
@@ -95,7 +93,7 @@
 
 //   if (moduleType === "Venues") {
 //     advanceAmount = Number(booking.venueId?.advanceDeposit) || 0;
-//   } 
+//   }
 //   else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
 //     advanceAmount = Number(booking.makeupId?.advanceBookingAmount) || 0;
 //   }
@@ -106,7 +104,6 @@
 //     advanceAmount = Number(booking.serviceProvider?.advanceBookingAmount) || 0;
 //   }
 // }
-
 
 //     console.log("✅ Final Computed Advance Amount:", advanceAmount);
 
@@ -187,7 +184,6 @@
 //   }
 // };
 
-
 // exports.juspayWebhook = async (req, res) => {
 //   try {
 //     console.log("🔔 JUSPAY WEBHOOK:", req.body);
@@ -225,7 +221,6 @@
 //     return res.sendStatus(200);
 //   }
 // };
-
 
 // /**
 //  * CREATE PAYMENT SESSION FOR SUBSCRIPTION
@@ -313,11 +308,6 @@
 // //     });
 // //   }
 // // };
-
-
-
-
-
 
 // exports.createSubscriptionPayment = async (req, res) => {
 //   try {
@@ -442,25 +432,6 @@
 //   }
 // };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const { Juspay, APIError } = require("expresscheckout-nodejs");
 const Booking = require("../models/vendor/Booking");
 const config = require("../config/smartgateway_config.json");
@@ -519,7 +490,9 @@ exports.createSmartGatewayPayment = async (req, res) => {
   try {
     const { bookingId } = req.body;
 
-    console.log("\n===================== PAYMENT DEBUG LOG =====================");
+    console.log(
+      "\n===================== PAYMENT DEBUG LOG ====================="
+    );
 
     // Fetch booking with module info
     const booking = await Booking.findById(bookingId)
@@ -552,9 +525,12 @@ exports.createSmartGatewayPayment = async (req, res) => {
       } else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
         advanceAmount = Number(booking.makeupId?.advanceBookingAmount) || 0;
       } else if (moduleType === "Photography") {
-        advanceAmount = Number(booking.photographyId?.advanceBookingAmount || 0);
+        advanceAmount = Number(
+          booking.photographyId?.advanceBookingAmount || 0
+        );
       } else {
-        advanceAmount = Number(booking.serviceProvider?.advanceBookingAmount) || 0;
+        advanceAmount =
+          Number(booking.serviceProvider?.advanceBookingAmount) || 0;
       }
     }
 
@@ -571,10 +547,10 @@ exports.createSmartGatewayPayment = async (req, res) => {
     console.log("🏦 FINAL AMOUNT SENT TO HDFC:", amountInRupees);
 
     const orderId = "order_" + Date.now();
-    
+
     // ✅ FIX: Construct return URL ONCE
     // const returnUrl = `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`;
-    const returnUrl =`https://bookmyevent.ae/payment-success/index.html?bookingId=${bookingId}`;
+    const returnUrl = `https://bookmyevent.ae/payment-success/index.html?bookingId=${bookingId}`;
 
     console.log("🔗 Return URL:", returnUrl);
 
@@ -610,8 +586,8 @@ exports.createSmartGatewayPayment = async (req, res) => {
       last_name: booking.userId.lastName || "",
       metadata: {
         bookingId: bookingId,
-        moduleType: "Venues"
-      }
+        moduleType: "Venues",
+      },
     });
 
     console.log("🎯 Payment Page:", session.payment_links?.web);
@@ -633,7 +609,6 @@ exports.createSmartGatewayPayment = async (req, res) => {
       sdk_payload: sdkPayload,
       return_url: returnUrl, // ✅ SAME RETURN URL IN RESPONSE
     });
-
   } catch (error) {
     console.error("❌ Payment Error:", error.response?.data || error.message);
     return res.status(500).json({
@@ -689,12 +664,13 @@ exports.juspayWebhook = async (req, res) => {
  */
 exports.createSubscriptionPayment = async (req, res) => {
   try {
-    const { providerId, planId, amount, customerEmail, customerPhone } = req.body;
+    const { providerId, planId, amount, customerEmail, customerPhone } =
+      req.body;
 
     if (!providerId || !planId || !amount) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields"
+        message: "Missing required fields",
       });
     }
 
@@ -702,15 +678,17 @@ exports.createSubscriptionPayment = async (req, res) => {
     if (!plan) {
       return res.status(404).json({
         success: false,
-        message: "Plan not found"
+        message: "Plan not found",
       });
     }
 
     const orderId = "subscription_" + Date.now();
     const amountInRupees = Number(amount).toFixed(2);
-    
+
     // ✅ FIX: Construct return URL
     // const returnUrl = `https://www.bookmyevent.ae/subscription-status.html?status=success&providerId=${providerId}`;
+    const returnUrl = `https://www.bookmyevent.ae/makeupartist/upgrade?order_id=${orderId}`;
+
 
     // Create pending subscription
     await Subscription.create({
@@ -720,7 +698,7 @@ exports.createSubscriptionPayment = async (req, res) => {
       startDate: new Date(),
       endDate: new Date(),
       paymentId: orderId,
-      status: "trial"
+      status: "trial",
     });
 
     // Create Juspay Order
@@ -746,8 +724,7 @@ exports.createSubscriptionPayment = async (req, res) => {
       customer_phone: customerPhone || "9999999999",
       return_url: returnUrl, // ✅ SAME RETURN URL
       redirect: true, // ✅ ENABLE AUTO-REDIRECT
-        analytics: false
-
+      analytics: false,
     });
 
     return res.json({
@@ -756,15 +733,48 @@ exports.createSubscriptionPayment = async (req, res) => {
       payment_links: session.payment_links,
       return_url: returnUrl, // ✅ CONSISTENT RETURN URL
     });
-
   } catch (error) {
     console.error("❌ Subscription payment error:", error);
     return res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
+
+
+exports.verifySubscriptionPayment = async (req, res) => {
+  try {
+    const { orderId } = req.body;
+
+    const order = await juspay.order.status({ order_id: orderId });
+
+    if (order.status !== "CHARGED") {
+      return res.status(400).json({
+        success: false,
+        message: "Payment not successful"
+      });
+    }
+
+    // Activate subscription
+    await Subscription.findOneAndUpdate(
+      { paymentId: orderId },
+      {
+        status: "active",
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+      }
+    );
+
+    return res.json({
+      success: true,
+      message: "Subscription activated"
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 
 /**
  * HANDLE PAYMENT RESPONSE (S2S Order Status Check)
