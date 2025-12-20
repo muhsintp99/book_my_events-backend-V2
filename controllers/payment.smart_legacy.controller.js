@@ -770,13 +770,16 @@ exports.createSubscriptionPayment = async (req, res) => {
   try {
     const { providerId, planId, customerEmail, customerPhone } = req.body;
 
+    console.log("📥 Payment request:", { providerId, planId, customerEmail, customerPhone });
+
     if (!providerId || !planId) {
       return res.status(400).json({
         success: false,
-        message: "Missing required fields",
+        message: "Missing required fields: providerId and planId",
       });
     }
 
+    // Get plan details
     const plan = await Plan.findById(planId);
     if (!plan) {
       return res.status(404).json({
@@ -785,17 +788,18 @@ exports.createSubscriptionPayment = async (req, res) => {
       });
     }
 
+    console.log("📋 Plan found:", { name: plan.name, price: plan.price, moduleId: plan.moduleId });
+
     const orderId = "subscription_" + Date.now();
     const amountInRupees = Number(plan.price).toFixed(2);
 
-    // 🔑 Use SAME STYLE of return URL as customer
-    const returnUrl =
-      `https://vendor.bookmyevent.ae/makeupartist/upgrade?orderId=${orderId}`;
+    // Return URL with orderId
+    const returnUrl = `https://vendor.bookmyevent.ae/makeupartist/upgrade?orderId=${orderId}`;
 
-    console.log("🔗 Subscription Return URL:", returnUrl);
+    console.log("🔗 Return URL:", returnUrl);
 
-    // Create pending subscription
-    await Subscription.create({
+    // 1️⃣ Create pending subscription FIRST
+    const newSubscription = await Subscription.create({
       userId: providerId,
       planId: plan._id,
       moduleId: plan.moduleId,
@@ -803,109 +807,159 @@ exports.createSubscriptionPayment = async (req, res) => {
       status: "pending",
     });
 
-    // Create Juspay Order (same as customer)
-    await juspay.order.create({
+    console.log("✅ Subscription created:", newSubscription._id);
+
+    // 2️⃣ Create Juspay Order
+    console.log("🏗️ Creating Juspay order...");
+    
+    const orderResponse = await juspay.order.create({
       order_id: orderId,
       amount: amountInRupees,
       currency: "INR",
       customer_id: providerId,
-      customer_email: customerEmail,
+      customer_email: customerEmail || "customer@example.com",
       customer_phone: customerPhone || "9999999999",
-      description: `Subscription Payment ₹${amountInRupees}`,
+      description: `Subscription: ${plan.name} - ₹${amountInRupees}`,
       return_url: returnUrl,
     });
 
-    // Create Payment Session (MATCH CUSTOMER FLOW)
+    console.log("✅ Juspay order created:", orderResponse.order_id);
+
+    // 3️⃣ Create Payment Session
+    console.log("🔐 Creating payment session...");
+    
     const session = await juspay.orderSession.create({
       order_id: orderId,
       action: "paymentPage",
       amount: amountInRupees,
       currency: "INR",
-
+      
       customer_id: providerId,
-      customer_email: customerEmail,
+      customer_email: customerEmail || "customer@example.com",
       customer_phone: customerPhone || "9999999999",
-
-      payment_page_client_id: "hdfcmaster", // 🔥 SAME AS CUSTOMER
+      
+      payment_page_client_id: "hdfcmaster",
       return_url: returnUrl,
-
+      
       redirect: true,
       auto_redirect: true,
-
-      description: `Subscription Payment ₹${amountInRupees}`,
+      
+      description: `Subscription: ${plan.name} - ₹${amountInRupees}`,
     });
 
-    console.log("🎯 Subscription Payment Page:", session.payment_links?.web);
+    console.log("✅ Payment session created");
+    console.log("🎯 Payment page URL:", session.payment_links?.web);
 
-  return res.json({
-  success: true,
-  order_id: orderId,
-  amount: amountInRupees,                // 🔥 ADD
-  plan: {
-    id: plan._id,
-    name: plan.name,
-    durationInDays: plan.durationInDays
-  },
-  payment_links: session.payment_links,
-  sdk_payload: session.sdk_payload,      // 🔥 ADD THIS
-  return_url: returnUrl
-});
+    // 4️⃣ Return response
+    return res.json({
+      success: true,
+      order_id: orderId,
+      amount: amountInRupees,
+      plan: {
+        id: plan._id,
+        name: plan.name,
+        durationInDays: plan.durationInDays
+      },
+      payment_links: session.payment_links,
+      sdk_payload: session.sdk_payload,
+      return_url: returnUrl
+    });
 
   } catch (error) {
-    console.error("❌ Subscription payment error:", error.response?.data || error.message);
+    console.error("❌ Subscription payment error:");
+    console.error("Error message:", error.message);
+    console.error("Error response:", error.response?.data);
+    console.error("Full error:", error);
+    
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: error.message || "Payment creation failed",
+      error: error.response?.data || error.toString()
     });
   }
 };
 
 
 // GET /api/subscription/verify
+// FIXED VERSION - Replace your verifySubscriptionPayment function
+
 exports.verifySubscriptionPayment = async (req, res) => {
   try {
-    const { order_id } = req.query;
+    const { orderId } = req.body; // Changed from req.query to req.body
 
-    if (!order_id) {
+    if (!orderId) {
       return res.status(400).json({
         success: false,
-        message: "order_id missing"
+        message: "orderId missing"
       });
     }
 
-    const order = await juspay.order.status(order_id);
+    console.log("🔍 Verifying payment for order:", orderId);
+
+    // Get order status from Juspay
+    const order = await juspay.order.status(orderId);
+    console.log("📦 Juspay order status:", order.status);
 
     if (order.status !== "CHARGED") {
       return res.json({
         success: false,
-        status: order.status
+        status: order.status,
+        message: "Payment not completed"
       });
     }
 
-    // Activate subscription
-    await Subscription.findOneAndUpdate(
-      { paymentId: order_id },
+    // Find the pending subscription
+    const subscription = await Subscription.findOne({ paymentId: orderId });
+    
+    if (!subscription) {
+      return res.status(404).json({
+        success: false,
+        message: "Subscription not found"
+      });
+    }
+
+    // Get plan to calculate end date
+    const plan = await Plan.findById(subscription.planId);
+    
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: "Plan not found"
+      });
+    }
+
+    // Activate subscription with correct duration
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + plan.durationInDays);
+
+    const updatedSubscription = await Subscription.findOneAndUpdate(
+      { paymentId: orderId },
       {
         status: "active",
-        startDate: new Date(),
-        endDate: new Date(
-          Date.now() + 30 * 24 * 60 * 60 * 1000 // 30 days
-        )
-      }
-    );
+        startDate: startDate,
+        endDate: endDate
+      },
+      { new: true }
+    ).populate('planId').populate('moduleId', 'title icon');
+
+    console.log("✅ Subscription activated:", updatedSubscription._id);
 
     return res.json({
       success: true,
       orderId: order.order_id,
-      amount: order.amount
+      amount: order.amount,
+      subscription: updatedSubscription
     });
 
   } catch (err) {
-    console.error("Subscription verify error:", err);
-    res.status(500).json({ success: false });
+    console.error("❌ Subscription verify error:", err);
+    res.status(500).json({ 
+      success: false,
+      message: err.message 
+    });
   }
 };
-
 /**
  * HANDLE PAYMENT RESPONSE (S2S Order Status Check)
  */
