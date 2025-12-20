@@ -883,7 +883,7 @@ const vendorProfileSchema = new mongoose.Schema(
 
     subscriptionStatus: {
       type: String,
-      enum: ["none", "trial", "pending_payment", "active", "expired", "cancelled", "suspended"],
+      enum: ["none", "trial","pending", "pending_payment", "active", "expired", "cancelled", "suspended"],
       default: "none",
       index: true
     },

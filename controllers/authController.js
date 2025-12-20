@@ -1933,6 +1933,152 @@ const crypto = require("crypto");
 const VendorProfile = require("../models/vendor/vendorProfile");
 const mongoose = require("mongoose");
 
+
+function mapSubscriptionStatus(subscriptionStatus) {
+  const statusMap = {
+    'active': 'active',
+    'trial': 'trial',
+    'cancelled': 'cancelled',
+    'expired': 'expired',
+    'pending': 'pending_payment', // Map 'pending' to 'pending_payment'
+    'suspended': 'suspended'
+  };
+  
+  return statusMap[subscriptionStatus] || 'none';
+}
+
+// ------------------ LOGIN (FIXED) ------------------
+exports.login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide email and password",
+      });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
+
+    const refreshToken = crypto.randomBytes(32).toString("hex");
+    user.refreshToken = refreshToken;
+    user.lastLogin = new Date();
+    await user.save();
+
+    let vendorProfile = null;
+    if (user.role === "vendor") {
+      vendorProfile = await VendorProfile.findOne({ user: user._id }).populate([
+        {
+          path: "module",
+          select: "moduleId title icon categories isActive",
+          populate: {
+            path: "categories",
+            select: "title description isActive",
+          },
+        },
+        {
+          path: "zone",
+          select: "name description city country isActive",
+        },
+      ]);
+    }
+
+    let upgradeDetails = {
+      isSubscribed: false,
+      status: "none",
+      plan: null,
+      module: null,
+      billing: null,
+      access: {
+        canAccess: false,
+        isExpired: false,
+        daysLeft: 0
+      }
+    };
+
+    if (user.role === "vendor") {
+      const subscription = await Subscription.findOne({ userId: user._id })
+        .populate("planId")
+        .populate("moduleId")
+        .sort({ createdAt: -1 });
+
+      if (subscription) {
+        const now = new Date();
+        const isExpired = subscription.endDate < now;
+        const daysLeft = Math.max(
+          0,
+          Math.ceil((subscription.endDate - now) / (1000 * 60 * 60 * 24))
+        );
+
+        upgradeDetails = {
+          isSubscribed: subscription.status === "active",
+          status: subscription.status,
+          plan: subscription.planId,
+          module: subscription.moduleId,
+          billing: {
+            startDate: subscription.startDate,
+            endDate: subscription.endDate,
+            paymentId: subscription.paymentId,
+            autoRenew: subscription.autoRenew
+          },
+          access: {
+            canAccess: subscription.status === "active" && !isExpired,
+            isExpired,
+            daysLeft
+          }
+        };
+
+        if (vendorProfile) {
+          vendorProfile.subscriptionPlan = subscription.planId?._id;
+          // ✅ FIXED: Use the mapping function
+          vendorProfile.subscriptionStatus = mapSubscriptionStatus(subscription.status);
+          vendorProfile.subscriptionStartDate = subscription.startDate;
+          vendorProfile.subscriptionEndDate = subscription.endDate;
+          vendorProfile.lastPaymentDate = subscription.createdAt;
+          vendorProfile.isFreeTrial = subscription.status === "trial";
+
+          await vendorProfile.save();
+        }
+      }
+    }
+
+    const token = generateJwtToken({ id: user._id });
+
+    return res.json({
+      success: true,
+      message: "Logged in successfully",
+      vendorId: user._id,
+      name: `${user.firstName} ${user.lastName}`,
+      token,
+      refreshToken,
+      profile: vendorProfile,
+      upgrade: upgradeDetails,
+      user: user.toJSON(),
+    });
+  } catch (err) {
+    console.error("❌ Login Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Login failed",
+      error: err.message,
+    });
+  }
+};
 // ------------------ REGISTER ------------------
 exports.register = async (req, res) => {
   const session = await User.startSession();
@@ -2363,7 +2509,7 @@ exports.login = async (req, res) => {
 
         if (vendorProfile) {
           vendorProfile.subscriptionPlan = subscription.planId?._id;
-          vendorProfile.subscriptionStatus = subscription.status;
+vendorProfile.subscriptionStatus = mapSubscriptionStatus(subscription.status);
           vendorProfile.subscriptionStartDate = subscription.startDate;
           vendorProfile.subscriptionEndDate = subscription.endDate;
           vendorProfile.lastPaymentDate = subscription.createdAt;
