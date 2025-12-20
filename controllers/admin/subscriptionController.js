@@ -115,43 +115,56 @@ exports.subscribeUser = async (req, res) => {
   try {
     const { userId, planId, moduleId, paymentId } = req.body;
 
-    if (!moduleId) {
-      return res.status(400).json({ success: false, message: "moduleId is required" });
+    // 1️⃣ Validation
+    if (!userId || !planId || !moduleId || !paymentId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId, planId, moduleId, paymentId are required"
+      });
     }
 
+    // 2️⃣ Check plan exists
     const plan = await Plan.findById(planId);
     if (!plan) {
-      return res.status(404).json({ success: false, message: "Plan not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Plan not found"
+      });
     }
 
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + plan.durationInDays);
+    // 3️⃣ Cancel previous active subscription for this module
+    await Subscription.updateMany(
+      { userId, moduleId, status: "active" },
+      { status: "cancelled" }
+    );
 
+    // 4️⃣ CREATE SUBSCRIPTION (PENDING)
     const subscription = await Subscription.create({
       userId,
       planId,
       moduleId,
-      startDate,
-      endDate,
       paymentId,
-      status: "active"
+      status: "pending" // ✅ VERY IMPORTANT
     });
 
     const populated = await Subscription.findById(subscription._id)
       .populate("planId")
       .populate("moduleId", "title icon");
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
-      subscription: populated,
-      message: "Subscription activated successfully"
+      message: "Subscription created. Waiting for payment verification.",
+      subscription: populated
     });
 
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
   }
 };
+
 
 
 

@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const controller = require("../../controllers/admin/subscriptionController");
+const subscriptionRequestController = require("../../controllers/admin/subscriptionRequest.controller");
 
 // PLAN ROUTES
 router.get("/plan/module/:moduleId", controller.getPlansByModule);
@@ -19,5 +20,15 @@ router.put("/cancel/:subscriptionId", controller.cancelSubscription);
 // ADMIN
 router.get("/all", controller.getAllSubscriptions);
 router.put("/update/:subscriptionId", controller.updateSubscription);
+
+
+// SUBSCRIPTION REQUEST ROUTES (NEW)
+// --------------------
+router.get("/requests", subscriptionRequestController.getRequests);
+router.put("/requests/:id/approve", subscriptionRequestController.approveRequest);
+router.put("/requests/:id/reject", subscriptionRequestController.rejectRequest);
+
+
+
 
 module.exports = router;

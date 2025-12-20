@@ -559,6 +559,14 @@ app.use("/api/photography-packages", require("./routes/vendor/photographyPackage
 app.use("/api/enquiries", require("./routes/vendor/enquiryRoutes"));
 app.use("/api/availability", require("./routes/vendor/availabilityRoutes"));
 
+
+
+
+
+app.use("/api/vendor/subscription", require("./routes/vendor/subscriptionRequest.routes"));
+app.use("/api/admin/subscription", require("./routes/admin/subscriptionRoutes"));
+
+
 /**********************************************************
  * SOCKET.IO (LIVE CHAT)
  **********************************************************/
