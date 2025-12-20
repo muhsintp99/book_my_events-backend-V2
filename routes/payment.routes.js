@@ -21,6 +21,10 @@ router.get("/test-connection", controller.testConnection);
 // Main payment creation endpoint
 router.post("/create-payment-session", controller.createSmartGatewayPayment);
 router.post("/juspay-webhook", controller.juspayWebhook);
+router.post(
+  "/subscription/verify",
+  controller.verifySubscriptionPayment
+);
 
 router.post("/create-subscription-payment", controller.createSubscriptionPayment);
 
