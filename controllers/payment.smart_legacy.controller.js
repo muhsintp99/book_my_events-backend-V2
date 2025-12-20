@@ -909,7 +909,14 @@ exports.verifySubscriptionPayment = async (req, res) => {
     }
 
     // Find the pending subscription
-    const subscription = await Subscription.findOne({ paymentId: orderId });
+    // const subscription = await Subscription.findOne({ paymentId: orderId });
+    const subscription = await Subscription.findOne({
+  userId,
+  status: "active"
+})
+.populate("planId")
+.populate("moduleId", "title icon");
+
     
     if (!subscription) {
       return res.status(404).json({
