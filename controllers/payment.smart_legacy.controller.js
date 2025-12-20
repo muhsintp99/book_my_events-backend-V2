@@ -687,7 +687,8 @@ exports.createSubscriptionPayment = async (req, res) => {
 
     // ✅ FIX: Construct return URL
     // const returnUrl = `https://www.bookmyevent.ae/subscription-status.html?status=success&providerId=${providerId}`;
-    const returnUrl = `https://vendor.bookmyevent.ae/makeupartist/upgrade?order_id=${orderId}`;
+const returnUrl =
+  `https://vendor.bookmyevent.ae/payment-success?order_id=${orderId}`;
 
 
     // Create pending subscription
