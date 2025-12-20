@@ -2117,7 +2117,7 @@ exports.register = async (req, res) => {
             bio: bioSection,
             vendorType: vendorTypeValue,
             subscriptionPlan: subscriptionPlan || null,
-            subscriptionStatus: subscriptionPlan ? "pending_payment" : "free",
+subscriptionStatus: subscriptionPlan ? "pending_payment" : "none",
             subscriptionStartDate: null,
             subscriptionEndDate: null,
             lastPaymentDate: null,
