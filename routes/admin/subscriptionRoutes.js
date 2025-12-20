@@ -28,6 +28,7 @@ router.get("/requests", subscriptionRequestController.getRequests);
 router.put("/requests/:id/approve", subscriptionRequestController.approveRequest);
 router.put("/requests/:id/reject", subscriptionRequestController.rejectRequest);
 
+router.get("/status/:providerId", controller.getSubscriptionStatus);
 
 
 

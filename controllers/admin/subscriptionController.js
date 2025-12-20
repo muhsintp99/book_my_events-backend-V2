@@ -14,6 +14,33 @@ const Subscription = require("../../models/admin/Subscription");
 //   }
 // };
 
+// controllers/subscriptionController.js
+
+exports.getSubscriptionStatus = async (req, res) => {
+  try {
+    const { providerId } = req.params;
+
+    const subscription = await Subscription.findOne({
+      userId: providerId,
+      status: "active",
+      endDate: { $gt: new Date() },
+      planId: { $ne: null }
+    })
+      .sort({ createdAt: -1 }) // 🔥 VERY IMPORTANT
+      .populate("planId")
+      .populate("moduleId", "title icon");
+
+    return res.json({
+      success: true,
+      subscription: subscription || null
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
 
 exports.createPlan = async (req, res) => {
   try {
