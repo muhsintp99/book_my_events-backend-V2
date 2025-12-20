@@ -1,8 +1,10 @@
+
 // const { Juspay, APIError } = require("expresscheckout-nodejs");
 // const Booking = require("../models/vendor/Booking");
 // const config = require("../config/smartgateway_config.json");
 // const Subscription = require("../models/admin/Subscription");
 // const Plan = require("../models/admin/Plan");
+
 
 // // Initialize SmartGateway with BASIC Authentication (API Key)
 // const juspay = new Juspay({
@@ -66,7 +68,7 @@
 //       .populate("venueId")
 //       .populate("makeupId")
 //       .populate("moduleId")
-//       .populate("photographyId")
+//       .populate("photographyId") 
 
 //     if (!booking) {
 //       return res.status(404).json({
@@ -93,7 +95,7 @@
 
 //   if (moduleType === "Venues") {
 //     advanceAmount = Number(booking.venueId?.advanceDeposit) || 0;
-//   }
+//   } 
 //   else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
 //     advanceAmount = Number(booking.makeupId?.advanceBookingAmount) || 0;
 //   }
@@ -104,6 +106,7 @@
 //     advanceAmount = Number(booking.serviceProvider?.advanceBookingAmount) || 0;
 //   }
 // }
+
 
 //     console.log("✅ Final Computed Advance Amount:", advanceAmount);
 
@@ -184,6 +187,7 @@
 //   }
 // };
 
+
 // exports.juspayWebhook = async (req, res) => {
 //   try {
 //     console.log("🔔 JUSPAY WEBHOOK:", req.body);
@@ -221,6 +225,7 @@
 //     return res.sendStatus(200);
 //   }
 // };
+
 
 // /**
 //  * CREATE PAYMENT SESSION FOR SUBSCRIPTION
@@ -308,6 +313,11 @@
 // //     });
 // //   }
 // // };
+
+
+
+
+
 
 // exports.createSubscriptionPayment = async (req, res) => {
 //   try {
@@ -432,6 +442,25 @@
 //   }
 // };
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const { Juspay, APIError } = require("expresscheckout-nodejs");
 const Booking = require("../models/vendor/Booking");
 const config = require("../config/smartgateway_config.json");
@@ -490,9 +519,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
   try {
     const { bookingId } = req.body;
 
-    console.log(
-      "\n===================== PAYMENT DEBUG LOG ====================="
-    );
+    console.log("\n===================== PAYMENT DEBUG LOG =====================");
 
     // Fetch booking with module info
     const booking = await Booking.findById(bookingId)
@@ -525,12 +552,9 @@ exports.createSmartGatewayPayment = async (req, res) => {
       } else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
         advanceAmount = Number(booking.makeupId?.advanceBookingAmount) || 0;
       } else if (moduleType === "Photography") {
-        advanceAmount = Number(
-          booking.photographyId?.advanceBookingAmount || 0
-        );
+        advanceAmount = Number(booking.photographyId?.advanceBookingAmount || 0);
       } else {
-        advanceAmount =
-          Number(booking.serviceProvider?.advanceBookingAmount) || 0;
+        advanceAmount = Number(booking.serviceProvider?.advanceBookingAmount) || 0;
       }
     }
 
@@ -547,10 +571,10 @@ exports.createSmartGatewayPayment = async (req, res) => {
     console.log("🏦 FINAL AMOUNT SENT TO HDFC:", amountInRupees);
 
     const orderId = "order_" + Date.now();
-
+    
     // ✅ FIX: Construct return URL ONCE
     // const returnUrl = `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`;
-    const returnUrl = `https://bookmyevent.ae/payment-success/index.html?bookingId=${bookingId}`;
+    const returnUrl =`https://bookmyevent.ae/payment-success/index.html?bookingId=${bookingId}`;
 
     console.log("🔗 Return URL:", returnUrl);
 
@@ -586,8 +610,8 @@ exports.createSmartGatewayPayment = async (req, res) => {
       last_name: booking.userId.lastName || "",
       metadata: {
         bookingId: bookingId,
-        moduleType: "Venues",
-      },
+        moduleType: "Venues"
+      }
     });
 
     console.log("🎯 Payment Page:", session.payment_links?.web);
@@ -609,6 +633,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
       sdk_payload: sdkPayload,
       return_url: returnUrl, // ✅ SAME RETURN URL IN RESPONSE
     });
+
   } catch (error) {
     console.error("❌ Payment Error:", error.response?.data || error.message);
     return res.status(500).json({
@@ -662,12 +687,90 @@ exports.juspayWebhook = async (req, res) => {
 /**
  * CREATE PAYMENT SESSION FOR SUBSCRIPTION
  */
+// exports.createSubscriptionPayment = async (req, res) => {
+//   try {
+//     const { providerId, planId, amount, customerEmail, customerPhone } = req.body;
+
+//     if (!providerId || !planId || !amount) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Missing required fields"
+//       });
+//     }
+
+//     const plan = await Plan.findById(planId);
+//     if (!plan) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Plan not found"
+//       });
+//     }
+
+//     const orderId = "subscription_" + Date.now();
+//     const amountInRupees = Number(amount).toFixed(2);
+    
+//     // ✅ FIX: Construct return URL
+// const returnUrl =
+//   `https://vendor.bookmyevent.ae/makeupartist/upgrade?order_id=${orderId}`;
+
+//     // Create pending subscription
+//     await Subscription.create({
+//       userId: providerId,
+//       planId: plan._id,
+//       moduleId: plan.moduleId,
+//       startDate: new Date(),
+//       endDate: new Date(),
+//       paymentId: orderId,
+//       status: "trial"
+//     });
+
+//     // Create Juspay Order
+//     await juspay.order.create({
+//       order_id: orderId,
+//       amount: amountInRupees,
+//       currency: "INR",
+//       customer_id: providerId,
+//       customer_email: customerEmail,
+//       customer_phone: customerPhone || "9999999999",
+//       description: `Subscription Payment - ${plan.name}`,
+//       return_url: returnUrl, // ✅ ADD RETURN URL
+//     });
+
+//     // Create Payment Session
+//     const session = await juspay.orderSession.create({
+//       order_id: orderId,
+//       amount: amountInRupees,
+//       action: "paymentPage",
+//       payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
+//       customer_id: providerId,
+//       customer_email: customerEmail,
+//       customer_phone: customerPhone || "9999999999",
+//       return_url: returnUrl, // ✅ SAME RETURN URL
+//       redirect: true, // ✅ ENABLE AUTO-REDIRECT
+//         analytics: false
+
+//     });
+
+//     return res.json({
+//       success: true,
+//       order_id: orderId,
+//       payment_links: session.payment_links,
+//       return_url: returnUrl, // ✅ CONSISTENT RETURN URL
+//     });
+
+//   } catch (error) {
+//     console.error("❌ Subscription payment error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: error.message
+//     });
+//   }
+// };
 exports.createSubscriptionPayment = async (req, res) => {
   try {
-    const { providerId, planId, amount, customerEmail, customerPhone } =
-      req.body;
+    const { providerId, planId, customerEmail, customerPhone } = req.body;
 
-    if (!providerId || !planId || !amount) {
+    if (!providerId || !planId) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
@@ -683,26 +786,24 @@ exports.createSubscriptionPayment = async (req, res) => {
     }
 
     const orderId = "subscription_" + Date.now();
-    const amountInRupees = Number(amount).toFixed(2);
+    const amountInRupees = Number(plan.price).toFixed(2);
 
-    // ✅ FIX: Construct return URL
-    // const returnUrl = `https://www.bookmyevent.ae/subscription-status.html?status=success&providerId=${providerId}`;
-const returnUrl =
-  `https://vendor.bookmyevent.ae/payment-success?order_id=${orderId}`;
+    // 🔑 Use SAME STYLE of return URL as customer
+    const returnUrl =
+      `https://vendor.bookmyevent.ae/makeupartist/upgrade?orderId=${orderId}`;
 
+    console.log("🔗 Subscription Return URL:", returnUrl);
 
     // Create pending subscription
     await Subscription.create({
       userId: providerId,
       planId: plan._id,
       moduleId: plan.moduleId,
-      startDate: new Date(),
-      endDate: new Date(),
       paymentId: orderId,
-      status: "trial",
+      status: "pending",
     });
 
-    // Create Juspay Order
+    // Create Juspay Order (same as customer)
     await juspay.order.create({
       order_id: orderId,
       amount: amountInRupees,
@@ -710,32 +811,48 @@ const returnUrl =
       customer_id: providerId,
       customer_email: customerEmail,
       customer_phone: customerPhone || "9999999999",
-      description: `Subscription Payment - ${plan.name}`,
-      return_url: returnUrl, // ✅ ADD RETURN URL
+      description: `Subscription Payment ₹${amountInRupees}`,
+      return_url: returnUrl,
     });
 
-    // Create Payment Session
+    // Create Payment Session (MATCH CUSTOMER FLOW)
     const session = await juspay.orderSession.create({
       order_id: orderId,
-      amount: amountInRupees,
       action: "paymentPage",
-      payment_page_client_id: config.PAYMENT_PAGE_CLIENT_ID,
+      amount: amountInRupees,
+      currency: "INR",
+
       customer_id: providerId,
       customer_email: customerEmail,
       customer_phone: customerPhone || "9999999999",
-      return_url: returnUrl, // ✅ SAME RETURN URL
-      redirect: true, // ✅ ENABLE AUTO-REDIRECT
-      analytics: false,
+
+      payment_page_client_id: "hdfcmaster", // 🔥 SAME AS CUSTOMER
+      return_url: returnUrl,
+
+      redirect: true,
+      auto_redirect: true,
+
+      description: `Subscription Payment ₹${amountInRupees}`,
     });
 
-    return res.json({
-      success: true,
-      order_id: orderId,
-      payment_links: session.payment_links,
-      return_url: returnUrl, // ✅ CONSISTENT RETURN URL
-    });
+    console.log("🎯 Subscription Payment Page:", session.payment_links?.web);
+
+  return res.json({
+  success: true,
+  order_id: orderId,
+  amount: amountInRupees,                // 🔥 ADD
+  plan: {
+    id: plan._id,
+    name: plan.name,
+    durationInDays: plan.durationInDays
+  },
+  payment_links: session.payment_links,
+  sdk_payload: session.sdk_payload,      // 🔥 ADD THIS
+  return_url: returnUrl
+});
+
   } catch (error) {
-    console.error("❌ Subscription payment error:", error);
+    console.error("❌ Subscription payment error:", error.response?.data || error.message);
     return res.status(500).json({
       success: false,
       message: error.message,
@@ -744,38 +861,50 @@ const returnUrl =
 };
 
 
+// GET /api/subscription/verify
 exports.verifySubscriptionPayment = async (req, res) => {
   try {
-    const { orderId } = req.body;
+    const { order_id } = req.query;
 
-    const order = await juspay.order.status({ order_id: orderId });
-
-    if (order.status !== "CHARGED") {
+    if (!order_id) {
       return res.status(400).json({
         success: false,
-        message: "Payment not successful"
+        message: "order_id missing"
+      });
+    }
+
+    const order = await juspay.order.status(order_id);
+
+    if (order.status !== "CHARGED") {
+      return res.json({
+        success: false,
+        status: order.status
       });
     }
 
     // Activate subscription
     await Subscription.findOneAndUpdate(
-      { paymentId: orderId },
+      { paymentId: order_id },
       {
         status: "active",
         startDate: new Date(),
-        endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+        endDate: new Date(
+          Date.now() + 30 * 24 * 60 * 60 * 1000 // 30 days
+        )
       }
     );
 
     return res.json({
       success: true,
-      message: "Subscription activated"
+      orderId: order.order_id,
+      amount: order.amount
     });
+
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error("Subscription verify error:", err);
+    res.status(500).json({ success: false });
   }
 };
-
 
 /**
  * HANDLE PAYMENT RESPONSE (S2S Order Status Check)
