@@ -788,7 +788,7 @@ exports.createSubscriptionPayment = async (req, res) => {
     // Return URL with orderId
     // const returnUrl = `https://vendor.bookmyevent.ae/makeupartist/upgrade?orderId=${orderId}`;
 
-const returnUrl = `http://localhost:5002/makeupartist/upgrade?orderId=${orderId}`;
+const returnUrl = `https://vendor.bookmyevent.ae/payment-success?orderId=${orderId}`;
 
     console.log("🔗 Return URL:", returnUrl);
 
