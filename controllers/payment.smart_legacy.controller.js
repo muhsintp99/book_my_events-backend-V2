@@ -886,8 +886,12 @@ exports.verifySubscriptionPayment = async (req, res) => {
       });
     }
 
+    console.log("🔍 Verifying payment for order:", orderId);
+
     // 1️⃣ Check payment status from Juspay
     const order = await juspay.order.status(orderId);
+    
+    console.log("📊 Juspay order status:", order.status);
 
     if (order.status !== "CHARGED") {
       return res.json({
@@ -904,11 +908,14 @@ exports.verifySubscriptionPayment = async (req, res) => {
     }).populate("planId");
 
     if (!subscription) {
+      console.log("❌ No pending subscription found for:", orderId);
       return res.status(404).json({
         success: false,
         message: "Pending subscription not found",
       });
     }
+
+    console.log("✅ Found subscription:", subscription._id);
 
     // 3️⃣ Cancel ALL other subscriptions for same module
     await Subscription.updateMany(
@@ -923,12 +930,12 @@ exports.verifySubscriptionPayment = async (req, res) => {
       }
     );
 
+    console.log("🗑️ Cancelled old subscriptions");
+
     // 4️⃣ Calculate dates
     const startDate = new Date();
     const endDate = new Date();
-    endDate.setDate(
-      endDate.getDate() + subscription.planId.durationInDays
-    );
+    endDate.setDate(endDate.getDate() + subscription.planId.durationInDays);
 
     // 5️⃣ Activate subscription
     subscription.status = "active";
@@ -938,10 +945,15 @@ exports.verifySubscriptionPayment = async (req, res) => {
 
     await subscription.save();
 
+    console.log("✅ Subscription activated:", subscription._id);
+
     return res.json({
       success: true,
       message: "Plan upgraded successfully",
-      subscription,
+      subscription: {
+        ...subscription.toObject(),
+        daysLeft: subscription.planId.durationInDays
+      }
     });
 
   } catch (err) {
@@ -952,6 +964,7 @@ exports.verifySubscriptionPayment = async (req, res) => {
     });
   }
 };
+
 /**
  * HANDLE PAYMENT RESPONSE (S2S Order Status Check)
  */
