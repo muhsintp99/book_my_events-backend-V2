@@ -28,7 +28,7 @@ exports.getSubscriptionStatus = async (req, res) => {
       });
     }
 
-    // ✅ ALWAYS pick the CURRENT ACTIVE subscription
+    // ✅ STRICT: only ACTIVE + CURRENT subscription
     const subscription = await Subscription.findOne({
       userId,
       moduleId,
@@ -36,24 +36,16 @@ exports.getSubscriptionStatus = async (req, res) => {
       isCurrent: true
     })
       .populate("planId")
-      .populate("moduleId", "title icon")
-      .sort({ updatedAt: -1 }); // optional but safe
+      .populate("moduleId", "title icon");
 
-    if (!subscription) {
-      return res.json({
-        success: true,
-        subscription: null
-      });
-    }
-
-    res.json({
+    return res.json({
       success: true,
-      subscription
+      subscription: subscription || null
     });
 
   } catch (err) {
     console.error("Subscription status error:", err);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to fetch subscription"
     });
@@ -179,10 +171,10 @@ exports.subscribeUser = async (req, res) => {
     }
 
     // 3️⃣ Cancel previous active subscription for this module
-    await Subscription.updateMany(
-      { userId, moduleId, status: "active" },
-      { status: "cancelled" }
-    );
+    // await Subscription.updateMany(
+    //   { userId, moduleId, status: "active" },
+    //   { status: "cancelled" }
+    // );
 
     // 4️⃣ CREATE SUBSCRIPTION (PENDING)
     const subscription = await Subscription.create({
@@ -301,23 +293,23 @@ exports.updatePlan = async (req, res) => {
 // --------------------------------------------------------
 // GET USER SUBSCRIPTION STATUS
 // --------------------------------------------------------
-exports.getUserSubscription = async (req, res) => {
-  try {
-    const { userId } = req.params;
+// exports.getUserSubscription = async (req, res) => {
+//   try {
+//     const { userId } = req.params;
 
-    const subscription = await Subscription.findOne({ userId })
-      .populate("planId")
-      .populate("moduleId", "title icon");
+//     const subscription = await Subscription.findOne({ userId })
+//       .populate("planId")
+//       .populate("moduleId", "title icon");
 
-    if (!subscription) {
-      return res.status(404).json({ success: false, message: "No subscription found" });
-    }
+//     if (!subscription) {
+//       return res.status(404).json({ success: false, message: "No subscription found" });
+//     }
 
-    res.json({ success: true, subscription });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
+//     res.json({ success: true, subscription });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
 
 // --------------------------------------------------------
 // UPGRADE PLAN
@@ -395,10 +387,10 @@ exports.upgradePlan = async (req, res) => {
     }
 
     // ❌ Deactivate ALL previous subscriptions for this module
-    await Subscription.updateMany(
-      { userId, moduleId },
-      { status: "cancelled", isCurrent: false }
-    );
+    // await Subscription.updateMany(
+    //   { userId, moduleId },
+    //   { status: "cancelled", isCurrent: false }
+    // );
 
     const plan = await Plan.findById(planId);
     if (!plan) return res.status(404).json({ success: false, message: "Plan not found" });
@@ -410,7 +402,7 @@ exports.upgradePlan = async (req, res) => {
       paymentId: paymentSession.order_id,
       paymentSession,
       status: "pending",
-      isCurrent: true
+      isCurrent: false  
     });
 
     res.json({

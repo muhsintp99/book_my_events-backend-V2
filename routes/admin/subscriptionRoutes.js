@@ -14,7 +14,6 @@ router.get("/plan/:id", controller.getSinglePlan);
 router.put("/plan/:id", controller.updatePlan);      
 // USER SUBSCRIPTION ROUTES
 router.post("/subscribe", controller.subscribeUser);
-router.get("/status/:userId", controller.getUserSubscription);
 router.put("/cancel/:subscriptionId", controller.cancelSubscription);
 
 // ADMIN
@@ -28,7 +27,7 @@ router.get("/requests", subscriptionRequestController.getRequests);
 router.put("/requests/:id/approve", subscriptionRequestController.approveRequest);
 router.put("/requests/:id/reject", subscriptionRequestController.rejectRequest);
 
-router.get("/status/:providerId", controller.getSubscriptionStatus);
+router.get("/status/:userId", controller.getSubscriptionStatus);
 
 
 

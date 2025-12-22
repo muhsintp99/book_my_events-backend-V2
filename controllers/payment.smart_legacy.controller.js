@@ -786,9 +786,9 @@ exports.createSubscriptionPayment = async (req, res) => {
     const amountInRupees = Number(plan.price).toFixed(2);
 
     // Return URL with orderId
-    const returnUrl = `https://vendor.bookmyevent.ae/makeupartist/upgrade?orderId=${orderId}`;
+    // const returnUrl = `https://vendor.bookmyevent.ae/makeupartist/upgrade?orderId=${orderId}`;
 
-    // const returnUrl = `  https://bookmyevent.ae/payment-success/index.html?orderId=${orderId};`;
+    const returnUrl = `https://bookmyevent.ae/payment-success/index.html?orderId=${orderId};`;
 
     console.log("🔗 Return URL:", returnUrl);
 
