@@ -28,14 +28,16 @@ exports.getSubscriptionStatus = async (req, res) => {
       });
     }
 
+    // ✅ ALWAYS pick the CURRENT ACTIVE subscription
     const subscription = await Subscription.findOne({
       userId,
       moduleId,
-      status: { $in: ["active", "trial"] }
+      status: "active",
+      isCurrent: true
     })
       .populate("planId")
-      .populate("moduleId")
-      .sort({ createdAt: -1 }); // 🔥 MOST IMPORTANT
+      .populate("moduleId", "title icon")
+      .sort({ updatedAt: -1 }); // optional but safe
 
     if (!subscription) {
       return res.json({
@@ -48,6 +50,7 @@ exports.getSubscriptionStatus = async (req, res) => {
       success: true,
       subscription
     });
+
   } catch (err) {
     console.error("Subscription status error:", err);
     res.status(500).json({
