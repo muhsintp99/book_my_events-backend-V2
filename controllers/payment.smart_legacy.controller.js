@@ -636,13 +636,21 @@ exports.juspayWebhook = async (req, res) => {
     if (status === "CHARGED") {
       const plan = await Plan.findById(subscription.planId);
 
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() + plan.durationInDays);
+      await Subscription.updateMany(
+        {
+          userId: subscription.userId,
+          moduleId: subscription.moduleId,
+          _id: { $ne: subscription._id },
+        },
+        { status: "cancelled", isCurrent: false }
+      );
 
-      subscription.startDate = startDate;
-      subscription.endDate = endDate;
       subscription.status = "active";
+      subscription.startDate = new Date();
+      subscription.endDate = new Date(
+        Date.now() + plan.durationInDays * 24 * 60 * 60 * 1000
+      );
+      subscription.isCurrent = true;
 
       await subscription.save();
     }
@@ -778,10 +786,9 @@ exports.createSubscriptionPayment = async (req, res) => {
     const amountInRupees = Number(plan.price).toFixed(2);
 
     // Return URL with orderId
-    // const returnUrl = `https://vendor.bookmyevent.ae/makeupartist/upgrade?orderId=${orderId}`;
+    const returnUrl = `https://vendor.bookmyevent.ae/makeupartist/upgrade?orderId=${orderId}`;
 
-        const returnUrl = `  https://bookmyevent.ae/payment-success/index.html?orderId=${orderId};`;
-
+    // const returnUrl = `  https://bookmyevent.ae/payment-success/index.html?orderId=${orderId};`;
 
     console.log("🔗 Return URL:", returnUrl);
 
@@ -875,80 +882,73 @@ exports.verifySubscriptionPayment = async (req, res) => {
     if (!orderId) {
       return res.status(400).json({
         success: false,
-        message: "orderId missing"
+        message: "orderId is required",
       });
     }
 
-    // 1️⃣ Check payment status
+    // 1️⃣ Check payment status from Juspay
     const order = await juspay.order.status(orderId);
 
     if (order.status !== "CHARGED") {
       return res.json({
         success: false,
         status: order.status,
-        message: "Payment not completed"
+        message: "Payment not completed",
       });
     }
 
-    // 2️⃣ Find subscription by paymentId ONLY
+    // 2️⃣ Find pending subscription
     const subscription = await Subscription.findOne({
-      paymentId: orderId
-    });
+      paymentId: orderId,
+      status: "pending",
+    }).populate("planId");
 
     if (!subscription) {
       return res.status(404).json({
         success: false,
-        message: "Subscription not found"
+        message: "Pending subscription not found",
       });
     }
 
-    // 3️⃣ Prevent double activation
-    if (subscription.status === "active") {
-      return res.json({
-        success: true,
-        message: "Subscription already active",
-        subscription
-      });
-    }
+    // 3️⃣ Cancel ALL other subscriptions for same module
+    await Subscription.updateMany(
+      {
+        userId: subscription.userId,
+        moduleId: subscription.moduleId,
+        _id: { $ne: subscription._id },
+      },
+      {
+        status: "cancelled",
+        isCurrent: false,
+      }
+    );
 
-    // 4️⃣ Get plan
-    const plan = await Plan.findById(subscription.planId);
-    if (!plan) {
-      return res.status(404).json({
-        success: false,
-        message: "Plan not found"
-      });
-    }
-
-    // 5️⃣ Activate
+    // 4️⃣ Calculate dates
     const startDate = new Date();
     const endDate = new Date();
-    endDate.setDate(endDate.getDate() + plan.durationInDays);
+    endDate.setDate(
+      endDate.getDate() + subscription.planId.durationInDays
+    );
 
-    const updatedSubscription = await Subscription.findByIdAndUpdate(
-      subscription._id,
-      {
-        status: "active",
-        startDate,
-        endDate
-      },
-      { new: true }
-    )
-      .populate("planId")
-      .populate("moduleId", "title icon");
+    // 5️⃣ Activate subscription
+    subscription.status = "active";
+    subscription.startDate = startDate;
+    subscription.endDate = endDate;
+    subscription.isCurrent = true;
+
+    await subscription.save();
 
     return res.json({
       success: true,
-      orderId,
-      amount: order.amount,
-      subscription: updatedSubscription
+      message: "Plan upgraded successfully",
+      subscription,
     });
 
   } catch (err) {
-    console.error("❌ Verify error:", err);
-    res.status(500).json({
+    console.error("❌ Verify subscription error:", err);
+    return res.status(500).json({
       success: false,
-      message: err.message
+      message: err.message,
     });
   }
 };

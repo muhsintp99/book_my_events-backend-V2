@@ -23,7 +23,7 @@
 // );
 
 // module.exports = mongoose.model("Subscription", subscriptionSchema);
-const mongoose = require("mongoose");
+const mongoose = require("mongoose"); // ✅ REQUIRED
 
 const subscriptionSchema = new mongoose.Schema(
   {
@@ -45,29 +45,29 @@ const subscriptionSchema = new mongoose.Schema(
       required: true
     },
 
-    // ✅ NOT required initially
-    startDate: {
-      type: Date
-    },
+    startDate: Date,
+    endDate: Date,
 
-    // ✅ NOT required initially
-    endDate: {
-      type: Date
-    },
-
-    // ✅ ADD pending
     status: {
       type: String,
       enum: ["pending", "active", "expired", "cancelled", "trial"],
       default: "pending"
     },
 
-    // 🔑 Used to map payment → subscription
     paymentId: {
       type: String,
       required: true
     },
 
+    // ✅ Payment session stored here
+    paymentSession: {
+      type: Object,
+      default: null
+    },
+isCurrent: {
+  type: Boolean,
+  default: true
+},
     autoRenew: {
       type: Boolean,
       default: false
