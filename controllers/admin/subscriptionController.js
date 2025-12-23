@@ -417,52 +417,59 @@ exports.upgradePlan = async (req, res) => {
 };
 
 
-exports.paymentSuccess = async (req, res) => {
-  try {
-    const { orderId } = req.query;
+// exports.paymentSuccess = async (req, res) => {
+//   try {
+//     const { orderId } = req.query;
 
-    const subscription = await Subscription.findOne({
-      paymentId: orderId,
-      status: "pending"
-    }).populate("planId");
+//     const subscription = await Subscription.findOne({
+//       paymentId: orderId,
+//       status: "pending"
+//     }).populate("planId");
 
-    if (!subscription) {
-      return res.status(404).json({ success: false, message: "Subscription not found" });
-    }
+//     if (!subscription) {
+//       return res.status(404).json({ success: false, message: "Subscription not found" });
+//     }
 
-    // Cancel others
-    await Subscription.updateMany(
-      {
-        userId: subscription.userId,
-        moduleId: subscription.moduleId,
-        _id: { $ne: subscription._id }
-      },
-      { status: "cancelled", isCurrent: false }
-    );
+//     // Cancel others
+//     await Subscription.updateMany(
+//       {
+//         userId: subscription.userId,
+//         moduleId: subscription.moduleId,
+//         _id: { $ne: subscription._id }
+//       },
+//       { status: "cancelled", isCurrent: false }
+//     );
 
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + subscription.planId.durationInDays);
+//     const startDate = new Date();
+//     const endDate = new Date();
+//     endDate.setDate(endDate.getDate() + subscription.planId.durationInDays);
 
+//     subscription.status = "active";
+//     subscription.startDate = startDate;
+//     subscription.endDate = endDate;
+//     subscription.isCurrent = true;
+
+//     await subscription.save();
+
+//     res.json({
+//       success: true,
+//       message: "Plan upgraded successfully",
+//       subscription
+//     });
+
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
+
+exports.juspayWebhook = async (req, res) => {
+  if (status === "CHARGED") {
     subscription.status = "active";
-    subscription.startDate = startDate;
-    subscription.endDate = endDate;
     subscription.isCurrent = true;
-
     await subscription.save();
-
-    res.json({
-      success: true,
-      message: "Plan upgraded successfully",
-      subscription
-    });
-
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
   }
 };
-
-
 
 // --------------------------------------------------------
 // CANCEL SUBSCRIPTION

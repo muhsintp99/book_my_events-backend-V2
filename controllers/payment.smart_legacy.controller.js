@@ -788,7 +788,7 @@ exports.createSubscriptionPayment = async (req, res) => {
     // Return URL with orderId
     // const returnUrl = `https://vendor.bookmyevent.ae/makeupartist/upgrade?orderId=${orderId}`;
 
-const returnUrl = `https://vendor.bookmyevent.ae/payment-success?orderId=${orderId}`;
+const returnUrl = `https://bookmyevent.ae/payment-success/index.html?orderId=test`;
 
     console.log("🔗 Return URL:", returnUrl);
 
@@ -879,91 +879,31 @@ exports.verifySubscriptionPayment = async (req, res) => {
   try {
     const { orderId } = req.body;
 
-    if (!orderId) {
-      return res.status(400).json({
-        success: false,
-        message: "orderId is required",
-      });
-    }
-
-    console.log("🔍 Verifying payment for order:", orderId);
-
-    // 1️⃣ Check payment status from Juspay
-    const order = await juspay.order.status(orderId);
-    
-    console.log("📊 Juspay order status:", order.status);
-
-    if (order.status !== "CHARGED") {
-      return res.json({
-        success: false,
-        status: order.status,
-        message: "Payment not completed",
-      });
-    }
-
-    // 2️⃣ Find pending subscription
     const subscription = await Subscription.findOne({
       paymentId: orderId,
-      status: "pending",
+      status: "active",
+      isCurrent: true
     }).populate("planId");
 
     if (!subscription) {
-      console.log("❌ No pending subscription found for:", orderId);
-      return res.status(404).json({
+      return res.json({
         success: false,
-        message: "Pending subscription not found",
+        message: "Payment not yet confirmed"
       });
     }
 
-    console.log("✅ Found subscription:", subscription._id);
-
-    // 3️⃣ Cancel ALL other subscriptions for same module
-    await Subscription.updateMany(
-      {
-        userId: subscription.userId,
-        moduleId: subscription.moduleId,
-        _id: { $ne: subscription._id },
-      },
-      {
-        status: "cancelled",
-        isCurrent: false,
-      }
-    );
-
-    console.log("🗑️ Cancelled old subscriptions");
-
-    // 4️⃣ Calculate dates
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + subscription.planId.durationInDays);
-
-    // 5️⃣ Activate subscription
-    subscription.status = "active";
-    subscription.startDate = startDate;
-    subscription.endDate = endDate;
-    subscription.isCurrent = true;
-
-    await subscription.save();
-
-    console.log("✅ Subscription activated:", subscription._id);
-
     return res.json({
       success: true,
-      message: "Plan upgraded successfully",
-      subscription: {
-        ...subscription.toObject(),
-        daysLeft: subscription.planId.durationInDays
-      }
+      subscription
     });
-
   } catch (err) {
-    console.error("❌ Verify subscription error:", err);
     return res.status(500).json({
       success: false,
-      message: err.message,
+      message: err.message
     });
   }
 };
+
 
 /**
  * HANDLE PAYMENT RESPONSE (S2S Order Status Check)
