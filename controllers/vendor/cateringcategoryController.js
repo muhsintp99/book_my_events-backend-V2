@@ -517,60 +517,158 @@ exports.getCatering = async (req, res) => {
 };
 
 // ----------------------------- LIST VENDORS FOR MODULE -----------------------------
+// exports.getVendorsForCateringModule = async (req, res) => {
+//   try {
+//     const { moduleId } = req.params;
+
+//     if (!mongoose.Types.ObjectId.isValid(moduleId)) {
+//       return res.status(400).json({ success: false, message: "Invalid module ID" });
+//     }
+
+//     // 🔥 1. Fetch all VendorProfiles assigned to this module
+//     const vendorProfiles = await VendorProfile.find({ module: moduleId })
+//       .select("storeName logo coverImage module user")
+//       .populate("user", "firstName lastName email phone role isActive")
+//       .lean();
+
+//     if (!vendorProfiles.length) {
+//       return res.json({
+//         success: true,
+//         message: "No vendors registered for this module",
+//         data: []
+//       });
+//     }
+
+//     // 🔥 2. Format response
+//     const base = `${req.protocol}://${req.get("host")}`;
+
+//     const formatted = vendorProfiles.map(vp => {
+//       const u = vp.user;
+
+//       return {
+//         vendorId: u?._id,
+//         firstName: u?.firstName,
+//         lastName: u?.lastName,
+//         email: u?.email,
+//         phone: u?.phone,
+
+//         storeName: vp.storeName,
+//         logo: vp.logo ? `${base}${vp.logo}` : null,
+//         coverImage: vp.coverImage ? `${base}${vp.coverImage}` : null,
+
+//         hasPackages: false   // We can override this later if needed
+//       };
+//     });
+
+//     res.json({
+//       success: true,
+//       count: formatted.length,
+//       data: formatted
+//     });
+
+//   } catch (err) {
+//     console.error("❌ Vendor List Error:", err);
+//     res.status(500).json({ success: false, error: err.message });
+//   }
+// };
+
+// ----------------------------- GET VENDORS FOR CATERING MODULE (SINGLE + ALL) -----------------------------
 exports.getVendorsForCateringModule = async (req, res) => {
   try {
     const { moduleId } = req.params;
 
+    // ✅ Support both providerId & providerid
+    const providerId =
+      req.query.providerId ||
+      req.query.providerid ||
+      null;
+
     if (!mongoose.Types.ObjectId.isValid(moduleId)) {
-      return res.status(400).json({ success: false, message: "Invalid module ID" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid module ID"
+      });
     }
 
-    // 🔥 1. Fetch all VendorProfiles assigned to this module
-    const vendorProfiles = await VendorProfile.find({ module: moduleId })
-      .select("storeName logo coverImage module user")
-      .populate("user", "firstName lastName email phone role isActive")
+    // 🔹 Base query
+    let query = { module: moduleId };
+
+    // 🔹 If providerId passed → fetch only that vendor
+    if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
+      query.user = providerId;
+    }
+
+    // 🔥 Fetch VendorProfiles
+    const vendorProfiles = await VendorProfile.find(query)
+      .select("user storeName logo coverImage")
       .lean();
 
     if (!vendorProfiles.length) {
       return res.json({
         success: true,
-        message: "No vendors registered for this module",
-        data: []
+        data: providerId ? null : [],
+        message: "Vendor not found for this module"
       });
     }
 
-    // 🔥 2. Format response
-    const base = `${req.protocol}://${req.get("host")}`;
+    const vendorIds = vendorProfiles.map(vp => vp.user);
 
-    const formatted = vendorProfiles.map(vp => {
-      const u = vp.user;
+    // 🔥 Fetch Users
+    const users = await User.find({ _id: { $in: vendorIds } })
+      .select("firstName lastName email phone profilePhoto")
+      .lean();
+
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+    // 🔥 Merge User + VendorProfile
+    const final = users.map(u => {
+      const vp = vendorProfiles.find(v => v.user.toString() === u._id.toString());
 
       return {
-        vendorId: u?._id,
-        firstName: u?.firstName,
-        lastName: u?.lastName,
-        email: u?.email,
-        phone: u?.phone,
+        _id: u._id,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        email: u.email,
+        phone: u.phone,
 
-        storeName: vp.storeName,
-        logo: vp.logo ? `${base}${vp.logo}` : null,
-        coverImage: vp.coverImage ? `${base}${vp.coverImage}` : null,
+        profilePhoto: u.profilePhoto
+          ? u.profilePhoto.startsWith("http")
+            ? u.profilePhoto
+            : `${baseUrl}${u.profilePhoto}`
+          : null,
 
-        hasPackages: false   // We can override this later if needed
+        storeName: vp?.storeName || `${u.firstName} ${u.lastName}`,
+        logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
+        coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
+
+        hasVendorProfile: !!vp
       };
     });
 
-    res.json({
+    // ⭐ If providerId → return SINGLE vendor
+    if (providerId) {
+      return res.json({
+        success: true,
+        data: final[0] || null
+      });
+    }
+
+    // ⭐ Else → return ALL vendors
+    return res.json({
       success: true,
-      count: formatted.length,
-      data: formatted
+      count: final.length,
+      data: final
     });
 
   } catch (err) {
-    console.error("❌ Vendor List Error:", err);
-    res.status(500).json({ success: false, error: err.message });
+    console.error("❌ Get Catering Vendors Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
   }
 };
+
 
 // ----------------------------- GET PACKAGES BY PROVIDER -----------------------------
 exports.getCateringsByProvider = async (req, res) => {
