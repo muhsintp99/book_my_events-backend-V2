@@ -980,6 +980,7 @@ const Profile = require("../../models/vendor/Profile");
 const Coupon = require("../../models/admin/coupons");
 const Module = require("../../models/admin/module");
 const Photography = require("../../models/vendor/PhotographyPackage");
+const Catering = require("../../models/vendor/Catering");
 
 const AUTH_API_URL = "https://api.bookmyevent.ae/api/auth/login";
 
@@ -1166,6 +1167,33 @@ exports.createBooking = async (req, res) => {
 
         break;
 
+      case "Catering":
+        if (!req.body.cateringId) {
+          return res.status(400).json({
+            success: false,
+            message: "cateringId is required for Catering module",
+          });
+        }
+
+        serviceProvider = await Catering.findById(req.body.cateringId).lean();
+        if (!serviceProvider) {
+          return res.status(404).json({
+            success: false,
+            message: "Catering service not found",
+          });
+        }
+
+        // Catering pricing (usually per plate × guests OR flat)
+        pricingData = {
+          basePrice: Number(serviceProvider.price) || 0,
+          perDayPrice: 0,
+          perHourCharge: 0,
+          perPersonCharge: 0,
+          discount: 0,
+        };
+
+        break;
+
       // Add more module types as needed
       default:
         return res.status(400).json({
@@ -1257,7 +1285,7 @@ exports.createBooking = async (req, res) => {
         Number(pkg.basePrice) ||
         0;
       if (packagePrice < 0) packagePrice = 0;
-    } else if (moduleType === "Photography") {
+    } else if (moduleType === "Photography" || moduleType === "Catering") {
       pkg = serviceProvider;
       packagePrice = Number(pkg.price) || 0;
     } else {
@@ -1402,14 +1430,19 @@ exports.createBooking = async (req, res) => {
     };
 
     // Add module-specific fields
-    if (moduleType === "Venues") {
-      bookingData.venueId = venueId;
-      bookingData.numberOfGuests = numberOfGuests;
-    } else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
-      bookingData.makeupId = makeupId;
-    } else if (moduleType === "Photography") {
-      bookingData.photographyId = photographyId; // ✅ Store photographyId
-    }
+   // Add module-specific fields
+if (moduleType === "Venues") {
+  bookingData.venueId = venueId;
+  bookingData.numberOfGuests = numberOfGuests;
+} else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+  bookingData.makeupId = makeupId;
+} else if (moduleType === "Photography") {
+  bookingData.photographyId = photographyId;
+} else if (moduleType === "Catering") {
+  bookingData.cateringId = req.body.cateringId;
+  bookingData.numberOfGuests = numberOfGuests; // ✅ FIX
+}
+
 
     const booking = await Booking.create(bookingData);
 
@@ -1424,7 +1457,17 @@ exports.createBooking = async (req, res) => {
       populateFields.push("makeupId");
     } else if (moduleType === "Photography") {
       populateFields.push("photographyId");
-    } else {
+      
+    } 
+    else if (moduleType === "Catering") {
+  populateFields.push("cateringId");
+}
+
+    else if (moduleType === "Catering") {
+  bookingData.cateringId = req.body.cateringId;
+}
+
+else {
       // Other modules
       if (packageId) populateFields.push("packageId");
     }
@@ -1464,7 +1507,6 @@ exports.createBooking = async (req, res) => {
   }
 };
 
-
 // GET BOOKINGS BY USER ID
 exports.getBookingsByUser = async (req, res) => {
   try {
@@ -1475,6 +1517,8 @@ exports.getBookingsByUser = async (req, res) => {
       .populate("venueId")
       .populate("makeupId")
       .populate("photographyId")
+      .populate("cateringId")   // ✅ ADD THIS
+
       .populate("packageId")
       .populate("moduleId")
       .select(

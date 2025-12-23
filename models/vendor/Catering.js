@@ -97,11 +97,37 @@ const CateringSchema = new mongoose.Schema(
 
     includes: [includesSchema],
 
-    price: { type: Number, required: true },
+    // ===============================
+    // PRICING
+    // ===============================
+    price: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
 
+    advanceBookingAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: {
+        validator: function (value) {
+          // advance should not exceed total price
+          return value <= this.price;
+        },
+        message: "Advance booking amount cannot be greater than price",
+      },
+    },
+
+    // ===============================
+    // MEDIA
+    // ===============================
     images: [{ type: String }],
     thumbnail: { type: String },
 
+    // ===============================
+    // PROVIDER INFO
+    // ===============================
     provider: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -112,6 +138,9 @@ const CateringSchema = new mongoose.Schema(
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
+    // ===============================
+    // FLAGS
+    // ===============================
     isTopPick: { type: Boolean, default: false, index: true },
     isActive: { type: Boolean, default: true, index: true },
   },
