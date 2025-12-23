@@ -463,13 +463,7 @@ exports.paymentSuccess = async (req, res) => {
 };
 
 
-exports.juspayWebhook = async (req, res) => {
-  if (status === "CHARGED") {
-    subscription.status = "active";
-    subscription.isCurrent = true;
-    await subscription.save();
-  }
-};
+
 
 // --------------------------------------------------------
 // CANCEL SUBSCRIPTION
