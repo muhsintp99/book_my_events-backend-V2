@@ -125,6 +125,75 @@ exports.createPhotographyPackage = async (req, res) => {
   }
 };
 
+
+// =======================================================================
+// GET SINGLE VENDOR OF A MODULE
+// =======================================================================
+exports.getSingleVendorForPhotographyModule = async (req, res) => {
+  try {
+    const { moduleId } = req.params;
+    const { providerid } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(moduleId)) {
+      return res.status(400).json({ success: false, message: "Invalid module ID" });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(providerid)) {
+      return res.status(400).json({ success: false, message: "Invalid provider ID" });
+    }
+
+    // Check vendor has at least one package in this module
+    const hasPackage = await Photography.exists({
+      module: moduleId,
+      provider: providerid,
+    });
+
+    if (!hasPackage) {
+      return res.status(404).json({
+        success: false,
+        message: "Vendor not found for this module",
+      });
+    }
+
+    const user = await User.findById(providerid)
+      .select("firstName lastName email phone profilePhoto")
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "Vendor not found" });
+    }
+
+    const vendorProfile = await VendorProfile.findOne({ user: providerid })
+      .select("storeName logo coverImage")
+      .lean();
+
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+    const data = {
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phone: user.phone,
+      storeName: vendorProfile?.storeName || `${user.firstName} ${user.lastName}`,
+      logo: vendorProfile?.logo ? `${baseUrl}${vendorProfile.logo}` : null,
+      coverImage: vendorProfile?.coverImage
+        ? `${baseUrl}${vendorProfile.coverImage}`
+        : null,
+      hasVendorProfile: !!vendorProfile,
+    };
+
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (err) {
+    console.error("Get Single Vendor Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
 // =======================================================================
 // UPDATE PACKAGE
 // =======================================================================
