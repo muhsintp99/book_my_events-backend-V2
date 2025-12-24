@@ -572,6 +572,17 @@ exports.createSmartGatewayPayment = async (req, res) => {
     });
 
     console.log("✅ Order created:", orderResponse);
+await Booking.findByIdAndUpdate(
+  bookingId,
+  {
+    paymentOrderId: orderId,     
+    paymentStatus: "initiated",  
+    paidAmount: advanceAmount
+  },
+  { new: true }
+);
+
+console.log("✅ Booking updated with payment orderId:", orderId);
 
     // ✅ FIX: Create Payment Session with proper configuration
     const session = await juspay.orderSession.create({

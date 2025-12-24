@@ -971,7 +971,7 @@
 //     sendResponse(res, 200, true, "Vehicle updated successfully", updatedVehicle);
 //   } catch (error) {
 //     console.error("Error updating vehicle:", error);
-    
+
 //     if (error.code === 11000) {
 //       const field = Object.keys(error.keyPattern)[0];
 //       return sendResponse(
@@ -1024,36 +1024,36 @@
 //   }
 // };
 
-
-
-
-
-
-
-
-const Vehicle = require('../../models/vendor/Vehicle');
-const fs = require('fs').promises;
-const path = require('path');
-const mongoose = require('mongoose');
-const Category = require('../../models/admin/category');
+const Vehicle = require("../../models/vendor/Vehicle");
+const fs = require("fs").promises;
+const path = require("path");
+const mongoose = require("mongoose");
+const Category = require("../../models/admin/category");
 
 // ================= HELPERS =================
 const deleteFiles = async (files = []) => {
   if (!files.length) return;
   await Promise.all(
     files.map(async (file) => {
-      const filePath = path.resolve(__dirname, '../../Uploads/vehicles', file);
+      const filePath = path.resolve(__dirname, "../../Uploads/vehicles", file);
       try {
         await fs.unlink(filePath);
       } catch (err) {
-        if (err.code !== 'ENOENT')
+        if (err.code !== "ENOENT")
           console.error(`Failed to delete ${file}:`, err);
       }
     })
   );
 };
 
-const sendResponse = (res, status, success, message, data = null, meta = null) => {
+const sendResponse = (
+  res,
+  status,
+  success,
+  message,
+  data = null,
+  meta = null
+) => {
   const response = { success, message };
   if (data) response.data = data;
   if (meta) response.meta = meta;
@@ -1061,8 +1061,9 @@ const sendResponse = (res, status, success, message, data = null, meta = null) =
 };
 
 const populateProvider = {
-  path: 'provider',
-  select: '-password -email -refreshToken -resetPasswordToken -resetPasswordExpire -firstName -lastName -vinNumber',
+  path: "provider",
+  select:
+    "-password -email -refreshToken -resetPasswordToken -resetPasswordExpire -firstName -lastName -vinNumber",
 };
 
 // Parse ObjectId arrays (for categories, brands)
@@ -1071,17 +1072,17 @@ const parseObjectIdArray = (value) => {
 
   let parsed = value;
 
-  if (typeof parsed === 'string') {
+  if (typeof parsed === "string") {
     parsed = parsed.trim();
     try {
       parsed = JSON.parse(parsed);
-      if (typeof parsed === 'string') {
+      if (typeof parsed === "string") {
         parsed = JSON.parse(parsed);
       }
     } catch {
       parsed = parsed
-        .replace(/[\[\]"']/g, '')
-        .split(',')
+        .replace(/[\[\]"']/g, "")
+        .split(",")
         .map((c) => c.trim())
         .filter((c) => c);
     }
@@ -1103,18 +1104,22 @@ const parseStringArray = (value) => {
 
   // If already an array, trim each item
   if (Array.isArray(value)) {
-    return value.map((item) => String(item).trim().toLowerCase()).filter((item) => item);
+    return value
+      .map((item) => String(item).trim().toLowerCase())
+      .filter((item) => item);
   }
 
   // If string, try to parse as JSON first
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     const trimmed = value.trim();
-    
+
     // Try JSON parse
     try {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) {
-        return parsed.map((item) => String(item).trim().toLowerCase()).filter((item) => item);
+        return parsed
+          .map((item) => String(item).trim().toLowerCase())
+          .filter((item) => item);
       }
     } catch (e) {
       // Not valid JSON, continue to CSV parsing
@@ -1122,16 +1127,19 @@ const parseStringArray = (value) => {
 
     // Parse as comma-separated values
     return trimmed
-      .replace(/^\[|\]$/g, '') // Remove outer brackets if present
-      .split(',')
-      .map((item) => item.trim().replace(/^["']|["']$/g, '').toLowerCase()) // Remove quotes
+      .replace(/^\[|\]$/g, "") // Remove outer brackets if present
+      .split(",")
+      .map((item) =>
+        item
+          .trim()
+          .replace(/^["']|["']$/g, "")
+          .toLowerCase()
+      ) // Remove quotes
       .filter((item) => item);
   }
 
   return [];
 };
-
-
 
 const parseObjectId = (value) => {
   if (!value) return null;
@@ -1142,9 +1150,9 @@ const parseObjectId = (value) => {
   }
 
   // If it's a string, try to parse it
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     const trimmed = value.trim();
-    
+
     // Try JSON parse first (in case it's wrapped in quotes)
     try {
       const parsed = JSON.parse(trimmed);
@@ -1168,32 +1176,39 @@ const sanitizeVehicleData = (body) => {
 
   // FIX: Parse brand as single ObjectId, not array
   if (sanitized.brand) sanitized.brand = parseObjectId(sanitized.brand);
-  
+
   // FIX: Parse type, fuelType, transmissionType as single strings (not arrays)
   if (sanitized.type) {
-    sanitized.type = typeof sanitized.type === 'string' 
-      ? sanitized.type.trim().toLowerCase() 
-      : sanitized.type;
+    sanitized.type =
+      typeof sanitized.type === "string"
+        ? sanitized.type.trim().toLowerCase()
+        : sanitized.type;
   }
   if (sanitized.fuelType) {
-    sanitized.fuelType = typeof sanitized.fuelType === 'string' 
-      ? sanitized.fuelType.trim().toLowerCase() 
-      : sanitized.fuelType;
+    sanitized.fuelType =
+      typeof sanitized.fuelType === "string"
+        ? sanitized.fuelType.trim().toLowerCase()
+        : sanitized.fuelType;
   }
   if (sanitized.transmissionType) {
-    sanitized.transmissionType = typeof sanitized.transmissionType === 'string' 
-      ? sanitized.transmissionType.trim().toLowerCase() 
-      : sanitized.transmissionType;
+    sanitized.transmissionType =
+      typeof sanitized.transmissionType === "string"
+        ? sanitized.transmissionType.trim().toLowerCase()
+        : sanitized.transmissionType;
   }
-  if (sanitized.seatType) sanitized.seatType = sanitized.seatType.trim().toLowerCase();
-  if (sanitized.camera) sanitized.camera = sanitized.camera.trim().toLowerCase();
+  if (sanitized.seatType)
+    sanitized.seatType = sanitized.seatType.trim().toLowerCase();
+  if (sanitized.camera)
+    sanitized.camera = sanitized.camera.trim().toLowerCase();
   if (sanitized.model) sanitized.model = sanitized.model.trim();
   if (sanitized.name) sanitized.name = sanitized.name.trim();
-  if (sanitized.description) sanitized.description = sanitized.description.trim();
+  if (sanitized.description)
+    sanitized.description = sanitized.description.trim();
   if (sanitized.vinNumber) sanitized.vinNumber = sanitized.vinNumber.trim();
   if (sanitized.licensePlateNumber)
     sanitized.licensePlateNumber = sanitized.licensePlateNumber.trim();
-  if (sanitized.audioSystem) sanitized.audioSystem = sanitized.audioSystem.trim();
+  if (sanitized.audioSystem)
+    sanitized.audioSystem = sanitized.audioSystem.trim();
 
   // Parse string arrays
   if (sanitized.searchTags !== undefined) {
@@ -1217,32 +1232,49 @@ const sanitizeVehicleData = (body) => {
 
   // Convert airCondition to boolean
   if (sanitized.airCondition !== undefined) {
-    if (typeof sanitized.airCondition === 'string') {
-      sanitized.airCondition = sanitized.airCondition.trim().toLowerCase() === 'true';
+    if (typeof sanitized.airCondition === "string") {
+      sanitized.airCondition =
+        sanitized.airCondition.trim().toLowerCase() === "true";
     } else {
       sanitized.airCondition = !!sanitized.airCondition;
     }
   }
-// Advance booking parsing
-// ✅ Advance booking amount (flat)
-if (sanitized.advanceBookingAmount !== undefined) {
-  sanitized.advanceBookingAmount = Number(sanitized.advanceBookingAmount);
-}
+  // Advance booking parsing
+  // ✅ Advance booking amount (flat)
+  if (sanitized.advanceBookingAmount !== undefined && sanitized.advanceBookingAmount !== '') {
+    const parsed = Number(sanitized.advanceBookingAmount);
+    // Only set if it's a valid number
+    if (!isNaN(parsed)) {
+      sanitized.advanceBookingAmount = parsed;
+    }
+  }
+  // If it's undefined or empty string, remove it so schema default doesn't apply
+  else if (sanitized.advanceBookingAmount === '') {
+    delete sanitized.advanceBookingAmount;
+  }
 
 
   // Parse numeric fields
-  if (sanitized.airbags !== undefined) sanitized.airbags = Number(sanitized.airbags);
-  if (sanitized.bootSpace !== undefined) sanitized.bootSpace = Number(sanitized.bootSpace);
-  if (sanitized.fuelTank !== undefined) sanitized.fuelTank = Number(sanitized.fuelTank);
-  if (sanitized.engineCapacity !== undefined) sanitized.engineCapacity = Number(sanitized.engineCapacity);
-  if (sanitized.enginePower !== undefined) sanitized.enginePower = Number(sanitized.enginePower);
-  if (sanitized.seatingCapacity !== undefined) sanitized.seatingCapacity = Number(sanitized.seatingCapacity);
-  if (sanitized.discount !== undefined) sanitized.discount = Number(sanitized.discount);
-  if (sanitized.latitude !== undefined) sanitized.latitude = Number(sanitized.latitude);
-  if (sanitized.longitude !== undefined) sanitized.longitude = Number(sanitized.longitude);
+  if (sanitized.airbags !== undefined)
+    sanitized.airbags = Number(sanitized.airbags);
+  if (sanitized.bootSpace !== undefined)
+    sanitized.bootSpace = Number(sanitized.bootSpace);
+  if (sanitized.fuelTank !== undefined)
+    sanitized.fuelTank = Number(sanitized.fuelTank);
+  if (sanitized.engineCapacity !== undefined)
+    sanitized.engineCapacity = Number(sanitized.engineCapacity);
+  if (sanitized.enginePower !== undefined)
+    sanitized.enginePower = Number(sanitized.enginePower);
+  if (sanitized.seatingCapacity !== undefined)
+    sanitized.seatingCapacity = Number(sanitized.seatingCapacity);
+  if (sanitized.discount !== undefined)
+    sanitized.discount = Number(sanitized.discount);
+  if (sanitized.latitude !== undefined)
+    sanitized.latitude = Number(sanitized.latitude);
+  if (sanitized.longitude !== undefined)
+    sanitized.longitude = Number(sanitized.longitude);
 
-  // Parse pricing object
-  if (sanitized.pricing) {
+   if (sanitized.pricing) {
     if (typeof sanitized.pricing === 'string') {
       try {
         sanitized.pricing = JSON.parse(sanitized.pricing);
@@ -1274,50 +1306,50 @@ if (sanitized.advanceBookingAmount !== undefined) {
   return sanitized;
 };
 
+
 // Helper function to calculate distance between two coordinates
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371; // Earth's radius in kilometers
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c; // Distance in kilometers
 };
 
 // Helper function to get effective price (min non-zero pricing)
 const getEffectivePrice = (pricing) => {
-  if (!pricing || typeof pricing !== 'object') return 0;
-  
+  if (!pricing || typeof pricing !== "object") return 0;
+
   const prices = [];
-  
+
   if (pricing.hourly && pricing.hourly > 0) prices.push(pricing.hourly);
   if (pricing.perDay && pricing.perDay > 0) prices.push(pricing.perDay);
-  if (pricing.distanceWise && pricing.distanceWise > 0) prices.push(pricing.distanceWise);
-  
+  if (pricing.distanceWise && pricing.distanceWise > 0)
+    prices.push(pricing.distanceWise);
+
   // Return the minimum non-zero price, or 0 if no valid prices
   return prices.length > 0 ? Math.min(...prices) : 0;
 };
-
 
 // ================= CREATE =================
 exports.createVehicle = async (req, res) => {
   const body = sanitizeVehicleData(req.body);
 
-
-  
-
   // Provider auto-fill
   if (!body.provider && req.user) {
     body.provider = req.user._id;
   } else if (
-    req.user?.role === 'vendor' &&
+    req.user?.role === "vendor" &&
     body.provider &&
     body.provider.toString() !== req.user._id.toString()
   ) {
-    return sendResponse(res, 403, false, 'Unauthorized: Invalid provider');
+    return sendResponse(res, 403, false, "Unauthorized: Invalid provider");
   }
 
   // Handle uploads
@@ -1332,7 +1364,7 @@ exports.createVehicle = async (req, res) => {
     if (body.category && body.category.length > 0) {
       const existingCategories = await Category.find({
         _id: { $in: body.category },
-      }).select('_id title');
+      }).select("_id title");
 
       if (existingCategories.length === 0) {
         // console.warn(
@@ -1343,23 +1375,28 @@ exports.createVehicle = async (req, res) => {
         const missingIds = body.category.filter(
           (id) => !foundIds.includes(id.toString())
         );
-        console.warn('⚠️ WARNING: Some category IDs not found:', missingIds);
+        console.warn("⚠️ WARNING: Some category IDs not found:", missingIds);
       }
     }
 
     // FIX: Verify brand exists - now checking for single ObjectId or null
     if (body.brand) {
       if (!mongoose.Types.ObjectId.isValid(body.brand)) {
-        return sendResponse(res, 400, false, 'Invalid brand ID format');
+        return sendResponse(res, 400, false, "Invalid brand ID format");
       }
-      
+
       const existingBrand = await mongoose
-        .model('Brand')
+        .model("Brand")
         .findById(body.brand)
-        .select('_id');
-        
+        .select("_id");
+
       if (!existingBrand) {
-        return sendResponse(res, 400, false, 'Brand does not exist in database');
+        return sendResponse(
+          res,
+          400,
+          false,
+          "Brand does not exist in database"
+        );
       }
     }
 
@@ -1367,25 +1404,25 @@ exports.createVehicle = async (req, res) => {
 
     // Populate after creation
     const populatedVehicle = await Vehicle.findById(vehicle._id)
-      .populate('brand')
+      .populate("brand")
       .populate({
-        path: 'category',
-        model: 'VehicleCategory',
-        select: 'title image vehicleCategoryId module isActive',
+        path: "category",
+        model: "VehicleCategory",
+        select: "title image vehicleCategoryId module isActive",
       })
       .populate(populateProvider)
-      .populate('zone')
+      .populate("zone")
       .lean();
 
     sendResponse(
       res,
       201,
       true,
-      'Vehicle created successfully',
+      "Vehicle created successfully",
       populatedVehicle
     );
   } catch (error) {
-    console.error('Error creating vehicle:', error);
+    console.error("Error creating vehicle:", error);
     // Cleanup uploaded files if vehicle creation fails
     if (body.images?.length) await deleteFiles(body.images);
     if (body.thumbnail) await deleteFiles([body.thumbnail]);
@@ -1398,7 +1435,7 @@ exports.createVehicle = async (req, res) => {
         400,
         false,
         `${
-          field === 'vinNumber' ? 'VIN number' : 'License plate number'
+          field === "vinNumber" ? "VIN number" : "License plate number"
         } already exists`
       );
     }
@@ -1432,18 +1469,19 @@ exports.getVehicles = async (req, res) => {
     if (category) query.category = { $in: parseObjectIdArray(category) };
     if (type) query.type = { $in: parseStringArray(type) };
     if (fuelType) query.fuelType = { $in: parseStringArray(fuelType) };
-    if (transmissionType) query.transmissionType = { $in: parseStringArray(transmissionType) };
+    if (transmissionType)
+      query.transmissionType = { $in: parseStringArray(transmissionType) };
     if (seatType) query.seatType = seatType.toLowerCase();
     if (camera) query.camera = camera.toLowerCase();
-    if (isActive !== undefined) query.isActive = isActive === 'true';
+    if (isActive !== undefined) query.isActive = isActive === "true";
     if (zone) query.zone = zone;
 
     // Price range filter
     if (minPrice || maxPrice) {
       query.$or = [
-        { 'pricing.hourly': {} },
-        { 'pricing.perDay': {} },
-        { 'pricing.distanceWise': {} },
+        { "pricing.hourly": {} },
+        { "pricing.perDay": {} },
+        { "pricing.distanceWise": {} },
       ];
       if (minPrice) {
         const min = Number(minPrice);
@@ -1463,7 +1501,7 @@ exports.getVehicles = async (req, res) => {
 
     // Search functionality
     if (search) {
-      const keywordRegex = new RegExp(search, 'i');
+      const keywordRegex = new RegExp(search, "i");
       query.$or = [
         { name: keywordRegex },
         { description: keywordRegex },
@@ -1477,81 +1515,14 @@ exports.getVehicles = async (req, res) => {
 
     const [vehicles, total] = await Promise.all([
       Vehicle.find(query)
-        .populate('brand')
+        .populate("brand")
         .populate({
-          path: 'category',
-          model: 'VehicleCategory',
-          select: 'title image vehicleCategoryId module isActive',
+          path: "category",
+          model: "VehicleCategory",
+          select: "title image vehicleCategoryId module isActive",
         })
         .populate(populateProvider)
-        .populate('zone')
-        .skip(skip)
-        .limit(Number(limit))
-        .sort({ createdAt: -1 })
-        .lean(),
-      Vehicle.countDocuments(query),
-    ]);
-
-    const meta = {
-      total,
-      page: Number(page),
-      limit: Number(limit),
-      totalPages: Math.ceil(total / Number(limit)),
-    };
-
-    sendResponse(res, 200, true, 'Vehicles retrieved successfully', vehicles, meta);
-  } catch (error) {
-    console.error('Error fetching vehicles:', error);
-    sendResponse(res, 500, false, error.message);
-  }
-};
-
-// ================= GET SINGLE VEHICLE =================
-exports.getVehicle = async (req, res) => {
-  try {
-    const vehicle = await Vehicle.findById(req.params.id)
-      .populate('brand')
-      .populate({
-        path: 'category',
-        model: 'VehicleCategory',
-        select: 'title image vehicleCategoryId module isActive',
-      })
-      .populate(populateProvider)
-      .populate('zone')
-      .lean();
-
-    if (!vehicle) {
-      return sendResponse(res, 404, false, 'Vehicle not found');
-    }
-
-    sendResponse(res, 200, true, 'Vehicle retrieved successfully', vehicle);
-  } catch (error) {
-    console.error('Error fetching vehicle:', error);
-    sendResponse(res, 500, false, error.message);
-  }
-};
-
-// ================= GET VEHICLES BY PROVIDER =================
-exports.getVehiclesByProvider = async (req, res) => {
-  try {
-    const { providerId } = req.params;
-    const { page = 1, limit = 10, isActive } = req.query;
-
-    const query = { provider: providerId };
-    if (isActive !== undefined) query.isActive = isActive === 'true';
-
-    const skip = (Number(page) - 1) * Number(limit);
-
-    const [vehicles, total] = await Promise.all([
-      Vehicle.find(query)
-        .populate('brand')
-        .populate({
-          path: 'category',
-          model: 'VehicleCategory',
-          select: 'title image vehicleCategoryId module isActive',
-        })
-        .populate(populateProvider)
-        .populate('zone')
+        .populate("zone")
         .skip(skip)
         .limit(Number(limit))
         .sort({ createdAt: -1 })
@@ -1570,12 +1541,86 @@ exports.getVehiclesByProvider = async (req, res) => {
       res,
       200,
       true,
-      'Provider vehicles retrieved successfully',
+      "Vehicles retrieved successfully",
       vehicles,
       meta
     );
   } catch (error) {
-    console.error('Error fetching provider vehicles:', error);
+    console.error("Error fetching vehicles:", error);
+    sendResponse(res, 500, false, error.message);
+  }
+};
+
+// ================= GET SINGLE VEHICLE =================
+exports.getVehicle = async (req, res) => {
+  try {
+    const vehicle = await Vehicle.findById(req.params.id)
+      .populate("brand")
+      .populate({
+        path: "category",
+        model: "VehicleCategory",
+        select: "title image vehicleCategoryId module isActive",
+      })
+      .populate(populateProvider)
+      .populate("zone")
+      .lean();
+
+    if (!vehicle) {
+      return sendResponse(res, 404, false, "Vehicle not found");
+    }
+
+    sendResponse(res, 200, true, "Vehicle retrieved successfully", vehicle);
+  } catch (error) {
+    console.error("Error fetching vehicle:", error);
+    sendResponse(res, 500, false, error.message);
+  }
+};
+
+// ================= GET VEHICLES BY PROVIDER =================
+exports.getVehiclesByProvider = async (req, res) => {
+  try {
+    const { providerId } = req.params;
+    const { page = 1, limit = 10, isActive } = req.query;
+
+    const query = { provider: providerId };
+    if (isActive !== undefined) query.isActive = isActive === "true";
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const [vehicles, total] = await Promise.all([
+      Vehicle.find(query)
+        .populate("brand")
+        .populate({
+          path: "category",
+          model: "VehicleCategory",
+          select: "title image vehicleCategoryId module isActive",
+        })
+        .populate(populateProvider)
+        .populate("zone")
+        .skip(skip)
+        .limit(Number(limit))
+        .sort({ createdAt: -1 })
+        .lean(),
+      Vehicle.countDocuments(query),
+    ]);
+
+    const meta = {
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(total / Number(limit)),
+    };
+
+    sendResponse(
+      res,
+      200,
+      true,
+      "Provider vehicles retrieved successfully",
+      vehicles,
+      meta
+    );
+  } catch (error) {
+    console.error("Error fetching provider vehicles:", error);
     sendResponse(res, 500, false, error.message);
   }
 };
@@ -1586,15 +1631,20 @@ exports.updateVehicle = async (req, res) => {
     const vehicle = await Vehicle.findById(req.params.id);
 
     if (!vehicle) {
-      return sendResponse(res, 404, false, 'Vehicle not found');
+      return sendResponse(res, 404, false, "Vehicle not found");
     }
 
     // Authorization check
     if (
-      req.user.role === 'vendor' &&
+      req.user.role === "vendor" &&
       vehicle.provider.toString() !== req.user._id.toString()
     ) {
-      return sendResponse(res, 403, false, 'Unauthorized to update this vehicle');
+      return sendResponse(
+        res,
+        403,
+        false,
+        "Unauthorized to update this vehicle"
+      );
     }
 
     const body = sanitizeVehicleData(req.body);
@@ -1619,14 +1669,14 @@ exports.updateVehicle = async (req, res) => {
     // Verify brand if changed
     if (body.brand && body.brand !== vehicle.brand?.toString()) {
       if (!mongoose.Types.ObjectId.isValid(body.brand)) {
-        return sendResponse(res, 400, false, 'Invalid brand ID');
+        return sendResponse(res, 400, false, "Invalid brand ID");
       }
       const existingBrand = await mongoose
-        .model('Brand')
+        .model("Brand")
         .findById(body.brand)
-        .select('_id');
+        .select("_id");
       if (!existingBrand) {
-        return sendResponse(res, 400, false, 'Brand does not exist');
+        return sendResponse(res, 400, false, "Brand does not exist");
       }
     }
 
@@ -1639,19 +1689,25 @@ exports.updateVehicle = async (req, res) => {
 
     // Populate and return updated vehicle
     const updatedVehicle = await Vehicle.findById(vehicle._id)
-      .populate('brand')
+      .populate("brand")
       .populate({
-        path: 'category',
-        model: 'VehicleCategory',
-        select: 'title image vehicleCategoryId module isActive',
+        path: "category",
+        model: "VehicleCategory",
+        select: "title image vehicleCategoryId module isActive",
       })
       .populate(populateProvider)
-      .populate('zone')
+      .populate("zone")
       .lean();
 
-    sendResponse(res, 200, true, 'Vehicle updated successfully', updatedVehicle);
+    sendResponse(
+      res,
+      200,
+      true,
+      "Vehicle updated successfully",
+      updatedVehicle
+    );
   } catch (error) {
-    console.error('Error updating vehicle:', error);
+    console.error("Error updating vehicle:", error);
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
       return sendResponse(
@@ -1659,7 +1715,7 @@ exports.updateVehicle = async (req, res) => {
         400,
         false,
         `${
-          field === 'vinNumber' ? 'VIN number' : 'License plate number'
+          field === "vinNumber" ? "VIN number" : "License plate number"
         } already exists`
       );
     }
@@ -1673,15 +1729,20 @@ exports.deleteVehicle = async (req, res) => {
     const vehicle = await Vehicle.findById(req.params.id);
 
     if (!vehicle) {
-      return sendResponse(res, 404, false, 'Vehicle not found');
+      return sendResponse(res, 404, false, "Vehicle not found");
     }
 
     // Authorization check
     if (
-      req.user.role === 'vendor' &&
+      req.user.role === "vendor" &&
       vehicle.provider.toString() !== req.user._id.toString()
     ) {
-      return sendResponse(res, 403, false, 'Unauthorized to delete this vehicle');
+      return sendResponse(
+        res,
+        403,
+        false,
+        "Unauthorized to delete this vehicle"
+      );
     }
 
     // Collect all files to delete
@@ -1697,9 +1758,9 @@ exports.deleteVehicle = async (req, res) => {
     // Cleanup files
     if (filesToDelete.length) await deleteFiles(filesToDelete);
 
-    sendResponse(res, 200, true, 'Vehicle deleted successfully');
+    sendResponse(res, 200, true, "Vehicle deleted successfully");
   } catch (error) {
-    console.error('Error deleting vehicle:', error);
+    console.error("Error deleting vehicle:", error);
     sendResponse(res, 500, false, error.message);
   }
 };
@@ -1710,15 +1771,20 @@ exports.blockVehicle = async (req, res) => {
     const vehicle = await Vehicle.findById(req.params.id);
 
     if (!vehicle) {
-      return sendResponse(res, 404, false, 'Vehicle not found');
+      return sendResponse(res, 404, false, "Vehicle not found");
     }
 
     // Authorization check
     if (
-      req.user.role === 'vendor' &&
+      req.user.role === "vendor" &&
       vehicle.provider.toString() !== req.user._id.toString()
     ) {
-      return sendResponse(res, 403, false, 'Unauthorized to block this vehicle');
+      return sendResponse(
+        res,
+        403,
+        false,
+        "Unauthorized to block this vehicle"
+      );
     }
 
     vehicle.isActive = false;
@@ -1726,19 +1792,25 @@ exports.blockVehicle = async (req, res) => {
 
     // Populate before sending response
     const blockedVehicle = await Vehicle.findById(vehicle._id)
-      .populate('brand')
+      .populate("brand")
       .populate({
-        path: 'category',
-        model: 'VehicleCategory',
-        select: 'title image vehicleCategoryId module isActive',
+        path: "category",
+        model: "VehicleCategory",
+        select: "title image vehicleCategoryId module isActive",
       })
       .populate(populateProvider)
-      .populate('zone')
+      .populate("zone")
       .lean();
 
-    sendResponse(res, 200, true, 'Vehicle blocked successfully', blockedVehicle);
+    sendResponse(
+      res,
+      200,
+      true,
+      "Vehicle blocked successfully",
+      blockedVehicle
+    );
   } catch (error) {
-    console.error('Error blocking vehicle:', error);
+    console.error("Error blocking vehicle:", error);
     sendResponse(res, 500, false, error.message);
   }
 };
@@ -1749,15 +1821,20 @@ exports.reactivateVehicle = async (req, res) => {
     const vehicle = await Vehicle.findById(req.params.id);
 
     if (!vehicle) {
-      return sendResponse(res, 404, false, 'Vehicle not found');
+      return sendResponse(res, 404, false, "Vehicle not found");
     }
 
     // Authorization check
     if (
-      req.user.role === 'vendor' &&
+      req.user.role === "vendor" &&
       vehicle.provider.toString() !== req.user._id.toString()
     ) {
-      return sendResponse(res, 403, false, 'Unauthorized to reactivate this vehicle');
+      return sendResponse(
+        res,
+        403,
+        false,
+        "Unauthorized to reactivate this vehicle"
+      );
     }
 
     vehicle.isActive = true;
@@ -1765,19 +1842,25 @@ exports.reactivateVehicle = async (req, res) => {
 
     // Populate before sending response
     const reactivatedVehicle = await Vehicle.findById(vehicle._id)
-      .populate('brand')
+      .populate("brand")
       .populate({
-        path: 'category',
-        model: 'VehicleCategory',
-        select: 'title image vehicleCategoryId module isActive',
+        path: "category",
+        model: "VehicleCategory",
+        select: "title image vehicleCategoryId module isActive",
       })
       .populate(populateProvider)
-      .populate('zone')
+      .populate("zone")
       .lean();
 
-    sendResponse(res, 200, true, 'Vehicle reactivated successfully', reactivatedVehicle);
+    sendResponse(
+      res,
+      200,
+      true,
+      "Vehicle reactivated successfully",
+      reactivatedVehicle
+    );
   } catch (error) {
-    console.error('Error reactivating vehicle:', error);
+    console.error("Error reactivating vehicle:", error);
     sendResponse(res, 500, false, error.message);
   }
 };
@@ -1791,7 +1874,7 @@ exports.filterVehicles = async (req, res) => {
       latitude,
       longitude,
       radius = 10,
-      
+
       // Filters
       brandId,
       categoryId,
@@ -1803,46 +1886,57 @@ exports.filterVehicles = async (req, res) => {
       maxSeatingCapacity,
       airCondition,
       insuranceIncluded,
-      
+
       // Price range
       minPrice,
       maxPrice,
-      
+
       // Rating filter
       minRating,
       maxRating,
-      
+
       // Pagination
       page = 1,
       limit = 50,
-      
+
       // Sorting
-      sortBy = 'createdAt',
-      sortOrder = 'desc'
+      sortBy = "createdAt",
+      sortOrder = "desc",
     } = req.query;
 
-    console.log('=== FILTER REQUEST ===');
-    console.log('minPrice:', minPrice, typeof minPrice);
-    console.log('maxPrice:', maxPrice, typeof maxPrice);
+    console.log("=== FILTER REQUEST ===");
+    console.log("minPrice:", minPrice, typeof minPrice);
+    console.log("maxPrice:", maxPrice, typeof maxPrice);
 
     // Validate and parse seatingCapacityRange
     let capacityFilter = null;
-    if (seatingCapacityRange && minSeatingCapacity === undefined && maxSeatingCapacity === undefined) {
+    if (
+      seatingCapacityRange &&
+      minSeatingCapacity === undefined &&
+      maxSeatingCapacity === undefined
+    ) {
       const decodedCapacityRange = decodeURIComponent(seatingCapacityRange);
 
       let min, max;
-      if (decodedCapacityRange.endsWith('+')) {
-        min = parseInt(decodedCapacityRange.replace('+', ''));
+      if (decodedCapacityRange.endsWith("+")) {
+        min = parseInt(decodedCapacityRange.replace("+", ""));
         if (isNaN(min) || min < 0) {
-          return sendResponse(res, 400, false, 'Invalid seatingCapacityRange');
+          return sendResponse(res, 400, false, "Invalid seatingCapacityRange");
         }
-      } else if (decodedCapacityRange.includes('-')) {
-        [min, max] = decodedCapacityRange.split('-').map(num => parseInt(num));
+      } else if (decodedCapacityRange.includes("-")) {
+        [min, max] = decodedCapacityRange
+          .split("-")
+          .map((num) => parseInt(num));
         if (isNaN(min) || isNaN(max) || min < 0 || max < 0 || min > max) {
-          return sendResponse(res, 400, false, 'Invalid seatingCapacityRange');
+          return sendResponse(res, 400, false, "Invalid seatingCapacityRange");
         }
       } else {
-        return sendResponse(res, 400, false, 'Invalid seatingCapacityRange format');
+        return sendResponse(
+          res,
+          400,
+          false,
+          "Invalid seatingCapacityRange format"
+        );
       }
 
       capacityFilter = { min, max };
@@ -1854,10 +1948,16 @@ exports.filterVehicles = async (req, res) => {
     // Apply capacity range filter
     if (capacityFilter) {
       if (capacityFilter.min !== undefined) {
-        query.seatingCapacity = { ...query.seatingCapacity, $gte: capacityFilter.min };
+        query.seatingCapacity = {
+          ...query.seatingCapacity,
+          $gte: capacityFilter.min,
+        };
       }
       if (capacityFilter.max !== undefined) {
-        query.seatingCapacity = { ...query.seatingCapacity, $lte: capacityFilter.max };
+        query.seatingCapacity = {
+          ...query.seatingCapacity,
+          $lte: capacityFilter.max,
+        };
       }
     }
 
@@ -1893,29 +1993,34 @@ exports.filterVehicles = async (req, res) => {
 
     // Type filter
     if (type) {
-      query.type = { $in: parseStringArray(type).map(t => t.toLowerCase()) };
+      query.type = { $in: parseStringArray(type).map((t) => t.toLowerCase()) };
     }
 
     // Fuel type filter
     if (fuelType) {
-      query.fuelType = { $in: parseStringArray(fuelType).map(f => f.toLowerCase()) };
+      query.fuelType = {
+        $in: parseStringArray(fuelType).map((f) => f.toLowerCase()),
+      };
     }
 
     // Transmission type filter
     if (transmissionType) {
-      query.transmissionType = { $in: parseStringArray(transmissionType).map(t => t.toLowerCase()) };
+      query.transmissionType = {
+        $in: parseStringArray(transmissionType).map((t) => t.toLowerCase()),
+      };
     }
 
     // Air condition filter
     if (airCondition !== undefined) {
-      const hasAC = airCondition === 'true' || airCondition === true;
+      const hasAC = airCondition === "true" || airCondition === true;
       query.airCondition = hasAC;
     }
 
     // Insurance included filter
     if (insuranceIncluded !== undefined) {
-      const hasInsurance = insuranceIncluded === 'true' || insuranceIncluded === true;
-      query['insuranceIncluded.0'] = { $exists: hasInsurance };
+      const hasInsurance =
+        insuranceIncluded === "true" || insuranceIncluded === true;
+      query["insuranceIncluded.0"] = { $exists: hasInsurance };
     }
 
     // Rating filter
@@ -1942,7 +2047,12 @@ exports.filterVehicles = async (req, res) => {
       searchRadius = parseFloat(radius);
 
       if (isNaN(userLat) || isNaN(userLon)) {
-        return sendResponse(res, 400, false, 'Invalid latitude or longitude values');
+        return sendResponse(
+          res,
+          400,
+          false,
+          "Invalid latitude or longitude values"
+        );
       }
 
       if (isNaN(searchRadius) || searchRadius <= 0) {
@@ -1954,79 +2064,81 @@ exports.filterVehicles = async (req, res) => {
       query.longitude = { $exists: true, $ne: null };
     }
 
-    console.log('MongoDB Query:', JSON.stringify(query, null, 2));
+    console.log("MongoDB Query:", JSON.stringify(query, null, 2));
 
     // Fetch vehicles
     let vehicles = await Vehicle.find(query)
-      .populate('brand')
+      .populate("brand")
       .populate({
-        path: 'category',
-        model: 'VehicleCategory',
-        select: 'title image vehicleCategoryId module isActive',
+        path: "category",
+        model: "VehicleCategory",
+        select: "title image vehicleCategoryId module isActive",
       })
       .populate(populateProvider)
-      .populate('zone')
+      .populate("zone")
       .lean();
 
     console.log(`Found ${vehicles.length} vehicles from database`);
 
     // Calculate distance
     if (useLocationFilter) {
-      vehicles = vehicles.map(vehicle => {
-        const distance = calculateDistance(
-          userLat,
-          userLon,
-          vehicle.latitude,
-          vehicle.longitude
-        );
-        return {
-          ...vehicle,
-          distance: parseFloat(distance.toFixed(2)),
-          distanceUnit: 'km'
-        };
-      }).filter(vehicle => vehicle.distance <= searchRadius);
-      
+      vehicles = vehicles
+        .map((vehicle) => {
+          const distance = calculateDistance(
+            userLat,
+            userLon,
+            vehicle.latitude,
+            vehicle.longitude
+          );
+          return {
+            ...vehicle,
+            distance: parseFloat(distance.toFixed(2)),
+            distanceUnit: "km",
+          };
+        })
+        .filter((vehicle) => vehicle.distance <= searchRadius);
+
       console.log(`${vehicles.length} vehicles after location filter`);
     }
 
     // Add calculated fields - IMPORTANT: Calculate effective price for ALL vehicles
-    vehicles = vehicles.map(vehicle => {
+    vehicles = vehicles.map((vehicle) => {
       const effectivePrice = getEffectivePrice(vehicle.pricing);
       const capacity = Number(vehicle.seatingCapacity) || 0;
-      
+
       // Debug log for first few vehicles
       if (vehicles.indexOf(vehicle) < 3) {
         console.log(`Vehicle: ${vehicle.name}`);
         console.log(`  Pricing:`, vehicle.pricing);
         console.log(`  Effective Price:`, effectivePrice);
       }
-      
+
       return {
         ...vehicle,
         effectivePrice,
-        totalCapacity: capacity
+        totalCapacity: capacity,
       };
     });
 
     // ===== CRITICAL: PRICE FILTER =====
     if (minPrice !== undefined || maxPrice !== undefined) {
       const beforePriceFilter = vehicles.length;
-      
-      vehicles = vehicles.filter(vehicle => {
+
+      vehicles = vehicles.filter((vehicle) => {
         const price = vehicle.effectivePrice;
-        
+
         // Log for debugging
         console.log(`Checking vehicle: ${vehicle.name}, Price: ${price}`);
-        
+
         // IMPORTANT: If price is 0 or null, exclude it
         if (!price || price <= 0) {
           console.log(`  ❌ Excluded (no valid price)`);
           return false;
         }
-        
+
         let meetsMinPrice = true;
         let meetsMaxPrice = true;
-        
+
         if (minPrice !== undefined) {
           const min = parseFloat(minPrice);
           if (!isNaN(min)) {
@@ -2036,7 +2148,7 @@ exports.filterVehicles = async (req, res) => {
             }
           }
         }
-        
+
         if (maxPrice !== undefined) {
           const max = parseFloat(maxPrice);
           if (!isNaN(max)) {
@@ -2046,42 +2158,42 @@ exports.filterVehicles = async (req, res) => {
             }
           }
         }
-        
+
         const result = meetsMinPrice && meetsMaxPrice;
         if (result) {
           console.log(`  ✅ Included (${price} in range)`);
         }
-        
+
         return result;
       });
-      
+
       console.log(`\n=== PRICE FILTER SUMMARY ===`);
       console.log(`Before: ${beforePriceFilter} vehicles`);
       console.log(`After: ${vehicles.length} vehicles`);
-      console.log(`Range: ${minPrice || 'any'} - ${maxPrice || 'any'}`);
+      console.log(`Range: ${minPrice || "any"} - ${maxPrice || "any"}`);
     }
 
     // Sorting
     const sortField = sortBy.toLowerCase();
-    const order = sortOrder.toLowerCase() === 'asc' ? 1 : -1;
+    const order = sortOrder.toLowerCase() === "asc" ? 1 : -1;
 
     vehicles.sort((a, b) => {
       let aValue, bValue;
 
       switch (sortField) {
-        case 'price':
+        case "price":
           aValue = a.effectivePrice || 0;
           bValue = b.effectivePrice || 0;
           break;
-        case 'rating':
+        case "rating":
           aValue = a.rating || 0;
           bValue = b.rating || 0;
           break;
-        case 'capacity':
+        case "capacity":
           aValue = a.totalCapacity || 0;
           bValue = b.totalCapacity || 0;
           break;
-        case 'distance':
+        case "distance":
           if (useLocationFilter) {
             aValue = a.distance || 0;
             bValue = b.distance || 0;
@@ -2090,7 +2202,7 @@ exports.filterVehicles = async (req, res) => {
             bValue = 0;
           }
           break;
-        case 'createdat':
+        case "createdat":
           aValue = new Date(a.createdAt).getTime();
           bValue = new Date(b.createdAt).getTime();
           break;
@@ -2114,7 +2226,14 @@ exports.filterVehicles = async (req, res) => {
 
     // Build response with applied filters summary
     const appliedFilters = {
-      location: useLocationFilter ? { latitude: userLat, longitude: userLon, radius: searchRadius, unit: 'km' } : null,
+      location: useLocationFilter
+        ? {
+            latitude: userLat,
+            longitude: userLon,
+            radius: searchRadius,
+            unit: "km",
+          }
+        : null,
       brandId: brandId || null,
       categoryId: categoryId || null,
       type: type || null,
@@ -2123,56 +2242,75 @@ exports.filterVehicles = async (req, res) => {
       seatingCapacityRange: seatingCapacityRange || null,
       capacity: {
         min: minSeatingCapacity || null,
-        max: maxSeatingCapacity || null
+        max: maxSeatingCapacity || null,
       },
-      airCondition: airCondition !== undefined ? (airCondition === 'true' || airCondition === true) : null,
+      airCondition:
+        airCondition !== undefined
+          ? airCondition === "true" || airCondition === true
+          : null,
       insuranceIncluded: insuranceIncluded || null,
       price: {
         min: minPrice || null,
-        max: maxPrice || null
+        max: maxPrice || null,
       },
       rating: {
         min: minRating || null,
-        max: maxRating || null
+        max: maxRating || null,
       },
       sorting: {
         sortBy: sortField,
-        sortOrder
-      }
+        sortOrder,
+      },
     };
 
-    sendResponse(res, 200, true, paginatedVehicles.length === 0 ? 'No vehicles found matching your filter criteria' : 'Vehicles filtered successfully', paginatedVehicles, {
-      count: paginatedVehicles.length,
-      totalResults,
-      page: parseInt(page),
-      totalPages,
-      appliedFilters
-    });
+    sendResponse(
+      res,
+      200,
+      true,
+      paginatedVehicles.length === 0
+        ? "No vehicles found matching your filter criteria"
+        : "Vehicles filtered successfully",
+      paginatedVehicles,
+      {
+        count: paginatedVehicles.length,
+        totalResults,
+        page: parseInt(page),
+        totalPages,
+        appliedFilters,
+      }
+    );
   } catch (err) {
-    console.error('❌ Error in filterVehicles:', err);
-    console.error('Stack:', err.stack);
+    console.error("❌ Error in filterVehicles:", err);
+    console.error("Stack:", err.stack);
     sendResponse(res, 500, false, `Failed to filter vehicles: ${err.message}`);
   }
 };
 
-
 // Advanced Vehicle Search API
 exports.searchVehicles = async (req, res) => {
   try {
-    const { keyword, latitude, longitude, radius = 10, limit = 50, page = 1, categoryId } = req.query;
+    const {
+      keyword,
+      latitude,
+      longitude,
+      radius = 10,
+      limit = 50,
+      page = 1,
+      categoryId,
+    } = req.query;
 
     // Build search query
     const searchQuery = { isActive: true };
 
     // Keyword search (searches in multiple fields)
     if (keyword && keyword.trim()) {
-      const keywordRegex = new RegExp(keyword.trim(), 'i');
+      const keywordRegex = new RegExp(keyword.trim(), "i");
       searchQuery.$or = [
         { name: keywordRegex },
         { description: keywordRegex },
         { model: keywordRegex },
         { searchTags: { $in: [keywordRegex] } },
-        { audioSystem: keywordRegex }
+        { audioSystem: keywordRegex },
       ];
     }
 
@@ -2182,7 +2320,7 @@ exports.searchVehicles = async (req, res) => {
       if (categoryIds.length > 0) {
         searchQuery.category = { $in: categoryIds };
       } else {
-        return sendResponse(res, 400, false, 'Invalid category ID');
+        return sendResponse(res, 400, false, "Invalid category ID");
       }
     }
 
@@ -2196,7 +2334,12 @@ exports.searchVehicles = async (req, res) => {
       searchRadius = parseFloat(radius);
 
       if (isNaN(userLat) || isNaN(userLon)) {
-        return sendResponse(res, 400, false, 'Invalid latitude or longitude values');
+        return sendResponse(
+          res,
+          400,
+          false,
+          "Invalid latitude or longitude values"
+        );
       }
 
       if (isNaN(searchRadius) || searchRadius <= 0) {
@@ -2210,31 +2353,33 @@ exports.searchVehicles = async (req, res) => {
 
     // Fetch vehicles
     let vehicles = await Vehicle.find(searchQuery)
-      .populate('brand')
+      .populate("brand")
       .populate({
-        path: 'category',
-        model: 'VehicleCategory',
-        select: 'title image vehicleCategoryId module isActive',
+        path: "category",
+        model: "VehicleCategory",
+        select: "title image vehicleCategoryId module isActive",
       })
       .populate(populateProvider)
-      .populate('zone')
+      .populate("zone")
       .lean();
 
     // Apply location filtering and calculate distances
     if (useLocationFilter) {
-      vehicles = vehicles.map(vehicle => {
-        const distance = calculateDistance(
-          userLat,
-          userLon,
-          vehicle.latitude,
-          vehicle.longitude
-        );
-        return {
-          ...vehicle,
-          distance: parseFloat(distance.toFixed(2)),
-          distanceUnit: 'km'
-        };
-      }).filter(vehicle => vehicle.distance <= searchRadius);
+      vehicles = vehicles
+        .map((vehicle) => {
+          const distance = calculateDistance(
+            userLat,
+            userLon,
+            vehicle.latitude,
+            vehicle.longitude
+          );
+          return {
+            ...vehicle,
+            distance: parseFloat(distance.toFixed(2)),
+            distanceUnit: "km",
+          };
+        })
+        .filter((vehicle) => vehicle.distance <= searchRadius);
 
       // Sort by distance
       vehicles.sort((a, b) => a.distance - b.distance);
@@ -2257,19 +2402,19 @@ exports.searchVehicles = async (req, res) => {
         latitude: useLocationFilter ? userLat : null,
         longitude: useLocationFilter ? userLon : null,
         radius: useLocationFilter ? searchRadius : null,
-        categoryId: categoryId || null
+        categoryId: categoryId || null,
       },
       data: paginatedVehicles,
-      message: paginatedVehicles.length === 0 
-        ? 'No vehicles found matching your search criteria' 
-        : 'Vehicles fetched successfully'
+      message:
+        paginatedVehicles.length === 0
+          ? "No vehicles found matching your search criteria"
+          : "Vehicles fetched successfully",
     };
 
     res.status(200).json(response);
-
   } catch (err) {
-    console.error('Error in searchVehicles:', err);
-    sendResponse(res, 500, false, 'Failed to search vehicles');
+    console.error("Error in searchVehicles:", err);
+    sendResponse(res, 500, false, "Failed to search vehicles");
   }
 };
 
@@ -2279,14 +2424,24 @@ exports.getVehiclesByLocation = async (req, res) => {
     const { lat, lng } = req.query;
 
     if (!lat || !lng) {
-      return sendResponse(res, 400, false, 'Latitude (lat) and Longitude (lng) are required');
+      return sendResponse(
+        res,
+        400,
+        false,
+        "Latitude (lat) and Longitude (lng) are required"
+      );
     }
 
     const latitude = parseFloat(lat);
     const longitude = parseFloat(lng);
 
     if (isNaN(latitude) || isNaN(longitude)) {
-      return sendResponse(res, 400, false, 'Invalid latitude or longitude values');
+      return sendResponse(
+        res,
+        400,
+        false,
+        "Invalid latitude or longitude values"
+      );
     }
 
     const zoneRadiusKm = 10;
@@ -2294,46 +2449,60 @@ exports.getVehiclesByLocation = async (req, res) => {
     const vehicles = await Vehicle.find({
       latitude: { $exists: true, $ne: null },
       longitude: { $exists: true, $ne: null },
-      isActive: true
+      isActive: true,
     })
-      .populate('brand')
+      .populate("brand")
       .populate({
-        path: 'category',
-        model: 'VehicleCategory',
-        select: 'title image vehicleCategoryId module isActive',
+        path: "category",
+        model: "VehicleCategory",
+        select: "title image vehicleCategoryId module isActive",
       })
       .populate(populateProvider)
-      .populate('zone')
+      .populate("zone")
       .lean();
 
     const vehiclesInZone = [];
-    
-    vehicles.forEach(vehicle => {
-      const distance = calculateDistance(latitude, longitude, vehicle.latitude, vehicle.longitude);
+
+    vehicles.forEach((vehicle) => {
+      const distance = calculateDistance(
+        latitude,
+        longitude,
+        vehicle.latitude,
+        vehicle.longitude
+      );
 
       if (distance <= zoneRadiusKm) {
         vehiclesInZone.push({
           ...vehicle,
           distance: parseFloat(distance.toFixed(2)),
-          distanceUnit: 'km'
+          distanceUnit: "km",
         });
       }
     });
 
     vehiclesInZone.sort((a, b) => a.distance - b.distance);
 
-    sendResponse(res, 200, true, vehiclesInZone.length === 0 ? `No vehicles found within ${zoneRadiusKm}km zone` : 'Vehicles in zone fetched successfully', vehiclesInZone, {
-      count: vehiclesInZone.length,
-      searchParams: {
-        latitude,
-        longitude,
-        zoneRadius: zoneRadiusKm,
-        unit: 'km'
+    sendResponse(
+      res,
+      200,
+      true,
+      vehiclesInZone.length === 0
+        ? `No vehicles found within ${zoneRadiusKm}km zone`
+        : "Vehicles in zone fetched successfully",
+      vehiclesInZone,
+      {
+        count: vehiclesInZone.length,
+        searchParams: {
+          latitude,
+          longitude,
+          zoneRadius: zoneRadiusKm,
+          unit: "km",
+        },
       }
-    });
+    );
   } catch (err) {
-    console.error('Error fetching vehicles by location:', err);
-    sendResponse(res, 500, false, 'Failed to fetch vehicles by location');
+    console.error("Error fetching vehicles by location:", err);
+    sendResponse(res, 500, false, "Failed to fetch vehicles by location");
   }
 };
 
@@ -2343,28 +2512,37 @@ exports.getVehiclesByCategory = async (req, res) => {
     const { categoryId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(categoryId)) {
-      return sendResponse(res, 400, false, 'Invalid category ID');
+      return sendResponse(res, 400, false, "Invalid category ID");
     }
 
-    const vehicles = await Vehicle.find({ 
+    const vehicles = await Vehicle.find({
       category: categoryId,
-      isActive: true 
+      isActive: true,
     })
-      .populate('brand')
+      .populate("brand")
       .populate({
-        path: 'category',
-        model: 'VehicleCategory',
-        select: 'title image vehicleCategoryId module isActive',
+        path: "category",
+        model: "VehicleCategory",
+        select: "title image vehicleCategoryId module isActive",
       })
       .populate(populateProvider)
-      .populate('zone')
+      .populate("zone")
       .sort({ createdAt: -1 })
       .lean();
 
-    sendResponse(res, 200, true, vehicles.length === 0 ? 'No vehicles found for this category' : 'Vehicles fetched successfully', vehicles, { count: vehicles.length });
+    sendResponse(
+      res,
+      200,
+      true,
+      vehicles.length === 0
+        ? "No vehicles found for this category"
+        : "Vehicles fetched successfully",
+      vehicles,
+      { count: vehicles.length }
+    );
   } catch (err) {
-    console.error('Error fetching vehicles by category:', err);
-    sendResponse(res, 500, false, 'Failed to fetch vehicles by category');
+    console.error("Error fetching vehicles by category:", err);
+    sendResponse(res, 500, false, "Failed to fetch vehicles by category");
   }
 };
 
@@ -2372,46 +2550,74 @@ exports.getVehiclesByCategory = async (req, res) => {
 exports.sortVehicles = async (req, res) => {
   try {
     const { sortBy, latitude, longitude } = req.query;
-    const validSortOptions = ['highPrice', 'lowPrice', 'topRated', 'lowRated', 'highCapacity', 'lowCapacity', 'mostBooked', 'newest'];
+    const validSortOptions = [
+      "highPrice",
+      "lowPrice",
+      "topRated",
+      "lowRated",
+      "highCapacity",
+      "lowCapacity",
+      "mostBooked",
+      "newest",
+    ];
 
     if (!sortBy || !validSortOptions.includes(sortBy)) {
-      return sendResponse(res, 400, false, 'Invalid or missing sortBy parameter. Use: highPrice, lowPrice, topRated, lowRated, highCapacity, lowCapacity, mostBooked, newest');
+      return sendResponse(
+        res,
+        400,
+        false,
+        "Invalid or missing sortBy parameter. Use: highPrice, lowPrice, topRated, lowRated, highCapacity, lowCapacity, mostBooked, newest"
+      );
     }
 
     let vehicles = await Vehicle.find({ isActive: true })
-      .populate('brand')
+      .populate("brand")
       .populate({
-        path: 'category',
-        model: 'VehicleCategory',
-        select: 'title image vehicleCategoryId module isActive',
+        path: "category",
+        model: "VehicleCategory",
+        select: "title image vehicleCategoryId module isActive",
       })
       .populate(populateProvider)
-      .populate('zone')
+      .populate("zone")
       .lean();
 
     let useLocationFilter = false;
-    let userLat, userLon, searchRadius = 10;
+    let userLat,
+      userLon,
+      searchRadius = 10;
 
     if (latitude && longitude) {
       userLat = parseFloat(latitude);
       userLon = parseFloat(longitude);
 
       if (isNaN(userLat) || isNaN(userLon)) {
-        return sendResponse(res, 400, false, 'Invalid latitude or longitude values');
+        return sendResponse(
+          res,
+          400,
+          false,
+          "Invalid latitude or longitude values"
+        );
       }
 
       useLocationFilter = true;
-      vehicles = vehicles.map(vehicle => {
-        const distance = calculateDistance(userLat, userLon, vehicle.latitude, vehicle.longitude);
-        return {
-          ...vehicle,
-          distance: parseFloat(distance.toFixed(2)),
-          distanceUnit: 'km'
-        };
-      }).filter(vehicle => vehicle.distance <= searchRadius);
+      vehicles = vehicles
+        .map((vehicle) => {
+          const distance = calculateDistance(
+            userLat,
+            userLon,
+            vehicle.latitude,
+            vehicle.longitude
+          );
+          return {
+            ...vehicle,
+            distance: parseFloat(distance.toFixed(2)),
+            distanceUnit: "km",
+          };
+        })
+        .filter((vehicle) => vehicle.distance <= searchRadius);
     }
 
-    const vehiclesWithData = vehicles.map(vehicle => {
+    const vehiclesWithData = vehicles.map((vehicle) => {
       const effectivePrice = getEffectivePrice(vehicle.pricing);
       const rating = Number(vehicle.rating) || 0;
       const capacity = Number(vehicle.seatingCapacity) || 0;
@@ -2422,42 +2628,72 @@ exports.sortVehicles = async (req, res) => {
 
     let sortedVehicles;
     switch (sortBy) {
-      case 'highPrice':
-        sortedVehicles = [...vehiclesWithData].sort((a, b) => b.effectivePrice - a.effectivePrice);
+      case "highPrice":
+        sortedVehicles = [...vehiclesWithData].sort(
+          (a, b) => b.effectivePrice - a.effectivePrice
+        );
         break;
-      case 'lowPrice':
-        sortedVehicles = [...vehiclesWithData].sort((a, b) => a.effectivePrice - b.effectivePrice);
+      case "lowPrice":
+        sortedVehicles = [...vehiclesWithData].sort(
+          (a, b) => a.effectivePrice - b.effectivePrice
+        );
         break;
-      case 'topRated':
-        sortedVehicles = [...vehiclesWithData].sort((a, b) => b.rating - a.rating);
+      case "topRated":
+        sortedVehicles = [...vehiclesWithData].sort(
+          (a, b) => b.rating - a.rating
+        );
         break;
-      case 'lowRated':
-        sortedVehicles = [...vehiclesWithData].sort((a, b) => a.rating - b.rating);
+      case "lowRated":
+        sortedVehicles = [...vehiclesWithData].sort(
+          (a, b) => a.rating - b.rating
+        );
         break;
-      case 'highCapacity':
-        sortedVehicles = [...vehiclesWithData].sort((a, b) => b.capacity - a.capacity);
+      case "highCapacity":
+        sortedVehicles = [...vehiclesWithData].sort(
+          (a, b) => b.capacity - a.capacity
+        );
         break;
-      case 'lowCapacity':
-        sortedVehicles = [...vehiclesWithData].sort((a, b) => a.capacity - b.capacity);
+      case "lowCapacity":
+        sortedVehicles = [...vehiclesWithData].sort(
+          (a, b) => a.capacity - b.capacity
+        );
         break;
-      case 'mostBooked':
-        sortedVehicles = [...vehiclesWithData].sort((a, b) => b.popularity - a.popularity);
+      case "mostBooked":
+        sortedVehicles = [...vehiclesWithData].sort(
+          (a, b) => b.popularity - a.popularity
+        );
         break;
-      case 'newest':
-        sortedVehicles = [...vehiclesWithData].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      case "newest":
+        sortedVehicles = [...vehiclesWithData].sort(
+          (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+        );
         break;
       default:
         sortedVehicles = vehiclesWithData;
     }
 
-    sendResponse(res, 200, true, 'Vehicles sorted successfully', sortedVehicles, {
-      count: sortedVehicles.length,
-      sortBy: sortBy,
-      searchParams: useLocationFilter ? { latitude: userLat, longitude: userLon, radius: searchRadius, unit: 'km' } : null
-    });
+    sendResponse(
+      res,
+      200,
+      true,
+      "Vehicles sorted successfully",
+      sortedVehicles,
+      {
+        count: sortedVehicles.length,
+        sortBy: sortBy,
+        searchParams: useLocationFilter
+          ? {
+              latitude: userLat,
+              longitude: userLon,
+              radius: searchRadius,
+              unit: "km",
+            }
+          : null,
+      }
+    );
   } catch (err) {
-    console.error('Error in sortVehicles:', err);
-    sendResponse(res, 500, false, 'Failed to sort vehicles');
+    console.error("Error in sortVehicles:", err);
+    sendResponse(res, 500, false, "Failed to sort vehicles");
   }
 };
 
@@ -2467,10 +2703,14 @@ exports.getVehicleCounts = async (req, res) => {
     const total = await Vehicle.countDocuments();
     const active = await Vehicle.countDocuments({ isActive: true });
     const inactive = await Vehicle.countDocuments({ isActive: false });
-    
-    sendResponse(res, 200, true, 'Vehicle counts fetched successfully', { total, active, inactive });
+
+    sendResponse(res, 200, true, "Vehicle counts fetched successfully", {
+      total,
+      active,
+      inactive,
+    });
   } catch (err) {
-    console.error('Error in getVehicleCounts:', err);
-    sendResponse(res, 500, false, 'Failed to fetch vehicle counts');
+    console.error("Error in getVehicleCounts:", err);
+    sendResponse(res, 500, false, "Failed to fetch vehicle counts");
   }
 };
