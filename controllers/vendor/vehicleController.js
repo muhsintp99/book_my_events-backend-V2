@@ -1241,7 +1241,10 @@ const sanitizeVehicleData = (body) => {
   }
   // Advance booking parsing
   // ✅ Advance booking amount (flat)
-  if (sanitized.advanceBookingAmount !== undefined && sanitized.advanceBookingAmount !== '') {
+  if (
+    sanitized.advanceBookingAmount !== undefined &&
+    sanitized.advanceBookingAmount !== ""
+  ) {
     const parsed = Number(sanitized.advanceBookingAmount);
     // Only set if it's a valid number
     if (!isNaN(parsed)) {
@@ -1249,10 +1252,9 @@ const sanitizeVehicleData = (body) => {
     }
   }
   // If it's undefined or empty string, remove it so schema default doesn't apply
-  else if (sanitized.advanceBookingAmount === '') {
+  else if (sanitized.advanceBookingAmount === "") {
     delete sanitized.advanceBookingAmount;
   }
-
 
   // Parse numeric fields
   if (sanitized.airbags !== undefined)
@@ -1274,15 +1276,15 @@ const sanitizeVehicleData = (body) => {
   if (sanitized.longitude !== undefined)
     sanitized.longitude = Number(sanitized.longitude);
 
-   if (sanitized.pricing) {
-    if (typeof sanitized.pricing === 'string') {
+  if (sanitized.pricing) {
+    if (typeof sanitized.pricing === "string") {
       try {
         sanitized.pricing = JSON.parse(sanitized.pricing);
       } catch (e) {
-        console.error('Failed to parse pricing:', e);
+        console.error("Failed to parse pricing:", e);
       }
     }
-    if (sanitized.pricing && typeof sanitized.pricing === 'object') {
+    if (sanitized.pricing && typeof sanitized.pricing === "object") {
       if (sanitized.pricing.hourly !== undefined) {
         sanitized.pricing.hourly = Number(sanitized.pricing.hourly);
       }
@@ -1296,16 +1298,18 @@ const sanitizeVehicleData = (body) => {
   }
 
   // Parse categories (ObjectId array)
-  if (sanitized.categories) {
-    sanitized.category = parseObjectIdArray(sanitized.categories);
-    delete sanitized.categories;
-  } else if (sanitized.category) {
-    sanitized.category = parseObjectIdArray(sanitized.category);
+  // Parent category (SINGLE)
+  if (sanitized.category) {
+    sanitized.category = parseObjectId(sanitized.category);
+  }
+
+  // Sub categories (ARRAY)
+  if (sanitized.subCategories) {
+    sanitized.subCategories = parseObjectIdArray(sanitized.subCategories);
   }
 
   return sanitized;
 };
-
 
 // Helper function to calculate distance between two coordinates
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -1361,23 +1365,39 @@ exports.createVehicle = async (req, res) => {
 
   try {
     // Verify categories exist
-    if (body.category && body.category.length > 0) {
-      const existingCategories = await Category.find({
-        _id: { $in: body.category },
-      }).select("_id title");
+   // Validate parent category
+if (body.category) {
+  const parentExists = await Category.findById(body.category).select("_id");
+  if (!parentExists) {
+    return sendResponse(res, 400, false, "Invalid parent category");
+  }
+}
 
-      if (existingCategories.length === 0) {
-        // console.warn(
-        //   '⚠️ WARNING: None of the provided category IDs exist in the database'
-        // );
-      } else if (existingCategories.length < body.category.length) {
-        const foundIds = existingCategories.map((c) => c._id.toString());
-        const missingIds = body.category.filter(
-          (id) => !foundIds.includes(id.toString())
-        );
-        console.warn("⚠️ WARNING: Some category IDs not found:", missingIds);
-      }
-    }
+// Validate sub categories
+if (body.subCategories?.length) {
+  const parentCategory = await Category.findById(body.category).lean();
+
+  console.log("📦 Parent category fetched:", parentCategory?.title);
+  console.log("📦 Parent subCategories:", parentCategory?.subCategories);
+
+  if (!parentCategory) {
+    return sendResponse(res, 400, false, "Invalid parent category");
+  }
+
+  const validSubIds = parentCategory.subCategories.map(
+    (s) => s._id.toString()
+  );
+
+  body.subCategories = body.subCategories.filter((id) =>
+    validSubIds.includes(id.toString())
+  );
+
+  console.log("✅ Final valid subCategories:", body.subCategories);
+}
+
+
+
+
 
     // FIX: Verify brand exists - now checking for single ObjectId or null
     if (body.brand) {
@@ -1407,9 +1427,15 @@ exports.createVehicle = async (req, res) => {
       .populate("brand")
       .populate({
         path: "category",
-        model: "VehicleCategory",
-        select: "title image vehicleCategoryId module isActive",
+        model: "Category",
+        select: "title image isActive",
       })
+      .populate({
+        path: "subCategories",
+        model: "Category",
+        select: "title image isActive",
+      })
+
       .populate(populateProvider)
       .populate("zone")
       .lean();
@@ -1518,9 +1544,15 @@ exports.getVehicles = async (req, res) => {
         .populate("brand")
         .populate({
           path: "category",
-          model: "VehicleCategory",
-          select: "title image vehicleCategoryId module isActive",
+          model: "Category",
+          select: "title image isActive",
         })
+        .populate({
+          path: "subCategories",
+          model: "Category",
+          select: "title image isActive",
+        })
+
         .populate(populateProvider)
         .populate("zone")
         .skip(skip)
@@ -1558,9 +1590,15 @@ exports.getVehicle = async (req, res) => {
       .populate("brand")
       .populate({
         path: "category",
-        model: "VehicleCategory",
-        select: "title image vehicleCategoryId module isActive",
+        model: "Category",
+        select: "title image isActive",
       })
+      .populate({
+        path: "subCategories",
+        model: "Category",
+        select: "title image isActive",
+      })
+
       .populate(populateProvider)
       .populate("zone")
       .lean();
@@ -1592,9 +1630,15 @@ exports.getVehiclesByProvider = async (req, res) => {
         .populate("brand")
         .populate({
           path: "category",
-          model: "VehicleCategory",
-          select: "title image vehicleCategoryId module isActive",
+          model: "Category",
+          select: "title image isActive",
         })
+        .populate({
+          path: "subCategories",
+          model: "Category",
+          select: "title image isActive",
+        })
+
         .populate(populateProvider)
         .populate("zone")
         .skip(skip)
@@ -1692,9 +1736,15 @@ exports.updateVehicle = async (req, res) => {
       .populate("brand")
       .populate({
         path: "category",
-        model: "VehicleCategory",
-        select: "title image vehicleCategoryId module isActive",
+        model: "Category",
+        select: "title image isActive",
       })
+      .populate({
+        path: "subCategories",
+        model: "Category",
+        select: "title image isActive",
+      })
+
       .populate(populateProvider)
       .populate("zone")
       .lean();
@@ -1795,9 +1845,15 @@ exports.blockVehicle = async (req, res) => {
       .populate("brand")
       .populate({
         path: "category",
-        model: "VehicleCategory",
-        select: "title image vehicleCategoryId module isActive",
+        model: "Category",
+        select: "title image isActive",
       })
+      .populate({
+        path: "subCategories",
+        model: "Category",
+        select: "title image isActive",
+      })
+
       .populate(populateProvider)
       .populate("zone")
       .lean();
@@ -1845,9 +1901,15 @@ exports.reactivateVehicle = async (req, res) => {
       .populate("brand")
       .populate({
         path: "category",
-        model: "VehicleCategory",
-        select: "title image vehicleCategoryId module isActive",
+        model: "Category",
+        select: "title image isActive",
       })
+      .populate({
+        path: "subCategories",
+        model: "Category",
+        select: "title image isActive",
+      })
+
       .populate(populateProvider)
       .populate("zone")
       .lean();
@@ -2071,9 +2133,15 @@ exports.filterVehicles = async (req, res) => {
       .populate("brand")
       .populate({
         path: "category",
-        model: "VehicleCategory",
-        select: "title image vehicleCategoryId module isActive",
+        model: "Category",
+        select: "title image isActive",
       })
+      .populate({
+        path: "subCategories",
+        model: "Category",
+        select: "title image isActive",
+      })
+
       .populate(populateProvider)
       .populate("zone")
       .lean();
@@ -2356,9 +2424,15 @@ exports.searchVehicles = async (req, res) => {
       .populate("brand")
       .populate({
         path: "category",
-        model: "VehicleCategory",
-        select: "title image vehicleCategoryId module isActive",
+        model: "Category",
+        select: "title image isActive",
       })
+      .populate({
+        path: "subCategories",
+        model: "Category",
+        select: "title image isActive",
+      })
+
       .populate(populateProvider)
       .populate("zone")
       .lean();
@@ -2454,9 +2528,15 @@ exports.getVehiclesByLocation = async (req, res) => {
       .populate("brand")
       .populate({
         path: "category",
-        model: "VehicleCategory",
-        select: "title image vehicleCategoryId module isActive",
+        model: "Category",
+        select: "title image isActive",
       })
+      .populate({
+        path: "subCategories",
+        model: "Category",
+        select: "title image isActive",
+      })
+
       .populate(populateProvider)
       .populate("zone")
       .lean();
@@ -2522,9 +2602,15 @@ exports.getVehiclesByCategory = async (req, res) => {
       .populate("brand")
       .populate({
         path: "category",
-        model: "VehicleCategory",
-        select: "title image vehicleCategoryId module isActive",
+        model: "Category",
+        select: "title image isActive",
       })
+      .populate({
+        path: "subCategories",
+        model: "Category",
+        select: "title image isActive",
+      })
+
       .populate(populateProvider)
       .populate("zone")
       .sort({ createdAt: -1 })
@@ -2574,9 +2660,15 @@ exports.sortVehicles = async (req, res) => {
       .populate("brand")
       .populate({
         path: "category",
-        model: "VehicleCategory",
-        select: "title image vehicleCategoryId module isActive",
+        model: "Category",
+        select: "title image isActive",
       })
+      .populate({
+        path: "subCategories",
+        model: "Category",
+        select: "title image isActive",
+      })
+
       .populate(populateProvider)
       .populate("zone")
       .lean();
