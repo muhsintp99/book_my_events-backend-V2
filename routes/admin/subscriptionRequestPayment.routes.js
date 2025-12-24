@@ -13,4 +13,7 @@ router.post("/initiate", protect, controller.initiateSubscriptionRequestPayment)
 // Verify payment (can be called by admin or vendor after payment)
 router.post("/verify", controller.verifySubscriptionRequestPayment);
 
+// Backend callback for Juspay redirect
+router.get("/payment-success", controller.handlePaymentSuccess);
+
 module.exports = router;
