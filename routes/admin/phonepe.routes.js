@@ -1,25 +1,31 @@
-const express = require("express");
-const router = express.Router();
-const phonepeController = require("../../controllers/admin/phonepe.controller");
-const { protect, adminOnly } = require("../../middlewares/authMiddleware");
+// ============================================================================
+// PHONEPE PAYMENT ROUTES (COMMENTED OUT - USING HDFC INSTEAD)
+// ============================================================================
+// const express = require("express");
+// const router = express.Router();
+// const phonepeController = require("../../controllers/admin/phonepe.controller");
+// const { protect, adminOnly } = require("../../middlewares/authMiddleware");
 
-/**
- * PHONEPE PAYMENT ROUTES FOR SUBSCRIPTION
- */
+// /**
+//  * PHONEPE PAYMENT ROUTES FOR SUBSCRIPTION (COMMENTED OUT - USING HDFC INSTEAD)
+//  */
 
-// Initiate payment (Admin only)
-router.post("/initiate", protect, phonepeController.initiatePayment);
+// // Initiate payment (Admin only)
+// router.post("/initiate", protect, phonepeController.initiatePayment);
 
-// PhonePe callback webhook (No auth - called by PhonePe)
-router.post("/callback", phonepeController.paymentCallback);
+// // PhonePe callback webhook (No auth - called by PhonePe)
+// router.post("/callback", phonepeController.paymentCallback);
 
-// Check payment status (Admin only)
-router.get("/status/:merchantTransactionId", protect, adminOnly, phonepeController.checkPaymentStatus);
+// // Check payment status (Admin only)
+// router.get("/status/:merchantTransactionId", protect, adminOnly, phonepeController.checkPaymentStatus);
 
-// Get all payments (Admin only)
-router.get("/all", protect, adminOnly, phonepeController.getAllPayments);
+// // Get all payments (Admin only)
+// router.get("/all", protect, adminOnly, phonepeController.getAllPayments);
 
-// Get payment by ID (Admin only)
-router.get("/:id", protect, adminOnly, phonepeController.getPaymentById);
+// // Get payment by ID (Admin only)
+// router.get("/:id", protect, adminOnly, phonepeController.getPaymentById);
 
-module.exports = router;
+// module.exports = router;
+
+// Export empty router to prevent errors
+module.exports = require("express").Router();

@@ -564,9 +564,16 @@ app.use("/api/availability", require("./routes/vendor/availabilityRoutes"));
 
 
 
+
 app.use("/api/vendor/subscription", require("./routes/vendor/subscriptionRequest.routes"));
 app.use("/api/admin/subscription", require("./routes/admin/subscriptionRoutes"));
-app.use("/api/admin/subscription/payment", require("./routes/admin/phonepe.routes"));
+
+// PhonePe payment routes (COMMENTED OUT - USING HDFC INSTEAD)
+// app.use("/api/admin/subscription/payment", require("./routes/admin/phonepe.routes"));
+
+// HDFC Subscription Request Payment Routes
+app.use("/api/admin/subscription-request/payment", require("./routes/admin/subscriptionRequestPayment.routes"));
+
 
 /**********************************************************
  * SOCKET.IO (LIVE CHAT)
@@ -624,7 +631,7 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log("🔴 Socket disconnected:", socket.id);
   });
-});   
+});
 
 /**********************************************************
  * GLOBAL ERROR HANDLER

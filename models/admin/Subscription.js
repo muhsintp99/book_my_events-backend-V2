@@ -64,10 +64,19 @@ const subscriptionSchema = new mongoose.Schema(
       type: Object,
       default: null
     },
-isCurrent: {
-  type: Boolean,
-  default: true
-},
+
+    // Link to subscription request (for admin-initiated payments)
+    subscriptionRequestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SubscriptionRequest",
+      default: null
+    },
+
+    isCurrent: {
+      type: Boolean,
+      default: true
+    },
+
     autoRenew: {
       type: Boolean,
       default: false
