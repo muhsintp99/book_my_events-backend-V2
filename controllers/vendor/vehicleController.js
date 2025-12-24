@@ -1223,6 +1223,12 @@ const sanitizeVehicleData = (body) => {
       sanitized.airCondition = !!sanitized.airCondition;
     }
   }
+// Advance booking parsing
+// ✅ Advance booking amount (flat)
+if (sanitized.advanceBookingAmount !== undefined) {
+  sanitized.advanceBookingAmount = Number(sanitized.advanceBookingAmount);
+}
+
 
   // Parse numeric fields
   if (sanitized.airbags !== undefined) sanitized.airbags = Number(sanitized.airbags);
@@ -1299,6 +1305,9 @@ const getEffectivePrice = (pricing) => {
 // ================= CREATE =================
 exports.createVehicle = async (req, res) => {
   const body = sanitizeVehicleData(req.body);
+
+
+  
 
   // Provider auto-fill
   if (!body.provider && req.user) {

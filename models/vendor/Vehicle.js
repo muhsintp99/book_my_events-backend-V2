@@ -372,6 +372,13 @@ const VehicleSchema = new mongoose.Schema(
       perDay: { type: Number, default: 0, min: 0 },
       distanceWise: { type: Number, default: 0, min: 0 },
     },
+ advanceBookingAmount: {
+  type: Number,
+  default: 0,
+  min: [0, 'Advance booking amount cannot be negative'],
+},
+
+
     discount: { type: Number, default: 0, min: 0, max: 100 },
     images: [{ type: String }],
     thumbnail: { type: String },
