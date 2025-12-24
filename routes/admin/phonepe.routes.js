@@ -8,7 +8,7 @@ const { protect, adminOnly } = require("../../middlewares/authMiddleware");
  */
 
 // Initiate payment (Admin only)
-router.post("/initiate", protect, adminOnly, phonepeController.initiatePayment);
+router.post("/initiate", protect, phonepeController.initiatePayment);
 
 // PhonePe callback webhook (No auth - called by PhonePe)
 router.post("/callback", phonepeController.paymentCallback);
