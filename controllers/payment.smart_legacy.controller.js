@@ -500,7 +500,9 @@ exports.createSmartGatewayPayment = async (req, res) => {
       .populate("venueId")
       .populate("makeupId")
       .populate("moduleId")
-      .populate("photographyId");
+      .populate("photographyId")
+      .populate("cateringId") // ✅ ADD
+
 
     if (!booking) {
       return res.status(404).json({
@@ -516,23 +518,26 @@ exports.createSmartGatewayPayment = async (req, res) => {
     let advanceAmount = Number(booking.advanceAmount) || 0;
     console.log("🔥 advanceAmount from Booking:", advanceAmount);
 
-    // Fallback logic
     if (advanceAmount <= 0) {
-      console.log("⚠️ advanceAmount missing — applying fallback logic");
+  console.log("⚠️ advanceAmount missing — applying fallback logic");
 
-      if (moduleType === "Venues") {
-        advanceAmount = Number(booking.venueId?.advanceDeposit) || 0;
-      } else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
-        advanceAmount = Number(booking.makeupId?.advanceBookingAmount) || 0;
-      } else if (moduleType === "Photography") {
-        advanceAmount = Number(
-          booking.photographyId?.advanceBookingAmount || 0
-        );
-      } else {
-        advanceAmount =
-          Number(booking.serviceProvider?.advanceBookingAmount) || 0;
-      }
-    }
+  if (moduleType === "Venues") {
+    advanceAmount = Number(booking.venueId?.advanceDeposit) || 0;
+
+  } else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+    advanceAmount = Number(booking.makeupId?.advanceBookingAmount) || 0;
+
+  } else if (moduleType === "Photography") {
+    advanceAmount = Number(
+      booking.photographyId?.advanceBookingAmount
+    ) || 0;
+
+  } else if (moduleType === "Catering") {
+    advanceAmount = Number(
+      booking.cateringId?.advanceBookingAmount
+    ) || 0; // ✅ FIX
+  }
+}
 
     console.log("✅ Final Computed Advance Amount:", advanceAmount);
 
@@ -584,10 +589,11 @@ exports.createSmartGatewayPayment = async (req, res) => {
       description: `Advance Payment ₹${amountInRupees}`,
       first_name: booking.userId.firstName || "",
       last_name: booking.userId.lastName || "",
-      metadata: {
-        bookingId: bookingId,
-        moduleType: "Venues",
-      },
+     metadata: {
+  bookingId: bookingId,
+  moduleType: booking.moduleType, // ✅ dynamic
+},
+
     });
 
     console.log("🎯 Payment Page:", session.payment_links?.web);

@@ -21,61 +21,182 @@
 
 // module.exports = router;
 
+// const express = require('express');
+// const router = express.Router();
+// const createUpload = require('../../middlewares/upload');
+// const categoryController = require('../../controllers/admin/categoryController');
+
+// // ✅ Create upload instance
+// const upload = createUpload('categories', {
+//   fileSizeMB: 2,
+//   allowedTypes: ['image/png', 'image/jpeg', 'image/jpg']
+// });
+
+// // ✅ Wrapper to catch Multer errors safely
+// const handleUpload = (req, res, next) => {
+//   try {
+//     upload.single('image')(req, res, (err) => {
+//       if (err) {
+//         console.error('❌ Multer Upload Error:', err.message);
+//         return res.status(400).json({ success: false, message: err.message });
+//       }
+//       next();
+//     });
+//   } catch (error) {
+//     console.error('❌ Unexpected Upload Error:', error);
+//     return res.status(500).json({ success: false, message: 'Upload failed.' });
+//   }
+// };
+
+// // ---------------- ROUTES ----------------
+
+
+
+
+// // Create category
+// router.post('/', handleUpload, categoryController.createCategory);
+
+// // Get categories by module - FIXED ROUTE
+// router.get('/modules/:moduleId', categoryController.getCategoriesByModule);
+
+// router.get("/parent/:parentId", categoryController.getSubCategories);
+// router.get('/with-parent/:id', categoryController.getSubCategoryWithParent);
+
+// // Get all categories
+// router.get('/', categoryController.getCategories);
+
+// // Get single category
+// router.get('/:id', categoryController.getCategory);
+
+// // Update category
+// router.put('/:id', handleUpload, categoryController.updateCategory);
+
+// // Delete category
+// router.delete('/:id', categoryController.deleteCategory);
+
+// // Block/Reactivate routes
+// router.patch('/:id/block', categoryController.blockCategory);
+// router.patch('/:id/reactivate', categoryController.reactivateCategory);
+
+// module.exports = router;
+
+
+
+
+
 const express = require('express');
 const router = express.Router();
 const createUpload = require('../../middlewares/upload');
 const categoryController = require('../../controllers/admin/categoryController');
 
-// ✅ Create upload instance
+/* -----------------------------------------------------
+   UPLOAD CONFIG
+----------------------------------------------------- */
 const upload = createUpload('categories', {
   fileSizeMB: 2,
-  allowedTypes: ['image/png', 'image/jpeg', 'image/jpg']
+  allowedTypes: ['image/png', 'image/jpeg', 'image/jpg'],
 });
 
-// ✅ Wrapper to catch Multer errors safely
 const handleUpload = (req, res, next) => {
-  try {
-    upload.single('image')(req, res, (err) => {
-      if (err) {
-        console.error('❌ Multer Upload Error:', err.message);
-        return res.status(400).json({ success: false, message: err.message });
-      }
-      next();
-    });
-  } catch (error) {
-    console.error('❌ Unexpected Upload Error:', error);
-    return res.status(500).json({ success: false, message: 'Upload failed.' });
-  }
+  upload.single('image')(req, res, (err) => {
+    if (err) {
+      console.error('❌ Multer Upload Error:', err.message);
+      return res
+        .status(400)
+        .json({ success: false, message: err.message });
+    }
+    next();
+  });
 };
 
-// ---------------- ROUTES ----------------
+/* -----------------------------------------------------
+   READ ROUTES (ORDER MATTERS)
+----------------------------------------------------- */
 
+/**
+ * ✅ NEW: Get ONLY parent categories by module
+ * GET /api/categories/parents/:moduleId
+ */
+router.get(
+  '/parents/:moduleId',
+  categoryController.getParentCategories
+);
 
+/**
+ * ✅ NEW: Get subcategories under a parent
+ * GET /api/categories/parents/:parentId/subcategories
+ */
+router.get(
+  '/parents/:parentId/subcategories',
+  categoryController.getSubCategoriesByParent
+);
 
+/**
+ * ✅ EXISTING: Get categories by module (with embedded subCategories)
+ * GET /api/categories/modules/:moduleId
+ */
+router.get(
+  '/modules/:moduleId',
+  categoryController.getCategoriesByModule
+);
 
-// Create category
-router.post('/', handleUpload, categoryController.createCategory);
+/**
+ * ✅ EXISTING: Get subcategories (legacy)
+ * GET /api/categories/parent/:parentId
+ */
+router.get(
+  '/parent/:parentId',
+  categoryController.getSubCategories
+);
 
-// Get categories by module - FIXED ROUTE
-router.get('/modules/:moduleId', categoryController.getCategoriesByModule);
+/**
+ * ✅ EXISTING: Get subcategory with full parent tree
+ * GET /api/categories/with-parent/:id
+ */
+router.get(
+  '/with-parent/:id',
+  categoryController.getSubCategoryWithParent
+);
 
-router.get("/parent/:parentId", categoryController.getSubCategories);
-router.get('/with-parent/:id', categoryController.getSubCategoryWithParent);
-
-// Get all categories
+/**
+ * ✅ EXISTING: Get ALL categories (admin/debug)
+ * GET /api/categories
+ */
 router.get('/', categoryController.getCategories);
 
-// Get single category
+/**
+ * ✅ EXISTING: Get single category by ID
+ * GET /api/categories/:id
+ */
 router.get('/:id', categoryController.getCategory);
 
-// Update category
+/* -----------------------------------------------------
+   WRITE ROUTES
+----------------------------------------------------- */
+
+/**
+ * Create category (parent or subcategory)
+ */
+router.post('/', handleUpload, categoryController.createCategory);
+
+/**
+ * Update category
+ */
 router.put('/:id', handleUpload, categoryController.updateCategory);
 
-// Delete category
+/**
+ * Delete category
+ */
 router.delete('/:id', categoryController.deleteCategory);
 
-// Block/Reactivate routes
+/**
+ * Block category
+ */
 router.patch('/:id/block', categoryController.blockCategory);
+
+/**
+ * Reactivate category
+ */
 router.patch('/:id/reactivate', categoryController.reactivateCategory);
 
 module.exports = router;

@@ -734,6 +734,48 @@ exports.deleteCategory = async (req, res) => {
   }
 };
 
+
+exports.getParentCategories = async (req, res) => {
+  try {
+    const { moduleId } = req.params;
+
+    const parents = await Category.find({
+      module: moduleId,
+      parentCategory: null,
+      isActive: true,
+    })
+      .select('_id title image')
+      .lean();
+
+    res.json({
+      success: true,
+      data: parents,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.getSubCategoriesByParent = async (req, res) => {
+  try {
+    const { parentId } = req.params;
+
+    const subcategories = await Category.find({
+      parentCategory: parentId,
+      isActive: true,
+    })
+      .select('_id title image')
+      .lean();
+
+    res.json({
+      success: true,
+      data: subcategories,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 /* -----------------------------------------------------
    GET ALL CATEGORIES
 ----------------------------------------------------- */
