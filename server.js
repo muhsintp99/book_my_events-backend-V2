@@ -566,7 +566,7 @@ app.use("/api/availability", require("./routes/vendor/availabilityRoutes"));
 
 app.use("/api/vendor/subscription", require("./routes/vendor/subscriptionRequest.routes"));
 app.use("/api/admin/subscription", require("./routes/admin/subscriptionRoutes"));
-
+app.use("/api/admin/subscription/payment", require("./routes/admin/phonepe.routes"));
 
 /**********************************************************
  * SOCKET.IO (LIVE CHAT)
