@@ -1411,9 +1411,10 @@ exports.createVehicle = async (req, res) => {
       }
 
       // Extract valid subcategory IDs from parent's embedded subdocuments
-      const validSubIds = parentCategory.subCategories.map((id) =>
-        id.toString()
-      );
+     const validSubIds = Array.isArray(parentCategory.subCategories)
+  ? parentCategory.subCategories.map((id) => id.toString())
+  : [];
+
 
       console.log("✅ Valid subcategory IDs:", validSubIds);
 
@@ -1612,14 +1613,19 @@ exports.getVehicles = async (req, res) => {
       if (vehicle.category && vehicle.subCategories?.length) {
         const subCategoryIds = vehicle.subCategories.map((id) => id.toString());
 
-        vehicle.subCategories = vehicle.category.subCategories
-          .filter((sub) => subCategoryIds.includes(sub._id.toString()))
-          .map((sub) => ({
-            _id: sub._id,
-            title: sub.title,
-            image: sub.image,
-            isActive: sub.isActive,
-          }));
+        const categorySubs = Array.isArray(vehicle.category?.subCategories)
+  ? vehicle.category.subCategories
+  : [];
+
+vehicle.subCategories = categorySubs
+  .filter((sub) => subCategoryIds.includes(sub._id.toString()))
+  .map((sub) => ({
+    _id: sub._id,
+    title: sub.title,
+    image: sub.image,
+    isActive: sub.isActive,
+  }));
+
 
         delete vehicle.category.subCategories;
       }
@@ -1814,9 +1820,12 @@ exports.updateVehicle = async (req, res) => {
       const parentCategory = await Category.findById(body.category).lean();
 
       if (parentCategory) {
-        const validSubIds = parentCategory.subCategories
-          .filter((sub) => sub.isActive)
-          .map((s) => s._id.toString());
+       const validSubIds = Array.isArray(parentCategory.subCategories)
+  ? parentCategory.subCategories
+      .filter((sub) => sub.isActive)
+      .map((s) => s._id.toString())
+  : [];
+
 
         body.subCategories = body.subCategories.filter((id) =>
           validSubIds.includes(id.toString())
