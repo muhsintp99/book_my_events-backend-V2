@@ -1902,6 +1902,8 @@ exports.updateVehicle = async (req, res) => {
   }
 };
 
+
+
 // ================= DELETE VEHICLE =================
 exports.deleteVehicle = async (req, res) => {
   try {
