@@ -1098,22 +1098,20 @@ const parseObjectIdArray = (value) => {
 
   return [];
 };
+
 // Parse string arrays (for connectivity, sensors, safety, etc.)
 const parseStringArray = (value) => {
   if (!value) return [];
 
-  // If already an array, trim each item
   if (Array.isArray(value)) {
     return value
       .map((item) => String(item).trim().toLowerCase())
       .filter((item) => item);
   }
 
-  // If string, try to parse as JSON first
   if (typeof value === "string") {
     const trimmed = value.trim();
 
-    // Try JSON parse
     try {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) {
@@ -1125,16 +1123,15 @@ const parseStringArray = (value) => {
       // Not valid JSON, continue to CSV parsing
     }
 
-    // Parse as comma-separated values
     return trimmed
-      .replace(/^\[|\]$/g, "") // Remove outer brackets if present
+      .replace(/^\[|\]$/g, "")
       .split(",")
       .map((item) =>
         item
           .trim()
           .replace(/^["']|["']$/g, "")
           .toLowerCase()
-      ) // Remove quotes
+      )
       .filter((item) => item);
   }
 
@@ -1144,23 +1141,19 @@ const parseStringArray = (value) => {
 const parseObjectId = (value) => {
   if (!value) return null;
 
-  // If it's already an ObjectId, return it
   if (mongoose.Types.ObjectId.isValid(value)) {
     return new mongoose.Types.ObjectId(value);
   }
 
-  // If it's a string, try to parse it
   if (typeof value === "string") {
     const trimmed = value.trim();
 
-    // Try JSON parse first (in case it's wrapped in quotes)
     try {
       const parsed = JSON.parse(trimmed);
       if (mongoose.Types.ObjectId.isValid(parsed)) {
         return new mongoose.Types.ObjectId(parsed);
       }
     } catch (e) {
-      // Not JSON, check if it's a valid ObjectId string
       if (mongoose.Types.ObjectId.isValid(trimmed)) {
         return new mongoose.Types.ObjectId(trimmed);
       }
@@ -1171,44 +1164,80 @@ const parseObjectId = (value) => {
 };
 
 // Sanitize and parse request body
+// Sanitize and parse request body - FIXED VERSION
 const sanitizeVehicleData = (body) => {
   const sanitized = { ...body };
 
-  // FIX: Parse brand as single ObjectId, not array
+  // Parse brand as single ObjectId
   if (sanitized.brand) sanitized.brand = parseObjectId(sanitized.brand);
 
-  // FIX: Parse type, fuelType, transmissionType as single strings (not arrays)
-  if (sanitized.type) {
-    sanitized.type =
-      typeof sanitized.type === "string"
-        ? sanitized.type.trim().toLowerCase()
-        : sanitized.type;
-  }
+  // Parse fuelType and transmissionType as single strings with type safety
   if (sanitized.fuelType) {
     sanitized.fuelType =
       typeof sanitized.fuelType === "string"
         ? sanitized.fuelType.trim().toLowerCase()
-        : sanitized.fuelType;
+        : String(sanitized.fuelType).toLowerCase();
   }
   if (sanitized.transmissionType) {
     sanitized.transmissionType =
       typeof sanitized.transmissionType === "string"
         ? sanitized.transmissionType.trim().toLowerCase()
-        : sanitized.transmissionType;
+        : String(sanitized.transmissionType).toLowerCase();
   }
-  if (sanitized.seatType)
-    sanitized.seatType = sanitized.seatType.trim().toLowerCase();
-  if (sanitized.camera)
-    sanitized.camera = sanitized.camera.trim().toLowerCase();
-  if (sanitized.model) sanitized.model = sanitized.model.trim();
-  if (sanitized.name) sanitized.name = sanitized.name.trim();
-  if (sanitized.description)
-    sanitized.description = sanitized.description.trim();
-  if (sanitized.vinNumber) sanitized.vinNumber = sanitized.vinNumber.trim();
-  if (sanitized.licensePlateNumber)
-    sanitized.licensePlateNumber = sanitized.licensePlateNumber.trim();
-  if (sanitized.audioSystem)
-    sanitized.audioSystem = sanitized.audioSystem.trim();
+
+  // ✅ FIXED: Add type checking for seatType
+  if (sanitized.seatType) {
+    sanitized.seatType =
+      typeof sanitized.seatType === "string"
+        ? sanitized.seatType.trim().toLowerCase()
+        : String(sanitized.seatType).toLowerCase();
+  }
+
+  // ✅ FIXED: Add type checking for camera
+  if (sanitized.camera) {
+    sanitized.camera =
+      typeof sanitized.camera === "string"
+        ? sanitized.camera.trim().toLowerCase()
+        : String(sanitized.camera).toLowerCase();
+  }
+
+  // ✅ FIXED: Add type checking for all string fields
+  if (sanitized.model) {
+    sanitized.model =
+      typeof sanitized.model === "string"
+        ? sanitized.model.trim()
+        : String(sanitized.model);
+  }
+  if (sanitized.name) {
+    sanitized.name =
+      typeof sanitized.name === "string"
+        ? sanitized.name.trim()
+        : String(sanitized.name);
+  }
+  if (sanitized.description) {
+    sanitized.description =
+      typeof sanitized.description === "string"
+        ? sanitized.description.trim()
+        : String(sanitized.description);
+  }
+  if (sanitized.vinNumber) {
+    sanitized.vinNumber =
+      typeof sanitized.vinNumber === "string"
+        ? sanitized.vinNumber.trim()
+        : String(sanitized.vinNumber);
+  }
+  if (sanitized.licensePlateNumber) {
+    sanitized.licensePlateNumber =
+      typeof sanitized.licensePlateNumber === "string"
+        ? sanitized.licensePlateNumber.trim()
+        : String(sanitized.licensePlateNumber);
+  }
+  if (sanitized.audioSystem) {
+    sanitized.audioSystem =
+      typeof sanitized.audioSystem === "string"
+        ? sanitized.audioSystem.trim()
+        : String(sanitized.audioSystem);
+  }
 
   // Parse string arrays
   if (sanitized.searchTags !== undefined) {
@@ -1235,24 +1264,23 @@ const sanitizeVehicleData = (body) => {
     if (typeof sanitized.airCondition === "string") {
       sanitized.airCondition =
         sanitized.airCondition.trim().toLowerCase() === "true";
+    } else if (typeof sanitized.airCondition === "boolean") {
+      sanitized.airCondition = sanitized.airCondition;
     } else {
       sanitized.airCondition = !!sanitized.airCondition;
     }
   }
-  // Advance booking parsing
-  // ✅ Advance booking amount (flat)
+
+  // Advance booking amount parsing
   if (
     sanitized.advanceBookingAmount !== undefined &&
     sanitized.advanceBookingAmount !== ""
   ) {
     const parsed = Number(sanitized.advanceBookingAmount);
-    // Only set if it's a valid number
     if (!isNaN(parsed)) {
       sanitized.advanceBookingAmount = parsed;
     }
-  }
-  // If it's undefined or empty string, remove it so schema default doesn't apply
-  else if (sanitized.advanceBookingAmount === "") {
+  } else if (sanitized.advanceBookingAmount === "") {
     delete sanitized.advanceBookingAmount;
   }
 
@@ -1276,6 +1304,7 @@ const sanitizeVehicleData = (body) => {
   if (sanitized.longitude !== undefined)
     sanitized.longitude = Number(sanitized.longitude);
 
+  // Parse pricing object
   if (sanitized.pricing) {
     if (typeof sanitized.pricing === "string") {
       try {
@@ -1297,7 +1326,6 @@ const sanitizeVehicleData = (body) => {
     }
   }
 
-  // Parse categories (ObjectId array)
   // Parent category (SINGLE)
   if (sanitized.category) {
     sanitized.category = parseObjectId(sanitized.category);
@@ -1310,10 +1338,9 @@ const sanitizeVehicleData = (body) => {
 
   return sanitized;
 };
-
 // Helper function to calculate distance between two coordinates
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
-  const R = 6371; // Earth's radius in kilometers
+  const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -1323,7 +1350,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c; // Distance in kilometers
+  return R * c;
 };
 
 // Helper function to get effective price (min non-zero pricing)
@@ -1337,7 +1364,6 @@ const getEffectivePrice = (pricing) => {
   if (pricing.distanceWise && pricing.distanceWise > 0)
     prices.push(pricing.distanceWise);
 
-  // Return the minimum non-zero price, or 0 if no valid prices
   return prices.length > 0 ? Math.min(...prices) : 0;
 };
 
@@ -1364,42 +1390,50 @@ exports.createVehicle = async (req, res) => {
     body.documents = req.files.documents.map((f) => f.filename);
 
   try {
-    // Verify categories exist
-   // Validate parent category
-if (body.category) {
-  const parentExists = await Category.findById(body.category).select("_id");
-  if (!parentExists) {
-    return sendResponse(res, 400, false, "Invalid parent category");
-  }
-}
+    // Validate parent category
+    if (body.category) {
+      const parentExists = await Category.findById(body.category).select("_id");
+      if (!parentExists) {
+        return sendResponse(res, 400, false, "Invalid parent category");
+      }
+    }
 
-// Validate sub categories
-if (body.subCategories?.length) {
-  const parentCategory = await Category.findById(body.category).lean();
+    // ✅ FIXED: Validate subcategories properly
+    if (body.subCategories?.length) {
+      const parentCategory = await Category.findById(body.category).lean();
 
-  console.log("📦 Parent category fetched:", parentCategory?.title);
-  console.log("📦 Parent subCategories:", parentCategory?.subCategories);
+      console.log("📦 Parent category fetched:", parentCategory?.title);
+      console.log("📦 Parent subCategories:", parentCategory?.subCategories);
+      console.log("📦 Requested subCategories:", body.subCategories);
 
-  if (!parentCategory) {
-    return sendResponse(res, 400, false, "Invalid parent category");
-  }
+      if (!parentCategory) {
+        return sendResponse(res, 400, false, "Invalid parent category");
+      }
 
-  const validSubIds = parentCategory.subCategories.map(
-    (s) => s._id.toString()
-  );
+      // Extract valid subcategory IDs from parent's embedded subdocuments
+      const validSubIds = parentCategory.subCategories.map((id) =>
+        id.toString()
+      );
 
-  body.subCategories = body.subCategories.filter((id) =>
-    validSubIds.includes(id.toString())
-  );
+      console.log("✅ Valid subcategory IDs:", validSubIds);
 
-  console.log("✅ Final valid subCategories:", body.subCategories);
-}
+      // Filter requested subcategories to only include valid ones
+      const validRequestedSubs = body.subCategories.filter((id) =>
+        validSubIds.includes(id.toString())
+      );
 
+      console.log("✅ Final valid subCategories:", validRequestedSubs);
 
+      // Only set subcategories if there are valid ones
+      if (validRequestedSubs.length > 0) {
+        body.subCategories = validRequestedSubs;
+      } else {
+        console.warn("⚠️ No valid subcategories found, setting to empty array");
+        body.subCategories = [];
+      }
+    }
 
-
-
-    // FIX: Verify brand exists - now checking for single ObjectId or null
+    // Verify brand exists
     if (body.brand) {
       if (!mongoose.Types.ObjectId.isValid(body.brand)) {
         return sendResponse(res, 400, false, "Invalid brand ID format");
@@ -1423,22 +1457,40 @@ if (body.subCategories?.length) {
     const vehicle = await Vehicle.create(body);
 
     // Populate after creation
+    // Populate after creation
     const populatedVehicle = await Vehicle.findById(vehicle._id)
       .populate("brand")
       .populate({
         path: "category",
         model: "Category",
-        select: "title image isActive",
+        select: "title image isActive subCategories",
       })
-      .populate({
-        path: "subCategories",
-        model: "Category",
-        select: "title image isActive",
-      })
-
       .populate(populateProvider)
       .populate("zone")
       .lean();
+
+    // ✅ MANUAL subCategory population (THIS IS THE KEY)
+    // ✅ MANUAL subCategory population (CORRECT WAY)
+    if (populatedVehicle.subCategories?.length) {
+      const subCategoryIds = populatedVehicle.subCategories.map((id) =>
+        id.toString()
+      );
+
+      const subCategoryDocs = await Category.find({
+        _id: { $in: subCategoryIds },
+        parentCategory: populatedVehicle.category._id,
+        isActive: true,
+      }).select("title image isActive");
+
+      populatedVehicle.subCategories = subCategoryDocs;
+
+ 
+    }
+
+    // Remove nested subCategories from category (clean response)
+    if (populatedVehicle.category) {
+      delete populatedVehicle.category.subCategories;
+    }
 
     sendResponse(
       res,
@@ -1468,6 +1520,7 @@ if (body.subCategories?.length) {
     sendResponse(res, 400, false, error.message);
   }
 };
+
 // ================= GET ALL VEHICLES =================
 exports.getVehicles = async (req, res) => {
   try {
@@ -1476,7 +1529,6 @@ exports.getVehicles = async (req, res) => {
       limit = 10,
       brand,
       category,
-      type,
       fuelType,
       transmissionType,
       seatType,
@@ -1493,7 +1545,6 @@ exports.getVehicles = async (req, res) => {
     // Build filters
     if (brand) query.brand = parseObjectIdArray(brand);
     if (category) query.category = { $in: parseObjectIdArray(category) };
-    if (type) query.type = { $in: parseStringArray(type) };
     if (fuelType) query.fuelType = { $in: parseStringArray(fuelType) };
     if (transmissionType)
       query.transmissionType = { $in: parseStringArray(transmissionType) };
@@ -1545,14 +1596,8 @@ exports.getVehicles = async (req, res) => {
         .populate({
           path: "category",
           model: "Category",
-          select: "title image isActive",
+          select: "title image isActive subCategories",
         })
-        .populate({
-          path: "subCategories",
-          model: "Category",
-          select: "title image isActive",
-        })
-
         .populate(populateProvider)
         .populate("zone")
         .skip(skip)
@@ -1561,6 +1606,24 @@ exports.getVehicles = async (req, res) => {
         .lean(),
       Vehicle.countDocuments(query),
     ]);
+
+    // Manually populate subcategories for each vehicle
+    for (let vehicle of vehicles) {
+      if (vehicle.category && vehicle.subCategories?.length) {
+        const subCategoryIds = vehicle.subCategories.map((id) => id.toString());
+
+        vehicle.subCategories = vehicle.category.subCategories
+          .filter((sub) => subCategoryIds.includes(sub._id.toString()))
+          .map((sub) => ({
+            _id: sub._id,
+            title: sub.title,
+            image: sub.image,
+            isActive: sub.isActive,
+          }));
+
+        delete vehicle.category.subCategories;
+      }
+    }
 
     const meta = {
       total,
@@ -1591,20 +1654,30 @@ exports.getVehicle = async (req, res) => {
       .populate({
         path: "category",
         model: "Category",
-        select: "title image isActive",
+        select: "title image isActive subCategories",
       })
-      .populate({
-        path: "subCategories",
-        model: "Category",
-        select: "title image isActive",
-      })
-
       .populate(populateProvider)
       .populate("zone")
       .lean();
 
     if (!vehicle) {
       return sendResponse(res, 404, false, "Vehicle not found");
+    }
+
+    // Manually populate subcategories
+    if (vehicle.category && vehicle.subCategories?.length) {
+      const subCategoryIds = vehicle.subCategories.map((id) => id.toString());
+
+      vehicle.subCategories = vehicle.category.subCategories
+        .filter((sub) => subCategoryIds.includes(sub._id.toString()))
+        .map((sub) => ({
+          _id: sub._id,
+          title: sub.title,
+          image: sub.image,
+          isActive: sub.isActive,
+        }));
+
+      delete vehicle.category.subCategories;
     }
 
     sendResponse(res, 200, true, "Vehicle retrieved successfully", vehicle);
@@ -1631,14 +1704,8 @@ exports.getVehiclesByProvider = async (req, res) => {
         .populate({
           path: "category",
           model: "Category",
-          select: "title image isActive",
+          select: "title image isActive subCategories",
         })
-        .populate({
-          path: "subCategories",
-          model: "Category",
-          select: "title image isActive",
-        })
-
         .populate(populateProvider)
         .populate("zone")
         .skip(skip)
@@ -1647,6 +1714,24 @@ exports.getVehiclesByProvider = async (req, res) => {
         .lean(),
       Vehicle.countDocuments(query),
     ]);
+
+    // Manually populate subcategories for each vehicle
+    for (let vehicle of vehicles) {
+      if (vehicle.category && vehicle.subCategories?.length) {
+        const subCategoryIds = vehicle.subCategories.map((id) => id.toString());
+
+        vehicle.subCategories = vehicle.category.subCategories
+          .filter((sub) => subCategoryIds.includes(sub._id.toString()))
+          .map((sub) => ({
+            _id: sub._id,
+            title: sub.title,
+            image: sub.image,
+            isActive: sub.isActive,
+          }));
+
+        delete vehicle.category.subCategories;
+      }
+    }
 
     const meta = {
       total,
@@ -1724,6 +1809,21 @@ exports.updateVehicle = async (req, res) => {
       }
     }
 
+    // Validate subcategories if being updated
+    if (body.subCategories?.length && body.category) {
+      const parentCategory = await Category.findById(body.category).lean();
+
+      if (parentCategory) {
+        const validSubIds = parentCategory.subCategories
+          .filter((sub) => sub.isActive)
+          .map((s) => s._id.toString());
+
+        body.subCategories = body.subCategories.filter((id) =>
+          validSubIds.includes(id.toString())
+        );
+      }
+    }
+
     // Update vehicle
     Object.assign(vehicle, body);
     await vehicle.save();
@@ -1737,17 +1837,29 @@ exports.updateVehicle = async (req, res) => {
       .populate({
         path: "category",
         model: "Category",
-        select: "title image isActive",
+        select: "title image isActive subCategories",
       })
-      .populate({
-        path: "subCategories",
-        model: "Category",
-        select: "title image isActive",
-      })
-
       .populate(populateProvider)
       .populate("zone")
       .lean();
+
+    // Manually populate subcategories
+    if (updatedVehicle.category && updatedVehicle.subCategories?.length) {
+      const subCategoryIds = updatedVehicle.subCategories.map((id) =>
+        id.toString()
+      );
+
+      updatedVehicle.subCategories = updatedVehicle.category.subCategories
+        .filter((sub) => subCategoryIds.includes(sub._id.toString()))
+        .map((sub) => ({
+          _id: sub._id,
+          title: sub.title,
+          image: sub.image,
+          isActive: sub.isActive,
+        }));
+
+      delete updatedVehicle.category.subCategories;
+    }
 
     sendResponse(
       res,
