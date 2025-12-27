@@ -1674,14 +1674,18 @@ exports.getVehicle = async (req, res) => {
     if (vehicle.category && vehicle.subCategories?.length) {
       const subCategoryIds = vehicle.subCategories.map((id) => id.toString());
 
-      vehicle.subCategories = vehicle.category.subCategories
-        .filter((sub) => subCategoryIds.includes(sub._id.toString()))
-        .map((sub) => ({
-          _id: sub._id,
-          title: sub.title,
-          image: sub.image,
-          isActive: sub.isActive,
-        }));
+   const categorySubs = Array.isArray(vehicle.category?.subCategories)
+  ? vehicle.category.subCategories
+  : [];
+
+vehicle.subCategories = categorySubs
+  .filter((sub) => subCategoryIds.includes(sub._id.toString()))
+  .map((sub) => ({
+    _id: sub._id,
+    title: sub.title,
+    image: sub.image,
+    isActive: sub.isActive,
+  }));
 
       delete vehicle.category.subCategories;
     }
@@ -1726,14 +1730,18 @@ exports.getVehiclesByProvider = async (req, res) => {
       if (vehicle.category && vehicle.subCategories?.length) {
         const subCategoryIds = vehicle.subCategories.map((id) => id.toString());
 
-        vehicle.subCategories = vehicle.category.subCategories
-          .filter((sub) => subCategoryIds.includes(sub._id.toString()))
-          .map((sub) => ({
-            _id: sub._id,
-            title: sub.title,
-            image: sub.image,
-            isActive: sub.isActive,
-          }));
+      const categorySubs = Array.isArray(vehicle.category?.subCategories)
+  ? vehicle.category.subCategories
+  : [];
+
+vehicle.subCategories = categorySubs
+  .filter((sub) => subCategoryIds.includes(sub._id.toString()))
+  .map((sub) => ({
+    _id: sub._id,
+    title: sub.title,
+    image: sub.image,
+    isActive: sub.isActive,
+  }));
 
         delete vehicle.category.subCategories;
       }
