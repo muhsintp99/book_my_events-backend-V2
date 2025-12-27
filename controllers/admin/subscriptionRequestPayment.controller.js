@@ -281,3 +281,87 @@ exports.verifySubscriptionRequestPayment = async (req, res) => {
         });
     }
 };
+
+/**
+ * HANDLE JUSPAY REDIRECT (GET)
+ * This handles the direct redirect from Juspay after payment.
+ */
+exports.handlePaymentSuccess = async (req, res) => {
+    try {
+        console.log("🎯 Payment callback received:", req.query);
+        const { order_id, status, requestId } = req.query;
+
+        if (!order_id) {
+            return res.redirect(`${process.env.ADMIN_PANEL_URL}/subscriptions/payment-failed?error=missing_order_id`);
+        }
+
+        // Verify and activate (reusing logic or calling internal verification)
+        // We simulate a call to verify logic here or just do it.
+
+        const subscription = await Subscription.findOne({
+            paymentId: order_id
+        }).populate("planId").populate("subscriptionRequestId");
+
+        if (!subscription) {
+            console.log("❌ Callback: Subscription not found for orderId:", order_id);
+            return res.redirect(`${process.env.ADMIN_PANEL_URL}/subscriptions/payment-failed?orderId=${order_id}&error=subscription_not_found`);
+        }
+
+        // Check payment status with Juspay if not already active
+        if (subscription.status !== "active") {
+            let juspayOrder;
+            try {
+                juspayOrder = await juspay.order.status(order_id);
+                console.log("📊 Callback: Juspay status check:", juspayOrder.status);
+
+                if (juspayOrder.status === "CHARGED") {
+                    // Activate subscription
+                    await Subscription.updateMany(
+                        {
+                            userId: subscription.userId,
+                            moduleId: subscription.moduleId,
+                            _id: { $ne: subscription._id }
+                        },
+                        { status: "cancelled", isCurrent: false }
+                    );
+
+                    const plan = subscription.planId;
+                    const startDate = new Date();
+                    const endDate = new Date();
+                    endDate.setDate(endDate.getDate() + plan.durationInDays);
+
+                    subscription.status = "active";
+                    subscription.startDate = startDate;
+                    subscription.endDate = endDate;
+                    subscription.isCurrent = true;
+                    await subscription.save();
+
+                    if (subscription.subscriptionRequestId) {
+                        const request = await SubscriptionRequest.findById(subscription.subscriptionRequestId);
+                        if (request) {
+                            request.status = "approved";
+                            request.reviewedAt = new Date();
+                            await request.save();
+                        }
+                    }
+                    console.log("✅ Callback: Subscription activated");
+                } else if (!["PENDING", "PENDING_VBV", "AUTHORIZING", "NEW"].includes(juspayOrder.status)) {
+                    subscription.status = "failed";
+                    await subscription.save();
+                    return res.redirect(`${process.env.ADMIN_PANEL_URL}/subscriptions/payment-failed?orderId=${order_id}&status=${juspayOrder.status}`);
+                }
+            } catch (error) {
+                console.error("❌ Callback: Juspay verification failed:", error.message);
+            }
+        }
+
+        // Redirect to frontend success page
+        const adminUrl = process.env.ADMIN_PANEL_URL || "https://admin.bookmyevent.ae";
+        return res.redirect(`${adminUrl}/subscriptions/payment-success?orderId=${order_id}&requestId=${requestId || subscription.subscriptionRequestId}`);
+
+    } catch (error) {
+        console.error("❌ Callback error:", error);
+        const adminUrl = process.env.ADMIN_PANEL_URL || "https://admin.bookmyevent.ae";
+        return res.redirect(`${adminUrl}/subscriptions/payment-failed?error=internal_server_error`);
+    }
+};
