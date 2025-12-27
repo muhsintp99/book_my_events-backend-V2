@@ -1070,3 +1070,66 @@ exports.handleJuspayResponse = async (req, res) => {
     });
   }
 };
+
+
+
+
+
+
+
+// GET /api/payment/verify?bookingId=xxxx
+exports.verifyBookingPayment = async (req, res) => {
+  try {
+    const { bookingId } = req.query;
+
+    if (!bookingId) {
+      return res.status(400).json({
+        status: "failed",
+        message: "bookingId required",
+      });
+    }
+
+    const booking = await Booking.findById(bookingId);
+
+    if (!booking || !booking.paymentOrderId) {
+      return res.json({
+        status: "failed",
+        message: "Invalid booking or payment not initiated",
+      });
+    }
+
+    const orderId = booking.paymentOrderId;
+
+    // 🔐 Ask Juspay for final truth
+    const order = await juspay.order.status(orderId);
+
+    let status = "failed";
+
+    if (order.status === "CHARGED") {
+      status = "completed";
+
+      // Update booking ONLY once
+      if (booking.paymentStatus !== "completed") {
+        booking.paymentStatus = "completed";
+        booking.paidAmount = order.amount;
+        await booking.save();
+      }
+    } else if (
+      ["PENDING", "PENDING_VBV", "AUTHORIZING", "NEW"].includes(order.status)
+    ) {
+      status = "pending";
+    } else {
+      status = "failed";
+      booking.paymentStatus = "failed";
+      await booking.save();
+    }
+
+    return res.json({ status });
+  } catch (err) {
+    console.error("❌ Verify booking payment error:", err.message);
+    return res.status(500).json({
+      status: "failed",
+      message: "Verification error",
+    });
+  }
+};

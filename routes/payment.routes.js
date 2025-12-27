@@ -31,5 +31,8 @@ router.post(
   controller.verifySubscriptionPayment
 );
 
+router.get("/payment/verify", controller.verifyBookingPayment);
+
+
 
 module.exports = router;
