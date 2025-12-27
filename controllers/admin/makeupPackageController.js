@@ -6,6 +6,8 @@ const path = require("path");
 require("../../models/vendor/Profile");
 const VendorProfile = require("../../models/vendor/vendorProfile");
 const User = require("../../models/User");
+const Subscription = require("../../models/admin/Subscription");
+
 
 
 // ---------------------- Helper: Parse JSON or Array ----------------------
@@ -424,69 +426,105 @@ exports.deleteMakeupPackage = async (req, res) => {
 exports.getVendorsForMakeupModule = async (req, res) => {
   try {
     const { moduleId } = req.params;
-    const { providerId } = req.query;
+    const providerId = req.query.providerId || req.query.providerid || null;
 
     if (!mongoose.Types.ObjectId.isValid(moduleId)) {
       return res.status(400).json({ success: false, message: "Invalid module ID" });
     }
 
-    let vendorProfilesQuery = { module: moduleId };
-
-    // ⭐ If providerId is given → filter a single vendor
+    let query = { module: moduleId };
     if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
-      vendorProfilesQuery.user = providerId;
+      query.user = providerId;
     }
 
-    const vendorProfiles = await VendorProfile.find(vendorProfilesQuery)
-      .select("user logo coverImage storeName")
+    const vendorProfiles = await VendorProfile.find(query)
+      .select("user storeName logo coverImage subscriptionStatus isFreeTrial")
       .lean();
 
     if (!vendorProfiles.length) {
       return res.json({
         success: true,
-        message: providerId
-          ? "Vendor not found for this module"
-          : "No vendors found for this module",
-        data: []
+        data: providerId ? null : []
       });
     }
 
-    const vendorIds = vendorProfiles.map(vp => vp.user);
+    const vendorIds = vendorProfiles.map(v => v.user);
 
-    const vendors = await User.find({ _id: { $in: vendorIds } })
+    const users = await User.find({ _id: { $in: vendorIds } })
       .select("firstName lastName email phone profilePhoto")
-      .populate("profile", "profilePhoto");
+      .lean();
+
+    const subscriptions = await Subscription.find({
+      userId: { $in: vendorIds },
+      isCurrent: true
+    })
+      .populate("planId")
+      .populate("moduleId", "title icon")
+      .lean();
 
     const baseUrl = `${req.protocol}://${req.get("host")}`;
 
-    const final = vendors.map(v => {
-      const obj = v.toObject();
-      const vp = vendorProfiles.find(p => p.user.toString() === obj._id.toString());
+    const final = users.map(u => {
+      const vp = vendorProfiles.find(v => v.user.toString() === u._id.toString());
+      const sub = subscriptions.find(s => s.userId.toString() === u._id.toString());
 
-      obj.storeName = vp?.storeName || `${obj.firstName} ${obj.lastName}`;
-      obj.logo = vp?.logo ? `${baseUrl}${vp.logo}` : null;
-      obj.coverImage = vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null;
+      const now = new Date();
+      const isExpired = sub ? sub.endDate < now : true;
+      const daysLeft = sub
+        ? Math.max(0, Math.ceil((sub.endDate - now) / (1000 * 60 * 60 * 24)))
+        : 0;
 
-      // Profile photo fallback logic
-      if (obj.profilePhoto && !obj.profilePhoto.startsWith("http")) {
-        obj.profilePhoto = `${baseUrl}${obj.profilePhoto}`;
-      }
-
-      obj.hasVendorProfile = !!vp;
-
-      return obj;
+      return {
+        _id: u._id,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        email: u.email,
+        phone: u.phone,
+        profilePhoto: u.profilePhoto ? `${baseUrl}${u.profilePhoto}` : null,
+        storeName: vp?.storeName || `${u.firstName} ${u.lastName}`,
+        logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
+        coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
+        hasVendorProfile: true,
+        subscription: sub
+          ? {
+              isSubscribed: sub.status === "active",
+              status: sub.status,
+              plan: sub.planId,
+              module: sub.moduleId,
+              billing: {
+                startDate: sub.startDate,
+                endDate: sub.endDate,
+                paymentId: sub.paymentId,
+                autoRenew: sub.autoRenew
+              },
+              access: {
+                canAccess: sub.status === "active" && !isExpired,
+                isExpired,
+                daysLeft
+              }
+            }
+          : {
+              isSubscribed: false,
+              status: "none",
+              plan: null,
+              module: null,
+              billing: null,
+              access: {
+                canAccess: false,
+                isExpired: true,
+                daysLeft: 0
+              }
+            }
+      };
     });
 
-    // ⭐ If providerId was passed → return only one
+    // ✅ SINGLE VENDOR
     if (providerId) {
-      return res.json({
-        success: true,
-        data: final[0] || null
-      });
+      return res.json({ success: true, data: final[0] || null });
     }
 
-    // ⭐ Otherwise return all
-    res.json({
+    // ✅ ALL VENDORS
+    return res.json({
       success: true,
       count: final.length,
       data: final
@@ -499,87 +537,114 @@ exports.getVendorsForMakeupModule = async (req, res) => {
 };
 
 
+
 // ✅ FIXED VERSION - Query VendorProfile directly by module
 // ✅ FIXED VERSION - Query VendorProfile directly by module
-exports.getVendorsForMakeupModule = async (req, res) => {
-  try {
-    const { moduleId } = req.params;
+// exports.getVendorsForMakeupModule = async (req, res) => {
+//   try {
+//     const { moduleId } = req.params;
 
-    // ⭐ Support BOTH providerId AND providerid
-    const providerId =
-      req.query.providerId ||
-      req.query.providerid ||
-      null;
+//     if (!mongoose.Types.ObjectId.isValid(moduleId)) {
+//       return res.status(400).json({ success: false, message: "Invalid module ID" });
+//     }
 
-    if (!mongoose.Types.ObjectId.isValid(moduleId)) {
-      return res.status(400).json({ success: false, message: "Invalid module ID" });
-    }
+//     // 1️⃣ Vendor profiles
+//     const vendorProfiles = await VendorProfile.find({ module: moduleId })
+//       .select("user storeName logo coverImage")
+//       .lean();
 
-    let query = { module: moduleId };
+//     if (!vendorProfiles.length) {
+//       return res.json({ success: true, data: [] });
+//     }
 
-    // ⭐ Filter for ONE vendor when providerId is given
-    if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
-      query.user = providerId;
-    }
+//     const vendorIds = vendorProfiles.map(v => v.user);
 
-    const vendorProfiles = await VendorProfile.find(query)
-      .select("user logo coverImage storeName")
-      .lean();
+//     // 2️⃣ Users
+//     const users = await User.find({ _id: { $in: vendorIds } })
+//       .select("firstName lastName email phone profilePhoto")
+//       .lean();
 
-    if (!vendorProfiles.length) {
-      return res.json({
-        success: true,
-        data: [],
-        message: "Vendor not found for this module"
-      });
-    }
+//     // 3️⃣ 🔥 Subscriptions
+//     const subscriptions = await Subscription.find({
+//       userId: { $in: vendorIds },
+//       isCurrent: true
+//     })
+//       .populate("planId")
+//       .populate("moduleId", "title icon")
+//       .lean();
 
-    const vendorIds = vendorProfiles.map(vp => vp.user);
+//     const baseUrl = `${req.protocol}://${req.get("host")}`;
 
-    const users = await User.find({ _id: { $in: vendorIds } })
-      .select("firstName lastName email phone profilePhoto")
-      .lean();
+//     const final = users.map(user => {
+//       const vp = vendorProfiles.find(v => v.user.toString() === user._id.toString());
+//       const sub = subscriptions.find(s => s.userId.toString() === user._id.toString());
 
-    const baseUrl = `${req.protocol}://${req.get("host")}`;
+//       const now = new Date();
+//       const isExpired = sub ? sub.endDate < now : true;
+//       const daysLeft = sub
+//         ? Math.max(0, Math.ceil((sub.endDate - now) / (1000 * 60 * 60 * 24)))
+//         : 0;
 
-    const final = users.map(u => {
-      const vp = vendorProfiles.find(v => v.user.toString() === u._id.toString());
-      return {
-        _id: u._id,
-        firstName: u.firstName,
-        lastName: u.lastName,
-        email: u.email,
-        phone: u.phone,
-        profilePhoto: u.profilePhoto?.startsWith("http")
-          ? u.profilePhoto
-          : `${baseUrl}${u.profilePhoto || ""}`,
-        storeName: vp?.storeName || `${u.firstName} ${u.lastName}`,
-        logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
-        coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
-        hasVendorProfile: true
-      };
-    });
+//       return {
+//         _id: user._id,
+//         firstName: user.firstName,
+//         lastName: user.lastName,
+//         email: user.email,
+//         phone: user.phone,
+//         profilePhoto: user.profilePhoto
+//           ? `${baseUrl}${user.profilePhoto}`
+//           : null,
 
-    // ⭐ If providerId exists → return ONLY 1 vendor
-    if (providerId) {
-      return res.json({
-        success: true,
-        data: final[0] || null
-      });
-    }
+//         storeName: vp?.storeName || `${user.firstName} ${user.lastName}`,
+//         logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
+//         coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
+//         hasVendorProfile: true,
 
-    // Otherwise return ALL vendors
-    return res.json({
-      success: true,
-      count: final.length,
-      data: final
-    });
+//         // ✅ SUBSCRIPTION BLOCK (THIS WAS MISSING)
+//         subscription: sub
+//           ? {
+//               isSubscribed: sub.status === "active",
+//               status: sub.status,
+//               plan: sub.planId,
+//               module: sub.moduleId,
+//               billing: {
+//                 startDate: sub.startDate,
+//                 endDate: sub.endDate,
+//                 paymentId: sub.paymentId,
+//                 autoRenew: sub.autoRenew
+//               },
+//               access: {
+//                 canAccess: sub.status === "active" && !isExpired,
+//                 isExpired,
+//                 daysLeft
+//               }
+//             }
+//           : {
+//               isSubscribed: false,
+//               status: "none",
+//               plan: null,
+//               module: null,
+//               billing: null,
+//               access: {
+//                 canAccess: false,
+//                 isExpired: true,
+//                 daysLeft: 0
+//               }
+//             }
+//       };
+//     });
 
-  } catch (error) {
-    console.error("Get Vendors Error:", error);
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
+//     res.json({
+//       success: true,
+//       count: final.length,
+//       data: final
+//     });
+
+//   } catch (err) {
+//     console.error("Get Vendors Error:", err);
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
 
 exports.listMakeupVendors = async (req, res) => {
   try {
