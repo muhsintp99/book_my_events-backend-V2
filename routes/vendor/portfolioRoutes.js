@@ -61,7 +61,9 @@ router.put(
   upload.fields([
         { name: "thumbnail", maxCount: 1 }, // ✅ REQUIRED
     { name: "images", maxCount: 20 },
-    { name: "videos", maxCount: 10 }
+    { name: "videos", maxCount: 10 },
+        { name: "videoThumbnail", maxCount: 1 } // ✅ ADD THIS
+
   ]),
   portfolioController.updatePortfolio
 );
