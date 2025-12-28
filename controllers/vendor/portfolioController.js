@@ -130,38 +130,52 @@ if (req.files?.thumbnail || req.files?.images) {
 
 
     // VIDEOS
-    if (req.files?.videos) {
-      const vids = req.files.videos.map(
-        (f) => `uploads/portfolio/${f.filename}`
-      );
-      if (vids.length > 0) {
-        media.push({
-          type: "video",
-          videos: vids,
-          isFeatured: false,
-        });
-      }
-    }
+  // ================= VIDEOS (WITH THUMBNAIL) =================
+if (req.files?.videos || req.files?.videoThumbnail) {
+  const videos = req.files?.videos
+    ? req.files.videos.map(f => `uploads/portfolio/${f.filename}`)
+    : [];
 
-    // VIDEO LINKS
-    if (videoLinks) {
-      let parsed = [];
-      try {
-        parsed = JSON.parse(videoLinks);
-      } catch {
-        parsed = [videoLinks];
-      }
+  const thumbnail = req.files?.videoThumbnail
+    ? `uploads/portfolio/${req.files.videoThumbnail[0].filename}`
+    : null;
 
-      const links = parsed.map((l) => extractVideoLink(l));
+  if (videos.length || thumbnail) {
+    media.push({
+      type: "video",
+      thumbnail,          // ✅ NEW
+      videos,
+      isFeatured: false
+    });
+  }
+}
 
-      if (links.length > 0) {
-        media.push({
-          type: "videoLink",
-          videoLinks: links,
-          isFeatured: false,
-        });
-      }
-    }
+
+   // ================= VIDEO LINKS (WITH THUMBNAIL) =================
+if (videoLinks) {
+  let parsed = [];
+  try {
+    parsed = JSON.parse(videoLinks);
+  } catch {
+    parsed = [videoLinks];
+  }
+
+  const links = parsed.map(l => extractVideoLink(l));
+
+  const thumbnail = req.files?.videoThumbnail
+    ? `uploads/portfolio/${req.files.videoThumbnail[0].filename}`
+    : null;
+
+  if (links.length) {
+    media.push({
+      type: "videoLink",
+      thumbnail,          // ✅ NEW
+      videoLinks: links,
+      isFeatured: false
+    });
+  }
+}
+
 
     const newPortfolio = await Portfolio.create({
       provider: providerId,
@@ -313,25 +327,47 @@ if (req.files?.thumbnail || req.files?.images) {
 
 
     // New videos
-    if (req.files?.videos) {
-      const vids = req.files.videos.map(
-        (f) => `uploads/portfolio/${f.filename}`
-      );
-      media.push({ type: "video", videos: vids, isFeatured: false });
-    }
+    // ================= UPDATE VIDEOS (WITH THUMBNAIL) =================
+if (req.files?.videos || req.files?.videoThumbnail) {
+  const videos = req.files?.videos
+    ? req.files.videos.map(f => `uploads/portfolio/${f.filename}`)
+    : portfolio.media.find(m => m.type === "video")?.videos || [];
 
-    // New video links
-    if (videoLinks) {
-      let parsed = [];
-      try {
-        parsed = JSON.parse(videoLinks);
-      } catch {
-        parsed = [videoLinks];
-      }
+  const thumbnail = req.files?.videoThumbnail
+    ? `uploads/portfolio/${req.files.videoThumbnail[0].filename}`
+    : portfolio.media.find(m => m.type === "video")?.thumbnail;
 
-      const links = parsed.map((link) => extractVideoLink(link));
-      media.push({ type: "videoLink", videoLinks: links, isFeatured: false });
-    }
+  media.push({
+    type: "video",
+    thumbnail,
+    videos,
+    isFeatured: false
+  });
+}
+
+
+ if (videoLinks) {
+  let parsed = [];
+  try {
+    parsed = JSON.parse(videoLinks);
+  } catch {
+    parsed = [videoLinks];
+  }
+
+  const links = parsed.map(link => extractVideoLink(link));
+
+  const thumbnail = req.files?.videoThumbnail
+    ? `uploads/portfolio/${req.files.videoThumbnail[0].filename}`
+    : portfolio.media.find(m => m.type === "videoLink")?.thumbnail;
+
+  media.push({
+    type: "videoLink",
+    thumbnail,
+    videoLinks: links,
+    isFeatured: false
+  });
+}
+
 
     if (media.length > 0) {
       portfolio.media = media;

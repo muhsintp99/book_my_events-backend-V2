@@ -25,7 +25,9 @@ router.post(
   upload.fields([
     { name: "thumbnail", maxCount: 1 }, // ✅ REQUIRED
     { name: "images", maxCount: 20 },   // gallery images
-    { name: "videos", maxCount: 10 }    // videos
+    { name: "videos", maxCount: 10 } ,
+      { name: "videoThumbnail", maxCount: 1 }    // ✅ NEW
+   // videos
   ]),
   portfolioController.createPortfolio
 );
