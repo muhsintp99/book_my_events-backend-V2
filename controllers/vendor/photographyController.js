@@ -5,6 +5,8 @@ const { v4: uuidv4 } = require("uuid");
 const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
+const Subscription = require("../../models/admin/Subscription");
+
 
 // ---------------------- Helper: Parse JSON or array ----------------------
 const parseField = (field) => {
@@ -142,16 +144,15 @@ exports.getSingleVendorForPhotographyModule = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid provider ID" });
     }
 
-    // Check vendor has at least one package in this module
     const hasPackage = await Photography.exists({
       module: moduleId,
-      provider: providerid,
+      provider: providerid
     });
 
     if (!hasPackage) {
       return res.status(404).json({
         success: false,
-        message: "Vendor not found for this module",
+        message: "Vendor not found for this module"
       });
     }
 
@@ -159,36 +160,75 @@ exports.getSingleVendorForPhotographyModule = async (req, res) => {
       .select("firstName lastName email phone profilePhoto")
       .lean();
 
-    if (!user) {
-      return res.status(404).json({ success: false, message: "Vendor not found" });
-    }
-
     const vendorProfile = await VendorProfile.findOne({ user: providerid })
       .select("storeName logo coverImage")
       .lean();
 
+    const subscription = await Subscription.findOne({
+      userId: providerid,
+      isCurrent: true
+    })
+      .populate("planId")
+      .populate("moduleId", "title icon")
+      .lean();
+
     const baseUrl = `${req.protocol}://${req.get("host")}`;
 
-    const data = {
-      _id: user._id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      phone: user.phone,
-      storeName: vendorProfile?.storeName || `${user.firstName} ${user.lastName}`,
-      logo: vendorProfile?.logo ? `${baseUrl}${vendorProfile.logo}` : null,
-      coverImage: vendorProfile?.coverImage
-        ? `${baseUrl}${vendorProfile.coverImage}`
-        : null,
-      hasVendorProfile: !!vendorProfile,
-    };
+    const now = new Date();
+    const isExpired = subscription ? subscription.endDate < now : true;
+    const daysLeft = subscription
+      ? Math.max(0, Math.ceil((subscription.endDate - now) / (1000 * 60 * 60 * 24)))
+      : 0;
 
     res.json({
       success: true,
-      data,
+      data: {
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        profilePhoto: user.profilePhoto ? `${baseUrl}${user.profilePhoto}` : null,
+        storeName: vendorProfile?.storeName || `${user.firstName} ${user.lastName}`,
+        logo: vendorProfile?.logo ? `${baseUrl}${vendorProfile.logo}` : null,
+        coverImage: vendorProfile?.coverImage ? `${baseUrl}${vendorProfile.coverImage}` : null,
+        hasVendorProfile: !!vendorProfile,
+
+        subscription: subscription
+          ? {
+              isSubscribed: subscription.status === "active",
+              status: subscription.status,
+              plan: subscription.planId,
+              module: subscription.moduleId,
+              billing: {
+                startDate: subscription.startDate,
+                endDate: subscription.endDate,
+                paymentId: subscription.paymentId,
+                autoRenew: subscription.autoRenew
+              },
+              access: {
+                canAccess: subscription.status === "active" && !isExpired,
+                isExpired,
+                daysLeft
+              }
+            }
+          : {
+              isSubscribed: false,
+              status: "none",
+              plan: null,
+              module: null,
+              billing: null,
+              access: {
+                canAccess: false,
+                isExpired: true,
+                daysLeft: 0
+              }
+            }
+      }
     });
+
   } catch (err) {
-    console.error("Get Single Vendor Error:", err);
+    console.error("Get Single Photography Vendor Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -384,67 +424,144 @@ exports.deletePhotographyPackage = async (req, res) => {
 exports.getVendorsForPhotographyModule = async (req, res) => {
   try {
     const { moduleId } = req.params;
+    const providerId = req.query.providerid || req.query.providerId || null;
 
     if (!mongoose.Types.ObjectId.isValid(moduleId)) {
-      return res.status(400).json({ success: false, message: "Invalid module ID" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid module ID"
+      });
     }
 
-    const vendorIds = await Photography.distinct("provider", { module: moduleId });
+    // 🔹 Build Photography query (THIS FIXES SINGLE VENDOR)
+    let photoQuery = { module: moduleId };
+
+    if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
+      photoQuery.provider = providerId;
+    }
+
+    // 🔹 Get vendor IDs from Photography
+    const vendorIds = await Photography.distinct("provider", photoQuery);
 
     if (!vendorIds.length) {
       return res.json({
         success: true,
-        message: "No vendors found for this module",
-        data: []
+        data: providerId ? null : []
       });
     }
 
-    const vendors = await User.find({ _id: { $in: vendorIds } })
+    // 🔹 Get users
+    const users = await User.find({ _id: { $in: vendorIds } })
       .select("firstName lastName email phone profilePhoto")
-      .populate("profile", "profilePhoto name mobileNumber");
-
-    const vendorProfiles = await VendorProfile.find({ user: { $in: vendorIds } })
-      .select("user logo coverImage storeName")
       .lean();
 
-    const map = {};
-    vendorProfiles.forEach((vp) => {
-      map[vp.user.toString()] = vp;
-    });
+    // 🔹 Vendor profiles
+    const vendorProfiles = await VendorProfile.find({
+      user: { $in: vendorIds }
+    })
+      .select("user storeName logo coverImage")
+      .lean();
+
+    // 🔹 Subscriptions
+    const subscriptions = await Subscription.find({
+      userId: { $in: vendorIds },
+      isCurrent: true
+    })
+      .populate("planId")
+      .populate("moduleId", "title icon")
+      .lean();
 
     const baseUrl = `${req.protocol}://${req.get("host")}`;
 
-    const final = vendors.map((v) => {
-      const obj = v.toObject();
-      const vp = map[obj._id.toString()];
+    // 🔹 Map final response
+    const final = users.map(user => {
+      const vp = vendorProfiles.find(
+        v => v.user.toString() === user._id.toString()
+      );
 
-      // Priority: logo > coverImage > profile.profilePhoto > user.profilePhoto
-      if (vp?.logo) {
-        obj.profilePhoto = `${baseUrl}${vp.logo}`;
-      } else if (vp?.coverImage) {
-        obj.profilePhoto = `${baseUrl}${vp.coverImage}`;
-      } else if (obj.profile?.profilePhoto) {
-        obj.profilePhoto = `${baseUrl}${obj.profile.profilePhoto}`;
-      } else if (obj.profilePhoto) {
-        obj.profilePhoto = `${baseUrl}${obj.profilePhoto}`;
-      }
+      const sub = subscriptions.find(
+        s => s.userId.toString() === user._id.toString()
+      );
 
-      obj.storeName = vp?.storeName || `${obj.firstName} ${obj.lastName}`;
-      obj.logo = vp?.logo ? `${baseUrl}${vp.logo}` : null;
-      obj.coverImage = vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null;
+      const now = new Date();
+      const isExpired = sub ? sub.endDate < now : true;
+      const daysLeft = sub
+        ? Math.max(
+            0,
+            Math.ceil((sub.endDate - now) / (1000 * 60 * 60 * 24))
+          )
+        : 0;
 
-      return obj;
+      return {
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        profilePhoto: user.profilePhoto
+          ? `${baseUrl}${user.profilePhoto}`
+          : null,
+
+        storeName: vp?.storeName || `${user.firstName} ${user.lastName}`,
+        logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
+        coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
+        hasVendorProfile: !!vp,
+
+        // 🔥 SUBSCRIPTION
+        subscription: sub
+          ? {
+              isSubscribed: sub.status === "active",
+              status: sub.status,
+              plan: sub.planId,
+              module: sub.moduleId,
+              billing: {
+                startDate: sub.startDate,
+                endDate: sub.endDate,
+                paymentId: sub.paymentId,
+                autoRenew: sub.autoRenew
+              },
+              access: {
+                canAccess: sub.status === "active" && !isExpired,
+                isExpired,
+                daysLeft
+              }
+            }
+          : {
+              isSubscribed: false,
+              status: "none",
+              plan: null,
+              module: null,
+              billing: null,
+              access: {
+                canAccess: false,
+                isExpired: true,
+                daysLeft: 0
+              }
+            }
+      };
     });
 
-    res.json({
+    // ✅ SINGLE VENDOR RESPONSE
+    if (providerId) {
+      return res.json({
+        success: true,
+        data: final[0] || null
+      });
+    }
+
+    // ✅ ALL VENDORS RESPONSE
+    return res.json({
       success: true,
       count: final.length,
       data: final
     });
 
   } catch (err) {
-    console.error("Get Vendors Error:", err);
-    res.status(500).json({ success: false, message: err.message });
+    console.error("Get Photography Vendors Error:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
   }
 };
 

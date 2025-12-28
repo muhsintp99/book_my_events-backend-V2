@@ -556,6 +556,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
     // ✅ FIX: Construct return URL ONCE
     // const returnUrl = `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`;
     const returnUrl = `https://bookmyevent.ae/payment-success/index.html?bookingId=${bookingId}`;
+    
 
     console.log("🔗 Return URL:", returnUrl);
 

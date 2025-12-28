@@ -74,47 +74,73 @@ const PortfolioSchema = new mongoose.Schema(
       index: true
     },
 
-    workTitle: { type: String, default: "" },
-    description: { type: String, default: "" },
-
-   media: [
-  {
-    type: {
+    workTitle: {
       type: String,
-      enum: ["image", "video", "videoLink"],
-      required: true
+      default: ""
     },
 
-    // Only add when present
-    images: {
-      type: [String],
-      required: false,
-      default: undefined
+    description: {
+      type: String,
+      default: ""
     },
 
-    videos: {
-      type: [String],
-      required: false,
-      default: undefined
-    },
+    media: [
+      {
+        type: {
+          type: String,
+          enum: ["image", "video", "videoLink"],
+          required: true
+        },
 
-    videoLinks: {
-      type: [String],
-      required: false,
-      default: undefined
-    },
+        // ✅ Thumbnail image (single)
+        thumbnail: {
+          type: String,
+          default: undefined
+        },
 
-    isFeatured: { type: Boolean, default: false }
-  }
-],
+        // ✅ Gallery images (multiple)
+        gallery: {
+          type: [String],
+          default: undefined
+        },
 
-    tags: [{ type: String }],
-    isActive: { type: Boolean, default: true, index: true }
+        // ✅ Uploaded videos
+        videos: {
+          type: [String],
+          default: undefined
+        },
+
+        // ✅ Video embed / iframe links
+        videoLinks: {
+          type: [String],
+          default: undefined
+        },
+
+        isFeatured: {
+          type: Boolean,
+          default: false
+        }
+      }
+    ],
+
+    tags: [
+      {
+        type: String
+      }
+    ],
+
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true
+    }
   },
-  { timestamps: true }
+  {
+    timestamps: true
+  }
 );
 
-// Virtual population
+// 🔗 Optional virtual (safe to keep)
 PortfolioSchema.virtual("moduleInfo", {
   ref: "Module",
   localField: "module",

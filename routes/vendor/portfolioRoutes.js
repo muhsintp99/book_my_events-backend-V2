@@ -23,8 +23,9 @@ const upload = createUpload("portfolio", {
 router.post(
   "/",
   upload.fields([
-    { name: "images", maxCount: 20 },
-    { name: "videos", maxCount: 10 }
+    { name: "thumbnail", maxCount: 1 }, // ✅ REQUIRED
+    { name: "images", maxCount: 20 },   // gallery images
+    { name: "videos", maxCount: 10 }    // videos
   ]),
   portfolioController.createPortfolio
 );
@@ -56,6 +57,7 @@ router.get("/:id", portfolioController.getPortfolioById);
 router.put(
   "/:id",
   upload.fields([
+        { name: "thumbnail", maxCount: 1 }, // ✅ REQUIRED
     { name: "images", maxCount: 20 },
     { name: "videos", maxCount: 10 }
   ]),

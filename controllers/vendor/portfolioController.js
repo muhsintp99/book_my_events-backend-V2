@@ -47,89 +47,6 @@ const extractVideoLink = (input) => {
   return input;
 };
 
-// ========================================================
-// ⭐ CREATE PORTFOLIO WORK
-// ========================================================
-// exports.createPortfolio = async (req, res) => {
-//   try {
-//     const { providerId, workTitle, description, tags, module, videoLinks } = req.body;
-
-//     if (!providerId)
-//       return res.status(400).json({ success: false, message: "Provider ID is required" });
-
-//     if (!module)
-//       return res.status(400).json({ success: false, message: "Module is required" });
-
-//     const parsedTags = parseTags(tags);
-//     const media = [];
-
-//     // IMAGES
-//     if (req.files?.images) {
-//       const imgs = req.files.images.map((f) => `uploads/portfolio/${f.filename}`);
-//       if (imgs.length > 0) {
-//         media.push({
-//           type: "image",
-//           images: imgs,
-//           isFeatured: false
-//         });
-//       }
-//     }
-
-//     // VIDEOS
-//     if (req.files?.videos) {
-//       const vids = req.files.videos.map((f) => `uploads/portfolio/${f.filename}`);
-//       if (vids.length > 0) {
-//         media.push({
-//           type: "video",
-//           videos: vids,
-//           isFeatured: false
-//         });
-//       }
-//     }
-
-//     // VIDEO LINKS
-//     if (videoLinks) {
-//       let parsed = [];
-//       try {
-//         parsed = JSON.parse(videoLinks);
-//       } catch {
-//         parsed = [videoLinks];
-//       }
-
-//       const links = parsed.map((l) => extractVideoLink(l));
-
-//       if (links.length > 0) {
-//         media.push({
-//           type: "videoLink",
-//           videoLinks: links,
-//           isFeatured: false
-//         });
-//       }
-//     }
-
-//     const newPortfolio = await Portfolio.create({
-//       provider: providerId,
-//       module,
-//       workTitle,
-//       description,
-//       tags: parsedTags,
-//       media
-//     });
-
-//     res.status(201).json({
-//       success: true,
-//       message: "Portfolio created",
-//       data: newPortfolio
-//     });
-
-//   } catch (err) {
-//     console.error("❌ Create Portfolio Error:", err);
-//     res.status(500).json({
-//       success: false,
-//       message: err.message
-//     });
-//   }
-// };
 
 exports.createPortfolio = async (req, res) => {
   try {
@@ -179,18 +96,38 @@ exports.createPortfolio = async (req, res) => {
     const media = [];
 
     // IMAGES
-    if (req.files?.images) {
-      const imgs = req.files.images.map(
+    // if (req.files?.images) {
+    //   const imgs = req.files.images.map(
+    //     (f) => `uploads/portfolio/${f.filename}`
+    //   );
+    //   if (imgs.length > 0) {
+    //     media.push({
+    //       type: "image",
+    //       images: imgs,
+    //       isFeatured: false,
+    //     });
+    //   }
+    // }
+    // ================= IMAGES (THUMBNAIL + GALLERY) =================
+if (req.files?.thumbnail || req.files?.images) {
+  const thumbnail = req.files?.thumbnail
+    ? `uploads/portfolio/${req.files.thumbnail[0].filename}`
+    : null;
+
+  const gallery = req.files?.images
+    ? req.files.images.map(
         (f) => `uploads/portfolio/${f.filename}`
-      );
-      if (imgs.length > 0) {
-        media.push({
-          type: "image",
-          images: imgs,
-          isFeatured: false,
-        });
-      }
-    }
+      )
+    : [];
+
+  media.push({
+    type: "image",
+    thumbnail,
+    gallery,
+    isFeatured: false
+  });
+}
+
 
     // VIDEOS
     if (req.files?.videos) {
@@ -354,12 +291,26 @@ exports.updatePortfolio = async (req, res) => {
     const media = [];
 
     // New images
-    if (req.files?.images) {
-      const imgs = req.files.images.map(
+   // ================= UPDATE IMAGES =================
+if (req.files?.thumbnail || req.files?.images) {
+  const thumbnail = req.files?.thumbnail
+    ? `uploads/portfolio/${req.files.thumbnail[0].filename}`
+    : portfolio.media.find(m => m.type === "image")?.thumbnail;
+
+  const gallery = req.files?.images
+    ? req.files.images.map(
         (f) => `uploads/portfolio/${f.filename}`
-      );
-      media.push({ type: "image", images: imgs, isFeatured: false });
-    }
+      )
+    : portfolio.media.find(m => m.type === "image")?.gallery || [];
+
+  media.push({
+    type: "image",
+    thumbnail,
+    gallery,
+    isFeatured: false
+  });
+}
+
 
     // New videos
     if (req.files?.videos) {
@@ -413,19 +364,30 @@ exports.deletePortfolio = async (req, res) => {
       });
 
     // Delete all files associated
-    portfolio.media.forEach((media) => {
-      if (media.images) {
-        media.images.forEach((img) =>
-          deleteFileIfExists(path.join(__dirname, "../../", img))
-        );
-      }
-      if (media.videos) {
-        media.videos.forEach((vid) =>
-          deleteFileIfExists(path.join(__dirname, "../../", vid))
-        );
-      }
-      // videoLinks are URLs → do not delete
-    });
+    portfolio.media.forEach(media => {
+  if (media.thumbnail) {
+    deleteFileIfExists(
+      path.join(__dirname, "../../", media.thumbnail)
+    );
+  }
+
+  if (media.gallery?.length) {
+    media.gallery.forEach(img =>
+      deleteFileIfExists(
+        path.join(__dirname, "../../", img)
+      )
+    );
+  }
+
+  if (media.videos?.length) {
+    media.videos.forEach(vid =>
+      deleteFileIfExists(
+        path.join(__dirname, "../../", vid)
+      )
+    );
+  }
+});
+
 
     await portfolio.deleteOne();
 
