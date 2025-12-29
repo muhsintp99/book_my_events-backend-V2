@@ -550,8 +550,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
     // ✅ TWO RETURN URL STRATEGIES:
 
     // Strategy 1: Direct with bookingId (preferred)
-    const returnUrl = `https://www.bookmyevent.ae/payment-success/index.html?bookingId=${bookingId}`;
-
+    const returnUrl = `https://bookmyevent.ae/payment-success/index.html?bookingId=${bookingId}`;
 
     // Strategy 2: With order_id (if Juspay sends this)
     // const returnUrl = `https://bookmyevent.ae/payment-success/index.html`;
