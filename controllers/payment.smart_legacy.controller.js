@@ -899,52 +899,130 @@ exports.verifySubscriptionPayment = async (req, res) => {
   try {
     const { orderId } = req.body;
 
+    console.log("🔍 Verifying payment for orderId:", orderId);
+
     if (!orderId) {
-      return res.json({ status: "failed" });
-    }
-
-    const subscription = await Subscription.findOne({ paymentId: orderId })
-      .populate("planId");
-
-    if (!subscription) {
-      return res.json({ status: "failed" });
-    }
-
-    const order = await juspay.order.status(orderId);
-
-    if (order.status === "CHARGED") {
-      if (subscription.status !== "active") {
-        const plan = subscription.planId;
-        subscription.status = "active";
-        subscription.startDate = new Date();
-        subscription.endDate = new Date(
-          Date.now() + plan.durationInDays * 24 * 60 * 60 * 1000
-        );
-        subscription.isCurrent = true;
-        await subscription.save();
-      }
-
-      return res.json({
-        status: "completed",
-        subscriptionId: subscription._id
+      return res.status(400).json({
+        success: false,
+        message: "orderId is required",
       });
     }
 
-    if (["NEW", "PENDING", "PENDING_VBV", "AUTHORIZING"].includes(order.status)) {
-      return res.json({ status: "pending" });
+    // 1️⃣ Find subscription in database
+    const subscription = await Subscription.findOne({
+      paymentId: orderId,
+    }).populate("planId");
+
+    if (!subscription) {
+      console.log("❌ Subscription not found for orderId:", orderId);
+      return res.json({
+        success: false,
+        message: "Invalid order",
+      });
     }
 
-    subscription.status = "cancelled";
-    await subscription.save();
+    console.log("📋 Subscription found:", {
+      id: subscription._id,
+      status: subscription.status,
+      planId: subscription.planId?._id,
+    });
 
-    return res.json({ status: "failed" });
+    // 2️⃣ If already active, return success
+    if (subscription.status === "active") {
+      console.log("✅ Subscription already active");
+      return res.json({
+        success: true,
+        subscription,
+        message: "Subscription is active",
+      });
+    }
 
+    // 3️⃣ Check payment status with Juspay
+    console.log("🔄 Checking Juspay order status...");
+
+    let juspayOrder;
+    try {
+      juspayOrder = await juspay.order.status(orderId);
+      console.log("📊 Juspay order status:", juspayOrder.status);
+    } catch (error) {
+      console.error("❌ Juspay API error:", error.message);
+      return res.json({
+        success: false,
+        status: subscription.status,
+        message: "Unable to verify payment status",
+      });
+    }
+
+    // 4️⃣ Handle payment status
+    if (juspayOrder.status === "CHARGED") {
+      console.log("✅ Payment is CHARGED - Activating subscription");
+
+      // Cancel all other subscriptions for this user+module
+      await Subscription.updateMany(
+        {
+          userId: subscription.userId,
+          moduleId: subscription.moduleId,
+          _id: { $ne: subscription._id },
+        },
+        {
+          status: "cancelled",
+          isCurrent: false,
+        }
+      );
+
+      // Activate this subscription
+      const plan = subscription.planId;
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + plan.durationInDays);
+
+      subscription.status = "active";
+      subscription.startDate = startDate;
+      subscription.endDate = endDate;
+      subscription.isCurrent = true;
+
+      await subscription.save();
+
+      console.log("✅ Subscription activated successfully");
+
+      return res.json({
+        success: true,
+        subscription,
+        message: "Payment successful, subscription activated",
+      });
+    } else if (
+      ["PENDING", "PENDING_VBV", "AUTHORIZING", "NEW"].includes(
+        juspayOrder.status
+      )
+    ) {
+      console.log("⏳ Payment is pending:", juspayOrder.status);
+
+      return res.json({
+        success: false,
+        status: "pending",
+        message: "Payment is being processed. Please wait...",
+      });
+    } else {
+      // Payment failed
+      console.log("❌ Payment failed:", juspayOrder.status);
+
+      subscription.status = "cancelled";
+      await subscription.save();
+
+      return res.json({
+        success: false,
+        status: "failed",
+        message: "Payment failed",
+      });
+    }
   } catch (err) {
-    console.error(err);
-    return res.json({ status: "failed" });
+    console.error("❌ Verification error:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
-};
-/**
+};/**
  * HANDLE PAYMENT RESPONSE (S2S Order Status Check)
  */
 exports.handleJuspayResponse = async (req, res) => {
@@ -1008,10 +1086,9 @@ exports.verifyBookingPayment = async (req, res) => {
     }
 
     const order = await juspay.order.status(booking.paymentOrderId);
-
     console.log("🧾 JUSPAY STATUS:", order.status);
 
-    // ✅ REAL SUCCESS
+    // ✅ SUCCESS — ONLY WHEN BANK CONFIRMS
     if (order.status === "CHARGED") {
       booking.paymentStatus = "completed";
       booking.paidAmount = order.amount;
@@ -1025,14 +1102,9 @@ exports.verifyBookingPayment = async (req, res) => {
       });
     }
 
-    // ⏳ UAT PENDING → TREAT AS SUCCESS AFTER PAYMENT PAGE
-    if (["PENDING", "AUTHORIZING", "NEW", "PENDING_VBV"].includes(order.status)) {
-      return res.json({
-        status: "completed",
-        bookingId,
-        amount: booking.paidAmount,
-        transactionId: booking.paymentOrderId,
-      });
+    // ⏳ STILL PROCESSING — SHOW VERIFYING
+    if (["NEW", "PENDING", "PENDING_VBV", "AUTHORIZING"].includes(order.status)) {
+      return res.json({ status: "pending" });
     }
 
     // ❌ FAILED
@@ -1042,7 +1114,7 @@ exports.verifyBookingPayment = async (req, res) => {
     return res.json({ status: "failed" });
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ verifyBookingPayment error:", err);
     return res.json({ status: "failed" });
   }
 };
