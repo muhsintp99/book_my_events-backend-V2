@@ -547,8 +547,8 @@ exports.createSmartGatewayPayment = async (req, res) => {
     // ✅ TWO RETURN URL STRATEGIES:
     
     // Strategy 1: Direct with bookingId (preferred)
-    const returnUrl = `https://bookmyevent.ae/payment-success/index.html?bookingId=${bookingId}`;
-    // const returnUrl = "https://bookmyevent.ae/payment-success/index.html";
+    // const returnUrl = `https://bookmyevent.ae/payment-success/index.html?bookingId=${bookingId}`;
+const returnUrl = `https://bookmyevent.ae/payment-success/index.html?orderId=${orderId}`;
 
     
     // Strategy 2: With order_id (if Juspay sends this)
@@ -1094,41 +1094,22 @@ exports.handleJuspayResponse = async (req, res) => {
 // GET /api/payment/verify?bookingId=xxxx
 exports.verifyBookingPayment = async (req, res) => {
   try {
-    let { bookingId, orderId } = req.query;
+    const { orderId } = req.query;
 
-    console.log("🔍 Verify request:", { bookingId, orderId });
-
-    // Extract bookingId from orderId if needed
-    if (!bookingId && orderId) {
-      const parts = orderId.split('_');
-      if (parts.length >= 3) {
-        bookingId = parts[1];
-        console.log("📌 Extracted bookingId from orderId:", bookingId);
-      }
+    if (!orderId) {
+      return res.json({ status: "pending" });
     }
 
-    if (!bookingId) {
-      console.log("❌ No bookingId found");
-      return res.json({ status: "failed", message: "Invalid booking reference" });
-    }
+    const booking = await Booking.findOne({
+      paymentOrderId: orderId,
+    });
 
-    const booking = await Booking.findById(bookingId);
-    
     if (!booking) {
-      console.log("❌ Booking not found:", bookingId);
-      return res.json({ status: "failed", message: "Booking not found" });
+      return res.json({ status: "pending" });
     }
 
-    if (!booking.paymentOrderId) {
-      console.log("❌ No payment order ID in booking");
-      return res.json({ status: "failed", message: "No payment initiated" });
-    }
+    const order = await juspay.order.status(orderId);
 
-    // Check Juspay order status
-    const order = await juspay.order.status(booking.paymentOrderId);
-    console.log("🧾 JUSPAY STATUS:", order.status);
-
-    // SUCCESS - CHARGED
     if (order.status === "CHARGED") {
       booking.paymentStatus = "completed";
       booking.paidAmount = order.amount;
@@ -1136,56 +1117,21 @@ exports.verifyBookingPayment = async (req, res) => {
 
       return res.json({
         status: "completed",
-        bookingId: bookingId,
+        bookingId: booking._id,
         amount: order.amount,
         transactionId: order.order_id,
       });
     }
 
-    // UAT/SANDBOX - Treat PENDING as success
     if (["PENDING", "AUTHORIZING", "PENDING_VBV", "NEW"].includes(order.status)) {
+      return res.json({ status: "pending" });
+    }
 
-  // ✅ OPTIONAL: allow auto-success ONLY in sandbox/UAT
-  if (process.env.NODE_ENV !== "production") {
-    console.log("⚠️ UAT MODE: Treating PENDING as success");
-
-    booking.paymentStatus = "completed";
-    booking.paidAmount = booking.paidAmount || order.amount;
+    booking.paymentStatus = "failed";
     await booking.save();
 
-    return res.json({
-      status: "completed",
-      bookingId: bookingId,
-      amount: booking.paidAmount,
-      transactionId: booking.paymentOrderId,
-    });
-  }
-
-  // ✅ PRODUCTION — DO NOT MARK SUCCESS
-  console.log("⏳ Payment pending, waiting for confirmation");
-
-  return res.json({
-    status: "pending",
-    message: "Payment is being processed. Please wait.",
-  });
-}
-
-/**
- * FAILED — PAYMENT NOT SUCCESSFUL
- */
-booking.paymentStatus = "failed";
-await booking.save();
-
-return res.json({
-  status: "failed",
-  message: "Payment was not successful",
-});
-
+    return res.json({ status: "failed" });
   } catch (err) {
-    console.error("❌ Verification error:", err);
-    return res.json({ 
-      status: "failed",
-      message: "Unable to verify payment"
-    });
+    return res.json({ status: "pending" });
   }
 };
