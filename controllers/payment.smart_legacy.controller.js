@@ -1143,29 +1143,43 @@ exports.verifyBookingPayment = async (req, res) => {
     }
 
     // UAT/SANDBOX - Treat PENDING as success
-    if (["PENDING", "AUTHORIZING", "PENDING_VBV"].includes(order.status)) {
-      console.log("⚠️ Payment status is PENDING - Treating as SUCCESS for UAT");
-      
-      booking.paymentStatus = "completed";
-      booking.paidAmount = booking.paidAmount || order.amount;
-      await booking.save();
+    if (["PENDING", "AUTHORIZING", "PENDING_VBV", "NEW"].includes(order.status)) {
 
-      return res.json({
-        status: "completed",
-        bookingId: bookingId,
-        amount: booking.paidAmount,
-        transactionId: booking.paymentOrderId,
-      });
-    }
+  // ✅ OPTIONAL: allow auto-success ONLY in sandbox/UAT
+  if (process.env.NODE_ENV !== "production") {
+    console.log("⚠️ UAT MODE: Treating PENDING as success");
 
-    // FAILED
-    booking.paymentStatus = "failed";
+    booking.paymentStatus = "completed";
+    booking.paidAmount = booking.paidAmount || order.amount;
     await booking.save();
 
-    return res.json({ 
-      status: "failed",
-      message: "Payment was not successful"
+    return res.json({
+      status: "completed",
+      bookingId: bookingId,
+      amount: booking.paidAmount,
+      transactionId: booking.paymentOrderId,
     });
+  }
+
+  // ✅ PRODUCTION — DO NOT MARK SUCCESS
+  console.log("⏳ Payment pending, waiting for confirmation");
+
+  return res.json({
+    status: "pending",
+    message: "Payment is being processed. Please wait.",
+  });
+}
+
+/**
+ * FAILED — PAYMENT NOT SUCCESSFUL
+ */
+booking.paymentStatus = "failed";
+await booking.save();
+
+return res.json({
+  status: "failed",
+  message: "Payment was not successful",
+});
 
   } catch (err) {
     console.error("❌ Verification error:", err);
