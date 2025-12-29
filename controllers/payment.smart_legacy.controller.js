@@ -501,8 +501,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
       .populate("makeupId")
       .populate("moduleId")
       .populate("photographyId")
-      .populate("cateringId") // ✅ ADD
-
+      .populate("cateringId"); // ✅ ADD
 
     if (!booking) {
       return res.status(404).json({
@@ -519,25 +518,19 @@ exports.createSmartGatewayPayment = async (req, res) => {
     console.log("🔥 advanceAmount from Booking:", advanceAmount);
 
     if (advanceAmount <= 0) {
-  console.log("⚠️ advanceAmount missing — applying fallback logic");
+      console.log("⚠️ advanceAmount missing — applying fallback logic");
 
-  if (moduleType === "Venues") {
-    advanceAmount = Number(booking.venueId?.advanceDeposit) || 0;
-
-  } else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
-    advanceAmount = Number(booking.makeupId?.advanceBookingAmount) || 0;
-
-  } else if (moduleType === "Photography") {
-    advanceAmount = Number(
-      booking.photographyId?.advanceBookingAmount
-    ) || 0;
-
-  } else if (moduleType === "Catering") {
-    advanceAmount = Number(
-      booking.cateringId?.advanceBookingAmount
-    ) || 0; // ✅ FIX
-  }
-}
+      if (moduleType === "Venues") {
+        advanceAmount = Number(booking.venueId?.advanceDeposit) || 0;
+      } else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+        advanceAmount = Number(booking.makeupId?.advanceBookingAmount) || 0;
+      } else if (moduleType === "Photography") {
+        advanceAmount =
+          Number(booking.photographyId?.advanceBookingAmount) || 0;
+      } else if (moduleType === "Catering") {
+        advanceAmount = Number(booking.cateringId?.advanceBookingAmount) || 0; // ✅ FIX
+      }
+    }
 
     console.log("✅ Final Computed Advance Amount:", advanceAmount);
 
@@ -556,7 +549,6 @@ exports.createSmartGatewayPayment = async (req, res) => {
     // ✅ FIX: Construct return URL ONCE
     // const returnUrl = `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`;
     const returnUrl = `https://bookmyevent.ae/payment-success/index.html?bookingId=${bookingId}`;
-    
 
     console.log("🔗 Return URL:", returnUrl);
 
@@ -573,17 +565,17 @@ exports.createSmartGatewayPayment = async (req, res) => {
     });
 
     console.log("✅ Order created:", orderResponse);
-await Booking.findByIdAndUpdate(
-  bookingId,
-  {
-    paymentOrderId: orderId,     
-    paymentStatus: "initiated",  
-    paidAmount: advanceAmount
-  },
-  { new: true }
-);
+    await Booking.findByIdAndUpdate(
+      bookingId,
+      {
+        paymentOrderId: orderId,
+        paymentStatus: "initiated",
+        paidAmount: advanceAmount,
+      },
+      { new: true }
+    );
 
-console.log("✅ Booking updated with payment orderId:", orderId);
+    console.log("✅ Booking updated with payment orderId:", orderId);
 
     // ✅ FIX: Create Payment Session with proper configuration
     const session = await juspay.orderSession.create({
@@ -601,11 +593,10 @@ console.log("✅ Booking updated with payment orderId:", orderId);
       description: `Advance Payment ₹${amountInRupees}`,
       first_name: booking.userId.firstName || "",
       last_name: booking.userId.lastName || "",
-     metadata: {
-  bookingId: bookingId,
-  moduleType: booking.moduleType, // ✅ dynamic
-},
-
+      metadata: {
+        bookingId: bookingId,
+        moduleType: booking.moduleType, // ✅ dynamic
+      },
     });
 
     console.log("🎯 Payment Page:", session.payment_links?.web);
@@ -646,6 +637,12 @@ exports.juspayWebhook = async (req, res) => {
     const { order_id, status } = req.body;
     if (!order_id) return res.sendStatus(200);
 
+    // 🚫 Ignore intermediate states
+    if (!["CHARGED", "FAILED"].includes(status)) {
+      console.log("⏳ Webhook ignored (status):", status);
+      return res.sendStatus(200);
+    }
+
     const subscription = await Subscription.findOne({
       paymentId: order_id,
     }).populate("planId");
@@ -655,16 +652,16 @@ exports.juspayWebhook = async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // Only process if not already active
-    if (subscription.status === "active") {
-      console.log("✅ Webhook: Subscription already active");
+    // 🚫 Idempotency guard
+    if (["active", "cancelled"].includes(subscription.status)) {
+      console.log("🔁 Webhook already processed:", subscription.status);
       return res.sendStatus(200);
     }
 
     if (status === "CHARGED") {
       console.log("✅ Webhook: Payment CHARGED - Activating");
 
-      // Cancel other subscriptions
+      // Cancel other subscriptions for same module
       await Subscription.updateMany(
         {
           userId: subscription.userId,
@@ -689,6 +686,7 @@ exports.juspayWebhook = async (req, res) => {
     if (status === "FAILED") {
       console.log("❌ Webhook: Payment FAILED");
       subscription.status = "cancelled";
+      subscription.isCurrent = false;
       await subscription.save();
     }
 
@@ -698,6 +696,7 @@ exports.juspayWebhook = async (req, res) => {
     return res.sendStatus(200);
   }
 };
+
 /**
  * CREATE PAYMENT SESSION FOR SUBSCRIPTION
  */
@@ -826,7 +825,7 @@ exports.createSubscriptionPayment = async (req, res) => {
       moduleId: plan.moduleId,
       paymentId: orderId,
       status: "pending",
-      isCurrent: false
+      isCurrent: false,
     });
 
     console.log("✅ Subscription created:", newSubscription._id);
@@ -900,128 +899,49 @@ exports.verifySubscriptionPayment = async (req, res) => {
   try {
     const { orderId } = req.body;
 
-    console.log("🔍 Verifying payment for orderId:", orderId);
-
     if (!orderId) {
-      return res.status(400).json({
-        success: false,
-        message: "orderId is required",
-      });
+      return res.json({ status: "failed" });
     }
 
-    // 1️⃣ Find subscription in database
-    const subscription = await Subscription.findOne({
-      paymentId: orderId,
-    }).populate("planId");
+    const subscription = await Subscription.findOne({ paymentId: orderId })
+      .populate("planId");
 
     if (!subscription) {
-      console.log("❌ Subscription not found for orderId:", orderId);
+      return res.json({ status: "failed" });
+    }
+
+    const order = await juspay.order.status(orderId);
+
+    if (order.status === "CHARGED") {
+      if (subscription.status !== "active") {
+        const plan = subscription.planId;
+        subscription.status = "active";
+        subscription.startDate = new Date();
+        subscription.endDate = new Date(
+          Date.now() + plan.durationInDays * 24 * 60 * 60 * 1000
+        );
+        subscription.isCurrent = true;
+        await subscription.save();
+      }
+
       return res.json({
-        success: false,
-        message: "Invalid order",
+        status: "completed",
+        subscriptionId: subscription._id
       });
     }
 
-    console.log("📋 Subscription found:", {
-      id: subscription._id,
-      status: subscription.status,
-      planId: subscription.planId?._id,
-    });
-
-    // 2️⃣ If already active, return success
-    if (subscription.status === "active") {
-      console.log("✅ Subscription already active");
-      return res.json({
-        success: true,
-        subscription,
-        message: "Subscription is active",
-      });
+    if (["NEW", "PENDING", "PENDING_VBV", "AUTHORIZING"].includes(order.status)) {
+      return res.json({ status: "pending" });
     }
 
-    // 3️⃣ Check payment status with Juspay
-    console.log("🔄 Checking Juspay order status...");
+    subscription.status = "cancelled";
+    await subscription.save();
 
-    let juspayOrder;
-    try {
-      juspayOrder = await juspay.order.status(orderId);
-      console.log("📊 Juspay order status:", juspayOrder.status);
-    } catch (error) {
-      console.error("❌ Juspay API error:", error.message);
-      return res.json({
-        success: false,
-        status: subscription.status,
-        message: "Unable to verify payment status",
-      });
-    }
+    return res.json({ status: "failed" });
 
-    // 4️⃣ Handle payment status
-    if (juspayOrder.status === "CHARGED") {
-      console.log("✅ Payment is CHARGED - Activating subscription");
-
-      // Cancel all other subscriptions for this user+module
-      await Subscription.updateMany(
-        {
-          userId: subscription.userId,
-          moduleId: subscription.moduleId,
-          _id: { $ne: subscription._id },
-        },
-        {
-          status: "cancelled",
-          isCurrent: false,
-        }
-      );
-
-      // Activate this subscription
-      const plan = subscription.planId;
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() + plan.durationInDays);
-
-      subscription.status = "active";
-      subscription.startDate = startDate;
-      subscription.endDate = endDate;
-      subscription.isCurrent = true;
-
-      await subscription.save();
-
-      console.log("✅ Subscription activated successfully");
-
-      return res.json({
-        success: true,
-        subscription,
-        message: "Payment successful, subscription activated",
-      });
-    } else if (
-      ["PENDING", "PENDING_VBV", "AUTHORIZING", "NEW"].includes(
-        juspayOrder.status
-      )
-    ) {
-      console.log("⏳ Payment is pending:", juspayOrder.status);
-
-      return res.json({
-        success: false,
-        status: "pending",
-        message: "Payment is being processed. Please wait...",
-      });
-    } else {
-      // Payment failed
-      console.log("❌ Payment failed:", juspayOrder.status);
-
-      subscription.status = "cancelled";
-      await subscription.save();
-
-      return res.json({
-        success: false,
-        status: "failed",
-        message: "Payment failed",
-      });
-    }
   } catch (err) {
-    console.error("❌ Verification error:", err);
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    console.error(err);
+    return res.json({ status: "failed" });
   }
 };
 /**
@@ -1072,65 +992,49 @@ exports.handleJuspayResponse = async (req, res) => {
   }
 };
 
-
-
-
-
-
-
 // GET /api/payment/verify?bookingId=xxxx
 exports.verifyBookingPayment = async (req, res) => {
   try {
     const { bookingId } = req.query;
 
     if (!bookingId) {
-      return res.status(400).json({
-        status: "failed",
-        message: "bookingId required",
-      });
+      return res.json({ status: "failed" });
     }
 
     const booking = await Booking.findById(bookingId);
-
     if (!booking || !booking.paymentOrderId) {
-      return res.json({
-        status: "failed",
-        message: "Invalid booking or payment not initiated",
-      });
+      return res.json({ status: "failed" });
     }
 
-    const orderId = booking.paymentOrderId;
-
-    // 🔐 Ask Juspay for final truth
-    const order = await juspay.order.status(orderId);
-
-    let status = "failed";
+    const order = await juspay.order.status(booking.paymentOrderId);
 
     if (order.status === "CHARGED") {
-      status = "completed";
-
-      // Update booking ONLY once
       if (booking.paymentStatus !== "completed") {
         booking.paymentStatus = "completed";
         booking.paidAmount = order.amount;
         await booking.save();
       }
-    } else if (
-      ["PENDING", "PENDING_VBV", "AUTHORIZING", "NEW"].includes(order.status)
-    ) {
-      status = "pending";
-    } else {
-      status = "failed";
-      booking.paymentStatus = "failed";
-      await booking.save();
+
+      return res.json({
+        status: "completed",
+        bookingId,
+        amount: order.amount,
+        transactionId: order.order_id,
+      });
     }
 
-    return res.json({ status });
+    if (
+      ["NEW", "PENDING", "PENDING_VBV", "AUTHORIZING"].includes(order.status)
+    ) {
+      return res.json({ status: "pending" });
+    }
+
+    booking.paymentStatus = "failed";
+    await booking.save();
+
+    return res.json({ status: "failed" });
   } catch (err) {
-    console.error("❌ Verify booking payment error:", err.message);
-    return res.status(500).json({
-      status: "failed",
-      message: "Verification error",
-    });
+    console.error(err);
+    return res.json({ status: "failed" });
   }
 };
