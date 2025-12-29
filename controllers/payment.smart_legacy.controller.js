@@ -490,9 +490,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
   try {
     const { bookingId } = req.body;
 
-    console.log(
-      "\n===================== PAYMENT DEBUG LOG ====================="
-    );
+    console.log("\n===================== PAYMENT DEBUG LOG =====================");
 
     // Fetch booking with module info
     const booking = await Booking.findById(bookingId)
@@ -501,7 +499,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
       .populate("makeupId")
       .populate("moduleId")
       .populate("photographyId")
-      .populate("cateringId"); // ✅ ADD
+      .populate("cateringId");
 
     if (!booking) {
       return res.status(404).json({
@@ -525,10 +523,9 @@ exports.createSmartGatewayPayment = async (req, res) => {
       } else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
         advanceAmount = Number(booking.makeupId?.advanceBookingAmount) || 0;
       } else if (moduleType === "Photography") {
-        advanceAmount =
-          Number(booking.photographyId?.advanceBookingAmount) || 0;
+        advanceAmount = Number(booking.photographyId?.advanceBookingAmount) || 0;
       } else if (moduleType === "Catering") {
-        advanceAmount = Number(booking.cateringId?.advanceBookingAmount) || 0; // ✅ FIX
+        advanceAmount = Number(booking.cateringId?.advanceBookingAmount) || 0;
       }
     }
 
@@ -544,15 +541,18 @@ exports.createSmartGatewayPayment = async (req, res) => {
     const amountInRupees = advanceAmount.toFixed(2);
     console.log("🏦 FINAL AMOUNT SENT TO HDFC:", amountInRupees);
 
-    const orderId = "order_" + Date.now();
+    // ✅ FIX: Create orderId that includes bookingId
+    const orderId = `order_${bookingId}_${Date.now()}`;
 
-    // ✅ FIX: Construct return URL ONCE
-    // const returnUrl = `https://bookmyevent.ae/booking.html?status=success&bookingId=${bookingId}`;
+    // ✅ CRITICAL FIX: Add bookingId as query param in return URL
+    // This way it's ALWAYS there regardless of what Juspay does
     const returnUrl = `https://bookmyevent.ae/payment-success/index.html?bookingId=${bookingId}`;
 
     console.log("🔗 Return URL:", returnUrl);
+    console.log("🆔 Order ID (contains bookingId):", orderId);
+    console.log("📌 BookingId in URL:", bookingId);
 
-    // Create Juspay Order
+    // Create Juspay Order with metadata
     const orderResponse = await juspay.order.create({
       order_id: orderId,
       amount: amountInRupees,
@@ -561,10 +561,17 @@ exports.createSmartGatewayPayment = async (req, res) => {
       customer_email: booking.userId.email,
       customer_phone: booking.userId.mobile || "9999999999",
       description: `Advance Payment ₹${amountInRupees}`,
-      return_url: returnUrl, // ✅ ADD RETURN URL HERE
+      return_url: returnUrl,
+      // ✅ Store bookingId in metadata
+      metadata: {
+        bookingId: bookingId,
+        moduleType: booking.moduleType,
+      },
     });
 
     console.log("✅ Order created:", orderResponse);
+    
+    // Update booking with orderId
     await Booking.findByIdAndUpdate(
       bookingId,
       {
@@ -577,7 +584,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
 
     console.log("✅ Booking updated with payment orderId:", orderId);
 
-    // ✅ FIX: Create Payment Session with proper configuration
+    // Create Payment Session
     const session = await juspay.orderSession.create({
       order_id: orderId,
       action: "paymentPage",
@@ -587,36 +594,36 @@ exports.createSmartGatewayPayment = async (req, res) => {
       customer_email: booking.userId.email,
       customer_phone: booking.userId.mobile || "9999999999",
       payment_page_client_id: "hdfcmaster",
-      return_url: returnUrl, // ✅ SAME RETURN URL
-      redirect: true, // ✅ ENABLE AUTO-REDIRECT
-      auto_redirect: true, // ✅ Additional flag for some gateways
+      return_url: returnUrl,
+      redirect: true,
+      auto_redirect: true,
       description: `Advance Payment ₹${amountInRupees}`,
       first_name: booking.userId.firstName || "",
       last_name: booking.userId.lastName || "",
       metadata: {
         bookingId: bookingId,
-        moduleType: booking.moduleType, // ✅ dynamic
+        moduleType: booking.moduleType,
       },
     });
 
     console.log("🎯 Payment Page:", session.payment_links?.web);
     console.log("🔗 Session Return URL:", session.return_url);
 
-    // Clean SDK Payload (remove returnUrl to avoid confusion)
+    // Clean SDK Payload
     const sdkPayload = JSON.parse(JSON.stringify(session.sdk_payload));
     if (sdkPayload?.payload?.returnUrl) {
       console.log("⚠️ Removing returnUrl from SDK payload");
       delete sdkPayload.payload.returnUrl;
     }
 
-    // ✅ FIX: Return consistent response
     return res.json({
       success: true,
       order_id: orderId,
+      bookingId: bookingId, // ✅ Return bookingId explicitly
       advanceAmount: amountInRupees,
       payment_links: session.payment_links,
       sdk_payload: sdkPayload,
-      return_url: returnUrl, // ✅ SAME RETURN URL IN RESPONSE
+      return_url: returnUrl,
     });
   } catch (error) {
     console.error("❌ Payment Error:", error.response?.data || error.message);
@@ -626,7 +633,6 @@ exports.createSmartGatewayPayment = async (req, res) => {
     });
   }
 };
-
 /**
  * JUSPAY WEBHOOK HANDLER
  */
@@ -1075,19 +1081,39 @@ exports.handleJuspayResponse = async (req, res) => {
 // GET /api/payment/verify?bookingId=xxx
 exports.verifyBookingPayment = async (req, res) => {
   try {
-    const { bookingId } = req.query;
+    let { bookingId, orderId } = req.query;
+
+    console.log("🔍 Verify request:", { bookingId, orderId });
+
+    // ✅ FIX: If orderId is provided, extract bookingId from it
+    if (!bookingId && orderId) {
+      // orderId format: order_BOOKINGID_TIMESTAMP
+      const parts = orderId.split('_');
+      if (parts.length >= 3) {
+        bookingId = parts[1]; // Extract bookingId from orderId
+        console.log("📌 Extracted bookingId from orderId:", bookingId);
+      }
+    }
 
     if (!bookingId) {
-      return res.json({ status: "failed" });
+      console.log("❌ No bookingId found");
+      return res.json({ status: "failed", message: "Invalid booking reference" });
     }
 
     const booking = await Booking.findById(bookingId);
-    if (!booking || !booking.paymentOrderId) {
-      return res.json({ status: "failed" });
+    
+    if (!booking) {
+      console.log("❌ Booking not found:", bookingId);
+      return res.json({ status: "failed", message: "Booking not found" });
     }
 
-    const order = await juspay.order.status(booking.paymentOrderId);
+    if (!booking.paymentOrderId) {
+      console.log("❌ No payment order ID in booking");
+      return res.json({ status: "failed", message: "No payment initiated" });
+    }
 
+    // Check Juspay order status
+    const order = await juspay.order.status(booking.paymentOrderId);
     console.log("🧾 JUSPAY STATUS:", order.status);
 
     // ✅ REAL SUCCESS
@@ -1098,17 +1124,17 @@ exports.verifyBookingPayment = async (req, res) => {
 
       return res.json({
         status: "completed",
-        bookingId,
+        bookingId: bookingId,
         amount: order.amount,
         transactionId: order.order_id,
       });
     }
 
-    // ⏳ UAT PENDING → TREAT AS SUCCESS AFTER PAYMENT PAGE
+    // ⏳ PENDING (treat as success in UAT)
     if (["PENDING", "AUTHORIZING", "NEW", "PENDING_VBV"].includes(order.status)) {
       return res.json({
-        status: "completed",
-        bookingId,
+        status: "completed", // Change to "pending" in production
+        bookingId: bookingId,
         amount: booking.paidAmount,
         transactionId: booking.paymentOrderId,
       });
@@ -1118,10 +1144,16 @@ exports.verifyBookingPayment = async (req, res) => {
     booking.paymentStatus = "failed";
     await booking.save();
 
-    return res.json({ status: "failed" });
+    return res.json({ 
+      status: "failed",
+      message: "Payment was not successful"
+    });
 
   } catch (err) {
-    console.error(err);
-    return res.json({ status: "failed" });
+    console.error("❌ Verification error:", err);
+    return res.json({ 
+      status: "failed",
+      message: "Unable to verify payment"
+    });
   }
 };
