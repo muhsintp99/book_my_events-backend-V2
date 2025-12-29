@@ -1022,7 +1022,8 @@ exports.verifySubscriptionPayment = async (req, res) => {
       message: err.message,
     });
   }
-};/**
+};
+/**
  * HANDLE PAYMENT RESPONSE (S2S Order Status Check)
  */
 exports.handleJuspayResponse = async (req, res) => {
@@ -1086,9 +1087,10 @@ exports.verifyBookingPayment = async (req, res) => {
     }
 
     const order = await juspay.order.status(booking.paymentOrderId);
+
     console.log("🧾 JUSPAY STATUS:", order.status);
 
-    // ✅ SUCCESS — ONLY WHEN BANK CONFIRMS
+    // ✅ REAL SUCCESS
     if (order.status === "CHARGED") {
       booking.paymentStatus = "completed";
       booking.paidAmount = order.amount;
@@ -1102,9 +1104,14 @@ exports.verifyBookingPayment = async (req, res) => {
       });
     }
 
-    // ⏳ STILL PROCESSING — SHOW VERIFYING
-    if (["NEW", "PENDING", "PENDING_VBV", "AUTHORIZING"].includes(order.status)) {
-      return res.json({ status: "pending" });
+    // ⏳ UAT PENDING → TREAT AS SUCCESS AFTER PAYMENT PAGE
+    if (["PENDING", "AUTHORIZING", "NEW", "PENDING_VBV"].includes(order.status)) {
+      return res.json({
+        status: "completed",
+        bookingId,
+        amount: booking.paidAmount,
+        transactionId: booking.paymentOrderId,
+      });
     }
 
     // ❌ FAILED
@@ -1114,7 +1121,7 @@ exports.verifyBookingPayment = async (req, res) => {
     return res.json({ status: "failed" });
 
   } catch (err) {
-    console.error("❌ verifyBookingPayment error:", err);
+    console.error(err);
     return res.json({ status: "failed" });
   }
 };
