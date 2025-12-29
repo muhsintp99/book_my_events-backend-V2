@@ -643,42 +643,56 @@ exports.createSmartGatewayPayment = async (req, res) => {
  */
 exports.juspayWebhook = async (req, res) => {
   try {
-    console.log("🔔 JUSPAY WEBHOOK RECEIVED:", req.body);
+    console.log("🔔 JUSPAY WEBHOOK RAW:", JSON.stringify(req.body, null, 2));
 
-    const { order_id, status } = req.body;
-    if (!order_id) {
-      console.log("⚠️ No order_id in webhook");
+    // ✅ Support ALL Juspay payload formats
+    const orderId =
+      req.body.order_id ||
+      req.body.content?.order_id ||
+      req.body.payload?.order_id;
+
+    const status =
+      req.body.status ||
+      req.body.content?.status ||
+      req.body.payload?.status;
+
+    if (!orderId) {
+      console.warn("⚠️ Webhook received without order_id");
       return res.sendStatus(200);
     }
 
-    const booking = await Booking.findOne({ paymentOrderId: order_id });
+    console.log("📌 Parsed webhook:", { orderId, status });
 
-    if (booking) {
-      console.log("📦 Booking found for webhook:", booking._id);
+    const booking = await Booking.findOne({
+      paymentOrderId: orderId,
+    });
 
-      if (status === "CHARGED") {
-        booking.paymentStatus = "completed";
-        booking.paymentCompletedAt = new Date();
-        await booking.save();
-        console.log("✅ Webhook: Booking payment marked as COMPLETED");
-      }
-
-      if (status === "FAILED") {
-        booking.paymentStatus = "failed";
-        await booking.save();
-        console.log("❌ Webhook: Booking payment marked as FAILED");
-      }
-
+    if (!booking) {
+      console.warn("⚠️ No booking found for order:", orderId);
       return res.sendStatus(200);
     }
 
-    // Handle subscription webhooks (if needed)
-    console.log("⚠️ No booking found for order:", order_id);
+    // ✅ SUCCESS
+    if (status === "CHARGED") {
+      booking.paymentStatus = "completed";
+      booking.paymentCompletedAt = new Date();
+      await booking.save();
+
+      console.log("🎉 Booking marked COMPLETED via webhook");
+    }
+
+    // ❌ FAILURE
+    if (["FAILED", "CANCELLED"].includes(status)) {
+      booking.paymentStatus = "failed";
+      await booking.save();
+
+      console.log("❌ Booking marked FAILED via webhook");
+    }
+
     return res.sendStatus(200);
-
   } catch (err) {
     console.error("❌ WEBHOOK ERROR:", err);
-    return res.sendStatus(200);
+    return res.sendStatus(200); // Juspay expects 200 always
   }
 };
 
