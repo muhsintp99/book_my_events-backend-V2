@@ -544,13 +544,29 @@ exports.createSmartGatewayPayment = async (req, res) => {
     // ✅ FIX: Create orderId that includes bookingId
     const orderId = `order_${bookingId}_${Date.now()}`;
 
-    // ✅ CRITICAL FIX: Add bookingId as query param in return URL
-    // This way it's ALWAYS there regardless of what Juspay does
+    // ✅ TWO RETURN URL STRATEGIES:
+    
+    // Strategy 1: Direct with bookingId (preferred)
     const returnUrl = `https://bookmyevent.ae/payment-success/index.html?bookingId=${bookingId}`;
-
+    
+    // Strategy 2: With order_id (if Juspay sends this)
+    // const returnUrl = `https://bookmyevent.ae/payment-success/index.html`;
+    // Juspay will append: ?order_id=xxx&status=xxx
+    
     console.log("🔗 Return URL:", returnUrl);
     console.log("🆔 Order ID (contains bookingId):", orderId);
     console.log("📌 BookingId in URL:", bookingId);
+    
+    // ✅ IMPORTANT: Verify the return URL is correctly formatted
+    try {
+      const testUrl = new URL(returnUrl);
+      console.log("✅ Return URL is valid");
+      console.log("   Host:", testUrl.host);
+      console.log("   Path:", testUrl.pathname);
+      console.log("   Query:", testUrl.search);
+    } catch (e) {
+      console.error("❌ Invalid return URL:", e.message);
+    }
 
     // Create Juspay Order with metadata
     const orderResponse = await juspay.order.create({
@@ -610,11 +626,14 @@ exports.createSmartGatewayPayment = async (req, res) => {
     console.log("🔗 Session Return URL:", session.return_url);
 
     // Clean SDK Payload
-    const sdkPayload = JSON.parse(JSON.stringify(session.sdk_payload));
-    if (sdkPayload?.payload?.returnUrl) {
-      console.log("⚠️ Removing returnUrl from SDK payload");
-      delete sdkPayload.payload.returnUrl;
-    }
+    const sdkPayload = session.sdk_payload;
+
+// Verify return URL is preserved
+if (sdkPayload?.payload?.returnUrl) {
+  console.log("✅ Return URL preserved in SDK payload");
+} else {
+  console.warn("⚠️ WARNING: Return URL not in SDK payload!");
+}
 
     return res.json({
       success: true,
