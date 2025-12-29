@@ -1049,44 +1049,42 @@ exports.handleJuspayResponse = async (req, res) => {
 // GET /api/payment/verify?bookingId=xxxx
 // GET /api/payment/verify?bookingId=xxx
 // GET /api/payment/verify?bookingId=xxx&orderId=yyy
+// GET /api/payment/verify?bookingId=xxxx&orderId=yyyy
 exports.verifyBookingPayment = async (req, res) => {
   try {
     let { bookingId, orderId } = req.query;
 
-    console.log("\n🔍 ==================== VERIFY PAYMENT ====================");
-    console.log("📥 Request params:", { bookingId, orderId });
+    console.log("\n🔍 ================= VERIFY PAYMENT =================");
+    console.log("📥 Incoming params:", { bookingId, orderId });
 
-    // Extract bookingId from orderId if not provided
+    /* --------------------------------------------------
+       1️⃣ Extract bookingId from orderId if missing
+       order format: order_<bookingId>_<timestamp>
+    -------------------------------------------------- */
     if (!bookingId && orderId) {
       const parts = orderId.split("_");
-      console.log("🔧 Parsing orderId:", parts);
-      
       if (parts.length >= 3 && parts[0] === "order") {
         bookingId = parts[1];
-        console.log("✅ Extracted bookingId from orderId:", bookingId);
+        console.log("✅ bookingId extracted from orderId:", bookingId);
       }
     }
 
-    if (!bookingId) {
-      console.error("❌ No bookingId found");
+    /* --------------------------------------------------
+       2️⃣ Validate bookingId
+    -------------------------------------------------- */
+    if (!bookingId || !/^[a-f0-9]{24}$/i.test(bookingId)) {
+      console.error("❌ Invalid bookingId:", bookingId);
       return res.json({
         status: "failed",
         message: "Invalid booking reference",
       });
     }
 
-    // Validate bookingId format
-    if (!/^[a-f0-9]{24}$/i.test(bookingId)) {
-      console.error("❌ Invalid bookingId format:", bookingId);
-      return res.json({
-        status: "failed",
-        message: "Invalid booking ID format",
-      });
-    }
-
-    console.log("📦 Finding booking:", bookingId);
+    /* --------------------------------------------------
+       3️⃣ Fetch booking
+    -------------------------------------------------- */
     const booking = await Booking.findById(bookingId);
-    
+
     if (!booking) {
       console.error("❌ Booking not found:", bookingId);
       return res.json({
@@ -1095,119 +1093,120 @@ exports.verifyBookingPayment = async (req, res) => {
       });
     }
 
-    console.log("✅ Booking found:", {
-      id: booking._id,
+    console.log("📦 Booking found:", {
+      bookingId: booking._id,
       paymentStatus: booking.paymentStatus,
-      orderId: booking.paymentOrderId,
-      paidAmount: booking.paidAmount
+      paymentOrderId: booking.paymentOrderId,
     });
 
-    // ✅ FAST RETURN: Already completed
+    /* --------------------------------------------------
+       4️⃣ FAST RETURNS (DB FIRST)
+    -------------------------------------------------- */
     if (booking.paymentStatus === "completed") {
-      console.log("✅ Payment already completed (cached in DB)");
+      console.log("✅ Payment already completed (DB)");
       return res.json({
         status: "completed",
-        bookingId: bookingId,
+        bookingId,
         amount: booking.paidAmount,
         transactionId: booking.paymentOrderId,
       });
     }
 
-    // ❌ FAST RETURN: Already failed
     if (booking.paymentStatus === "failed") {
-      console.log("❌ Payment already marked as failed");
+      console.log("❌ Payment already failed (DB)");
       return res.json({
         status: "failed",
         message: "Payment failed",
       });
     }
 
-    // Check if payment was initiated
     if (!booking.paymentOrderId) {
-      console.error("❌ No payment order ID in booking");
+      console.error("❌ No paymentOrderId on booking");
       return res.json({
         status: "failed",
         message: "No payment initiated for this booking",
       });
     }
 
-    // 🔄 CHECK JUSPAY STATUS
-    console.log("🔄 Checking Juspay order status:", booking.paymentOrderId);
-    
+    /* --------------------------------------------------
+       5️⃣ Check Juspay Order Status
+    -------------------------------------------------- */
+    console.log("🔄 Checking Juspay status:", booking.paymentOrderId);
+
     let order;
     try {
       order = await juspay.order.status(booking.paymentOrderId);
-      console.log("📊 Juspay response:", {
-        order_id: order.order_id,
-        status: order.status,
-        status_id: order.status_id,
-        amount: order.amount
-      });
-    } catch (juspayError) {
-      console.error("❌ Juspay API error:", juspayError.message);
-      console.error("Error details:", juspayError.response?.data);
-      
-      // Return pending if we can't reach Juspay
+    } catch (e) {
+      console.error("❌ Juspay API error:", e.message);
       return res.json({
         status: "pending",
-        message: "Unable to verify payment status at this moment. Please try again.",
-        bookingId: bookingId,
+        bookingId,
+        message: "Unable to verify payment at the moment",
       });
     }
 
-    // ✅ PAYMENT SUCCESSFUL
+    console.log("📊 Juspay response:", {
+      orderId: order.order_id,
+      status: order.status,
+      amount: order.amount,
+    });
+
+    /* --------------------------------------------------
+       6️⃣ SUCCESS (REAL)
+    -------------------------------------------------- */
     if (order.status === "CHARGED") {
-      console.log("✅ Payment CHARGED - Updating booking to completed");
-      
       booking.paymentStatus = "completed";
       booking.paymentCompletedAt = new Date();
       await booking.save();
 
-      console.log("✅ Booking updated successfully");
+      console.log("🎉 Payment CHARGED → booking completed");
 
       return res.json({
         status: "completed",
-        bookingId: bookingId,
+        bookingId,
         amount: order.amount,
         transactionId: order.order_id,
       });
     }
 
-    // ⏳ PAYMENT PENDING
-    const PENDING_STATUSES = ["NEW", "PENDING", "PENDING_VBV", "AUTHORIZING", "AUTHORIZATION_FAILED"];
+    /* --------------------------------------------------
+       7️⃣ PENDING STATES
+    -------------------------------------------------- */
+    const PENDING_STATUSES = [
+      "NEW",
+      "PENDING",
+      "PENDING_VBV",
+      "AUTHORIZING",
+    ];
+
     if (PENDING_STATUSES.includes(order.status)) {
-      console.log("⏳ Payment still processing:", order.status);
-      
+      console.log("⏳ Payment pending:", order.status);
       return res.json({
         status: "pending",
-        message: "Payment is being processed",
-        bookingId: bookingId,
+        bookingId,
         transactionId: booking.paymentOrderId,
       });
     }
 
-    // ❌ PAYMENT FAILED
-    console.log("❌ Payment failed with status:", order.status);
-    
+    /* --------------------------------------------------
+       8️⃣ FAILED
+    -------------------------------------------------- */
+    console.log("❌ Payment failed:", order.status);
+
     booking.paymentStatus = "failed";
     await booking.save();
 
     return res.json({
       status: "failed",
+      bookingId,
       message: `Payment failed (${order.status})`,
-      bookingId: bookingId,
     });
 
   } catch (err) {
-    console.error("❌ CRITICAL ERROR in verifyBookingPayment:", err);
-    console.error("Stack trace:", err.stack);
-    
+    console.error("❌ VERIFY API ERROR:", err);
     return res.status(500).json({
       status: "error",
       message: "Internal server error while verifying payment",
-      error: err.message,
     });
-  } finally {
-    console.log("==================== END VERIFY ====================\n");
   }
 };
