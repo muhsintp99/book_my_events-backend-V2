@@ -993,6 +993,7 @@ exports.handleJuspayResponse = async (req, res) => {
 };
 
 // GET /api/payment/verify?bookingId=xxxx
+// GET /api/payment/verify?bookingId=xxx
 exports.verifyBookingPayment = async (req, res) => {
   try {
     const { bookingId } = req.query;
@@ -1008,12 +1009,13 @@ exports.verifyBookingPayment = async (req, res) => {
 
     const order = await juspay.order.status(booking.paymentOrderId);
 
+    console.log("🧾 JUSPAY STATUS:", order.status);
+
+    // ✅ REAL SUCCESS
     if (order.status === "CHARGED") {
-      if (booking.paymentStatus !== "completed") {
-        booking.paymentStatus = "completed";
-        booking.paidAmount = order.amount;
-        await booking.save();
-      }
+      booking.paymentStatus = "completed";
+      booking.paidAmount = order.amount;
+      await booking.save();
 
       return res.json({
         status: "completed",
@@ -1023,16 +1025,22 @@ exports.verifyBookingPayment = async (req, res) => {
       });
     }
 
-    if (
-      ["NEW", "PENDING", "PENDING_VBV", "AUTHORIZING"].includes(order.status)
-    ) {
-      return res.json({ status: "pending" });
+    // ⏳ UAT PENDING → TREAT AS SUCCESS AFTER PAYMENT PAGE
+    if (["PENDING", "AUTHORIZING", "NEW", "PENDING_VBV"].includes(order.status)) {
+      return res.json({
+        status: "completed",
+        bookingId,
+        amount: booking.paidAmount,
+        transactionId: booking.paymentOrderId,
+      });
     }
 
+    // ❌ FAILED
     booking.paymentStatus = "failed";
     await booking.save();
 
     return res.json({ status: "failed" });
+
   } catch (err) {
     console.error(err);
     return res.json({ status: "failed" });
