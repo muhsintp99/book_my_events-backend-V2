@@ -916,6 +916,22 @@ const vendorProfileSchema = new mongoose.Schema(
       paymentMethod: String,
       transactionId: String
     }],
+// ----------------------- CAKE MODULE FIELDS -----------------------
+estimatedDeliveryTime: {
+  minDays: {
+    type: Number,
+    default: null
+  },
+  maxDays: {
+    type: Number,
+    default: null
+  },
+  unit: {
+    type: String,
+    enum: ["hours", "days"],
+    default: "days"
+  }
+},
 
     bio: {
       title: { type: String, default: "" },

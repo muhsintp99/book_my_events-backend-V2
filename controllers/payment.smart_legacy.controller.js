@@ -490,7 +490,9 @@ exports.createSmartGatewayPayment = async (req, res) => {
   try {
     const { bookingId } = req.body;
 
-    console.log("\n===================== PAYMENT DEBUG LOG =====================");
+    console.log(
+      "\n===================== PAYMENT DEBUG LOG ====================="
+    );
 
     // Fetch booking with module info
     const booking = await Booking.findById(bookingId)
@@ -523,7 +525,8 @@ exports.createSmartGatewayPayment = async (req, res) => {
       } else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
         advanceAmount = Number(booking.makeupId?.advanceBookingAmount) || 0;
       } else if (moduleType === "Photography") {
-        advanceAmount = Number(booking.photographyId?.advanceBookingAmount) || 0;
+        advanceAmount =
+          Number(booking.photographyId?.advanceBookingAmount) || 0;
       } else if (moduleType === "Catering") {
         advanceAmount = Number(booking.cateringId?.advanceBookingAmount) || 0;
       }
@@ -545,18 +548,18 @@ exports.createSmartGatewayPayment = async (req, res) => {
     const orderId = `order_${bookingId}_${Date.now()}`;
 
     // ✅ TWO RETURN URL STRATEGIES:
-    
+
     // Strategy 1: Direct with bookingId (preferred)
-    const returnUrl = `https://bookmyevent.ae/payment-success/index.html?bookingId=${bookingId}`;
-    
+    // const returnUrl = `https://bookmyevent.ae/payment-success/index.html?bookingId=${bookingId}`;
+    const returnUrl = `https://bookmyevent.ae/payment-success/index.html`;
     // Strategy 2: With order_id (if Juspay sends this)
     // const returnUrl = `https://bookmyevent.ae/payment-success/index.html`;
     // Juspay will append: ?order_id=xxx&status=xxx
-    
+
     console.log("🔗 Return URL:", returnUrl);
     console.log("🆔 Order ID (contains bookingId):", orderId);
     console.log("📌 BookingId in URL:", bookingId);
-    
+
     // ✅ IMPORTANT: Verify the return URL is correctly formatted
     try {
       const testUrl = new URL(returnUrl);
@@ -586,7 +589,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
     });
 
     console.log("✅ Order created:", orderResponse);
-    
+
     // Update booking with orderId
     await Booking.findByIdAndUpdate(
       bookingId,
@@ -659,6 +662,28 @@ exports.juspayWebhook = async (req, res) => {
     const { order_id, status } = req.body;
     if (!order_id) return res.sendStatus(200);
 
+    /* =========================
+       UPDATE BOOKING (IMPORTANT)
+    ========================== */
+    const booking = await Booking.findOne({
+      paymentOrderId: order_id,
+    });
+
+    if (booking) {
+      if (status === "CHARGED") {
+        booking.paymentStatus = "completed";
+        booking.paidAmount =
+          booking.paidAmount || booking.advanceAmount || 0;
+      } else if (status === "FAILED") {
+        booking.paymentStatus = "failed";
+      }
+      await booking.save();
+      console.log("✅ Booking updated via webhook:", booking._id);
+    }
+
+    /* =========================
+       SUBSCRIPTION HANDLING
+    ========================== */
     const subscription = await Subscription.findOne({
       paymentId: order_id,
     }).populate("planId");
@@ -668,16 +693,14 @@ exports.juspayWebhook = async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // Only process if not already active
     if (subscription.status === "active") {
       console.log("✅ Webhook: Subscription already active");
       return res.sendStatus(200);
     }
 
     if (status === "CHARGED") {
-      console.log("✅ Webhook: Payment CHARGED - Activating");
+      console.log("✅ Webhook: Subscription payment CHARGED");
 
-      // Cancel other subscriptions
       await Subscription.updateMany(
         {
           userId: subscription.userId,
@@ -696,11 +719,9 @@ exports.juspayWebhook = async (req, res) => {
       subscription.isCurrent = true;
 
       await subscription.save();
-      console.log("✅ Webhook: Subscription activated");
     }
 
     if (status === "FAILED") {
-      console.log("❌ Webhook: Payment FAILED");
       subscription.status = "cancelled";
       await subscription.save();
     }
@@ -711,6 +732,7 @@ exports.juspayWebhook = async (req, res) => {
     return res.sendStatus(200);
   }
 };
+
 /**
  * CREATE PAYMENT SESSION FOR SUBSCRIPTION
  */
@@ -1094,7 +1116,7 @@ exports.verifyBookingPayment = async (req, res) => {
     // ✅ FIX: If orderId is provided, extract bookingId from it
     if (!bookingId && orderId) {
       // orderId format: order_BOOKINGID_TIMESTAMP
-      const parts = orderId.split('_');
+      const parts = orderId.split("_");
       if (parts.length >= 3) {
         bookingId = parts[1]; // Extract bookingId from orderId
         console.log("📌 Extracted bookingId from orderId:", bookingId);
@@ -1103,11 +1125,14 @@ exports.verifyBookingPayment = async (req, res) => {
 
     if (!bookingId) {
       console.log("❌ No bookingId found");
-      return res.json({ status: "failed", message: "Invalid booking reference" });
+      return res.json({
+        status: "failed",
+        message: "Invalid booking reference",
+      });
     }
 
     const booking = await Booking.findById(bookingId);
-    
+
     if (!booking) {
       console.log("❌ Booking not found:", bookingId);
       return res.json({ status: "failed", message: "Booking not found" });
@@ -1137,7 +1162,9 @@ exports.verifyBookingPayment = async (req, res) => {
     }
 
     // ⏳ PENDING (treat as success in UAT)
-    if (["PENDING", "AUTHORIZING", "NEW", "PENDING_VBV"].includes(order.status)) {
+    if (
+      ["PENDING", "AUTHORIZING", "NEW", "PENDING_VBV"].includes(order.status)
+    ) {
       return res.json({
         status: "completed", // Change to "pending" in production
         bookingId: bookingId,
@@ -1150,16 +1177,15 @@ exports.verifyBookingPayment = async (req, res) => {
     booking.paymentStatus = "failed";
     await booking.save();
 
-    return res.json({ 
+    return res.json({
       status: "failed",
-      message: "Payment was not successful"
+      message: "Payment was not successful",
     });
-
   } catch (err) {
     console.error("❌ Verification error:", err);
-    return res.json({ 
+    return res.json({
       status: "failed",
-      message: "Unable to verify payment"
+      message: "Unable to verify payment",
     });
   }
 };

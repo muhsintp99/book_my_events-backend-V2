@@ -2154,6 +2154,8 @@ exports.register = async (req, res) => {
       const ModuleModel = mongoose.model("Module");
       const moduleData = await ModuleModel.findById(module);
       const moduleName = moduleData?.title?.toLowerCase() || "";
+const isCakeModule =
+  moduleName === "cake" || moduleName === "cake vendor";
 
       const isBioModule =
         moduleName === "makeup artist" || moduleName === "photography";
@@ -2199,6 +2201,14 @@ exports.register = async (req, res) => {
             subscriptionStartDate: null,
             subscriptionEndDate: null,
             lastPaymentDate: null,
+            estimatedDeliveryTime: isCakeModule
+  ? {
+      minDays: req.body.minDeliveryDays || null,
+      maxDays: req.body.maxDeliveryDays || null,
+      unit: req.body.deliveryUnit || "days"
+    }
+  : undefined,
+
             module: mongoose.Types.ObjectId.isValid(module)
               ? new mongoose.Types.ObjectId(module)
               : null,
