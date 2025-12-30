@@ -548,8 +548,6 @@ exports.createSmartGatewayPayment = async (req, res) => {
     
     // Strategy 1: Direct with bookingId (preferred)
     const returnUrl = `https://bookmyevent.ae/payment-success/index.html?bookingId=${bookingId}`;
-    // const returnUrl = "https://bookmyevent.ae/payment-success/index.html";
-
     
     // Strategy 2: With order_id (if Juspay sends this)
     // const returnUrl = `https://bookmyevent.ae/payment-success/index.html`;
@@ -628,15 +626,11 @@ exports.createSmartGatewayPayment = async (req, res) => {
     console.log("🔗 Session Return URL:", session.return_url);
 
     // Clean SDK Payload
-   // Clean SDK Payload for response
-const sdkPayload = session.sdk_payload;
-
-// Verify return URL is preserved
-if (sdkPayload?.payload?.returnUrl) {
-  console.log("✅ Return URL preserved in SDK payload");
-} else {
-  console.warn("⚠️ WARNING: Return URL not in SDK payload!");
-}
+    const sdkPayload = JSON.parse(JSON.stringify(session.sdk_payload));
+    if (sdkPayload?.payload?.returnUrl) {
+      console.log("⚠️ Removing returnUrl from SDK payload");
+      delete sdkPayload.payload.returnUrl;
+    }
 
     return res.json({
       success: true,
@@ -655,7 +649,6 @@ if (sdkPayload?.payload?.returnUrl) {
     });
   }
 };
-
 /**
  * JUSPAY WEBHOOK HANDLER
  */
@@ -1098,11 +1091,12 @@ exports.verifyBookingPayment = async (req, res) => {
 
     console.log("🔍 Verify request:", { bookingId, orderId });
 
-    // Extract bookingId from orderId if needed
+    // ✅ FIX: If orderId is provided, extract bookingId from it
     if (!bookingId && orderId) {
+      // orderId format: order_BOOKINGID_TIMESTAMP
       const parts = orderId.split('_');
       if (parts.length >= 3) {
-        bookingId = parts[1];
+        bookingId = parts[1]; // Extract bookingId from orderId
         console.log("📌 Extracted bookingId from orderId:", bookingId);
       }
     }
@@ -1128,7 +1122,7 @@ exports.verifyBookingPayment = async (req, res) => {
     const order = await juspay.order.status(booking.paymentOrderId);
     console.log("🧾 JUSPAY STATUS:", order.status);
 
-    // SUCCESS - CHARGED
+    // ✅ REAL SUCCESS
     if (order.status === "CHARGED") {
       booking.paymentStatus = "completed";
       booking.paidAmount = order.amount;
@@ -1142,44 +1136,24 @@ exports.verifyBookingPayment = async (req, res) => {
       });
     }
 
-    // UAT/SANDBOX - Treat PENDING as success
-    if (["PENDING", "AUTHORIZING", "PENDING_VBV", "NEW"].includes(order.status)) {
+    // ⏳ PENDING (treat as success in UAT)
+    if (["PENDING", "AUTHORIZING", "NEW", "PENDING_VBV"].includes(order.status)) {
+      return res.json({
+        status: "completed", // Change to "pending" in production
+        bookingId: bookingId,
+        amount: booking.paidAmount,
+        transactionId: booking.paymentOrderId,
+      });
+    }
 
-  // ✅ OPTIONAL: allow auto-success ONLY in sandbox/UAT
-  if (process.env.NODE_ENV !== "production") {
-    console.log("⚠️ UAT MODE: Treating PENDING as success");
-
-    booking.paymentStatus = "completed";
-    booking.paidAmount = booking.paidAmount || order.amount;
+    // ❌ FAILED
+    booking.paymentStatus = "failed";
     await booking.save();
 
-    return res.json({
-      status: "completed",
-      bookingId: bookingId,
-      amount: booking.paidAmount,
-      transactionId: booking.paymentOrderId,
+    return res.json({ 
+      status: "failed",
+      message: "Payment was not successful"
     });
-  }
-
-  // ✅ PRODUCTION — DO NOT MARK SUCCESS
-  console.log("⏳ Payment pending, waiting for confirmation");
-
-  return res.json({
-    status: "pending",
-    message: "Payment is being processed. Please wait.",
-  });
-}
-
-/**
- * FAILED — PAYMENT NOT SUCCESSFUL
- */
-booking.paymentStatus = "failed";
-await booking.save();
-
-return res.json({
-  status: "failed",
-  message: "Payment was not successful",
-});
 
   } catch (err) {
     console.error("❌ Verification error:", err);
