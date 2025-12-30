@@ -490,124 +490,65 @@ exports.createSmartGatewayPayment = async (req, res) => {
   try {
     const { bookingId } = req.body;
 
-    console.log(
-      "\n===================== PAYMENT DEBUG LOG ====================="
-    );
-
-    // Fetch booking with module info
     const booking = await Booking.findById(bookingId)
       .populate("userId")
       .populate("venueId")
       .populate("makeupId")
-      .populate("moduleId")
       .populate("photographyId")
       .populate("cateringId");
 
     if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: "Booking not found",
-      });
+      return res.status(404).json({ success: false, message: "Booking not found" });
     }
 
-    const moduleType = booking.moduleType;
-    console.log("📌 Module Type:", moduleType);
-
-    // Get advance amount
+    /* ================= AMOUNT LOGIC ================= */
     let advanceAmount = Number(booking.advanceAmount) || 0;
-    console.log("🔥 advanceAmount from Booking:", advanceAmount);
 
     if (advanceAmount <= 0) {
-      console.log("⚠️ advanceAmount missing — applying fallback logic");
-
-      if (moduleType === "Venues") {
-        advanceAmount = Number(booking.venueId?.advanceDeposit) || 0;
-      } else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+      if (booking.moduleType === "Makeup Artist")
         advanceAmount = Number(booking.makeupId?.advanceBookingAmount) || 0;
-      } else if (moduleType === "Photography") {
-        advanceAmount =
-          Number(booking.photographyId?.advanceBookingAmount) || 0;
-      } else if (moduleType === "Catering") {
+      if (booking.moduleType === "Photography")
+        advanceAmount = Number(booking.photographyId?.advanceBookingAmount) || 0;
+      if (booking.moduleType === "Catering")
         advanceAmount = Number(booking.cateringId?.advanceBookingAmount) || 0;
-      }
     }
-
-    console.log("✅ Final Computed Advance Amount:", advanceAmount);
 
     if (advanceAmount <= 0) {
       return res.status(400).json({
         success: false,
-        message: `No advance amount configured for ${moduleType}`,
+        message: "No advance amount configured",
       });
     }
 
-    const amountInRupees = advanceAmount.toFixed(2);
-    console.log("🏦 FINAL AMOUNT SENT TO HDFC:", amountInRupees);
-
-    // ✅ FIX: Create orderId that includes bookingId
+    const amount = advanceAmount.toFixed(2);
     const orderId = `order_${bookingId}_${Date.now()}`;
 
-    // ✅ TWO RETURN URL STRATEGIES:
+    /* ================= RETURN URL ================= */
+    // ⚠️ MUST be static — HDFC may strip params
+    const returnUrl = "https://bookmyevent.ae/payment-success/index.html";
 
-    // Strategy 1: Direct with bookingId (preferred)
-    // const returnUrl = `https://bookmyevent.ae/payment-success/index.html?bookingId=${bookingId}`;
-    const returnUrl = `https://bookmyevent.ae/payment-success/index.html`;
-    // Strategy 2: With order_id (if Juspay sends this)
-    // const returnUrl = `https://bookmyevent.ae/payment-success/index.html`;
-    // Juspay will append: ?order_id=xxx&status=xxx
-
-    console.log("🔗 Return URL:", returnUrl);
-    console.log("🆔 Order ID (contains bookingId):", orderId);
-    console.log("📌 BookingId in URL:", bookingId);
-
-    // ✅ IMPORTANT: Verify the return URL is correctly formatted
-    try {
-      const testUrl = new URL(returnUrl);
-      console.log("✅ Return URL is valid");
-      console.log("   Host:", testUrl.host);
-      console.log("   Path:", testUrl.pathname);
-      console.log("   Query:", testUrl.search);
-    } catch (e) {
-      console.error("❌ Invalid return URL:", e.message);
-    }
-
-    // Create Juspay Order with metadata
-    const orderResponse = await juspay.order.create({
+    /* ================= CREATE ORDER ================= */
+    await juspay.order.create({
       order_id: orderId,
-      amount: amountInRupees,
+      amount,
       currency: "INR",
       customer_id: booking.userId._id.toString(),
       customer_email: booking.userId.email,
       customer_phone: booking.userId.mobile || "9999999999",
-      description: `Advance Payment ₹${amountInRupees}`,
+      description: `Advance Payment ₹${amount}`,
       return_url: returnUrl,
-      // ✅ Store bookingId in metadata
-      metadata: {
-        bookingId: bookingId,
-        moduleType: booking.moduleType,
-      },
+
+      // ✅ HDFC UDF FIELDS (VISIBLE IN DASHBOARD + ORDER STATUS API)
+      udf1: bookingId,
+      udf2: booking.moduleType,
+      udf3: booking.userId._id.toString(),
     });
 
-    console.log("✅ Order created:", orderResponse);
-
-    // Update booking with orderId
-    await Booking.findByIdAndUpdate(
-      bookingId,
-      {
-        paymentOrderId: orderId,
-        paymentStatus: "initiated",
-        paidAmount: advanceAmount,
-      },
-      { new: true }
-    );
-
-    console.log("✅ Booking updated with payment orderId:", orderId);
-
-    // Create Payment Session
+    /* ================= CREATE SESSION ================= */
     const session = await juspay.orderSession.create({
       order_id: orderId,
       action: "paymentPage",
-      amount: amountInRupees,
+      amount,
       currency: "INR",
       customer_id: booking.userId._id.toString(),
       customer_email: booking.userId.email,
@@ -616,119 +557,52 @@ exports.createSmartGatewayPayment = async (req, res) => {
       return_url: returnUrl,
       redirect: true,
       auto_redirect: true,
-      description: `Advance Payment ₹${amountInRupees}`,
-      first_name: booking.userId.firstName || "",
-      last_name: booking.userId.lastName || "",
-      metadata: {
-        bookingId: bookingId,
-        moduleType: booking.moduleType,
-      },
     });
 
-    console.log("🎯 Payment Page:", session.payment_links?.web);
-    console.log("🔗 Session Return URL:", session.return_url);
-
-    // Clean SDK Payload
-    const sdkPayload = JSON.parse(JSON.stringify(session.sdk_payload));
-    if (sdkPayload?.payload?.returnUrl) {
-      console.log("⚠️ Removing returnUrl from SDK payload");
-      delete sdkPayload.payload.returnUrl;
-    }
+    /* ================= SAVE BOOKING ================= */
+    booking.paymentOrderId = orderId;
+    booking.paymentStatus = "initiated";
+    booking.paidAmount = advanceAmount;
+    await booking.save();
 
     return res.json({
       success: true,
       order_id: orderId,
-      bookingId: bookingId, // ✅ Return bookingId explicitly
-      advanceAmount: amountInRupees,
+      bookingId,
+      advanceAmount: amount,
       payment_links: session.payment_links,
-      sdk_payload: sdkPayload,
       return_url: returnUrl,
     });
-  } catch (error) {
-    console.error("❌ Payment Error:", error.response?.data || error.message);
-    return res.status(500).json({
-      success: false,
-      error: error.response?.data || error.message,
-    });
+
+  } catch (err) {
+    console.error("❌ Payment Error:", err.message);
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
+
 /**
  * JUSPAY WEBHOOK HANDLER
  */
 exports.juspayWebhook = async (req, res) => {
   try {
-    console.log("🔔 JUSPAY WEBHOOK:", req.body);
-
     const { order_id, status } = req.body;
     if (!order_id) return res.sendStatus(200);
 
-    /* =========================
-       UPDATE BOOKING (IMPORTANT)
-    ========================== */
-    const booking = await Booking.findOne({
-      paymentOrderId: order_id,
-    });
+    /* ================= UPDATE BOOKING ================= */
+    const booking = await Booking.findOne({ paymentOrderId: order_id });
 
     if (booking) {
       if (status === "CHARGED") {
         booking.paymentStatus = "completed";
-        booking.paidAmount =
-          booking.paidAmount || booking.advanceAmount || 0;
       } else if (status === "FAILED") {
         booking.paymentStatus = "failed";
       }
       await booking.save();
-      console.log("✅ Booking updated via webhook:", booking._id);
-    }
-
-    /* =========================
-       SUBSCRIPTION HANDLING
-    ========================== */
-    const subscription = await Subscription.findOne({
-      paymentId: order_id,
-    }).populate("planId");
-
-    if (!subscription) {
-      console.log("⚠️ Webhook: Subscription not found for", order_id);
-      return res.sendStatus(200);
-    }
-
-    if (subscription.status === "active") {
-      console.log("✅ Webhook: Subscription already active");
-      return res.sendStatus(200);
-    }
-
-    if (status === "CHARGED") {
-      console.log("✅ Webhook: Subscription payment CHARGED");
-
-      await Subscription.updateMany(
-        {
-          userId: subscription.userId,
-          moduleId: subscription.moduleId,
-          _id: { $ne: subscription._id },
-        },
-        { status: "cancelled", isCurrent: false }
-      );
-
-      const plan = subscription.planId;
-      subscription.status = "active";
-      subscription.startDate = new Date();
-      subscription.endDate = new Date(
-        Date.now() + plan.durationInDays * 24 * 60 * 60 * 1000
-      );
-      subscription.isCurrent = true;
-
-      await subscription.save();
-    }
-
-    if (status === "FAILED") {
-      subscription.status = "cancelled";
-      await subscription.save();
     }
 
     return res.sendStatus(200);
   } catch (err) {
-    console.error("❌ WEBHOOK ERROR:", err);
+    console.error("❌ Webhook Error:", err.message);
     return res.sendStatus(200);
   }
 };
@@ -1111,81 +985,67 @@ exports.verifyBookingPayment = async (req, res) => {
   try {
     let { bookingId, orderId } = req.query;
 
-    console.log("🔍 Verify request:", { bookingId, orderId });
-
-    // ✅ FIX: If orderId is provided, extract bookingId from it
+    // 1️⃣ Extract bookingId from orderId if missing
     if (!bookingId && orderId) {
-      // orderId format: order_BOOKINGID_TIMESTAMP
       const parts = orderId.split("_");
-      if (parts.length >= 3) {
-        bookingId = parts[1]; // Extract bookingId from orderId
-        console.log("📌 Extracted bookingId from orderId:", bookingId);
-      }
+      if (parts.length >= 3) bookingId = parts[1];
     }
 
-    if (!bookingId) {
-      console.log("❌ No bookingId found");
+    // 2️⃣ If we still don't have orderId → FAIL
+    if (!orderId) {
       return res.json({
         status: "failed",
-        message: "Invalid booking reference",
+        message: "Invalid payment reference",
       });
     }
 
-    const booking = await Booking.findById(bookingId);
+    // 3️⃣ Check order status FIRST (bank source of truth)
+    const order = await juspay.order.status(orderId);
 
-    if (!booking) {
-      console.log("❌ Booking not found:", bookingId);
-      return res.json({ status: "failed", message: "Booking not found" });
-    }
-
-    if (!booking.paymentOrderId) {
-      console.log("❌ No payment order ID in booking");
-      return res.json({ status: "failed", message: "No payment initiated" });
-    }
-
-    // Check Juspay order status
-    const order = await juspay.order.status(booking.paymentOrderId);
     console.log("🧾 JUSPAY STATUS:", order.status);
 
-    // ✅ REAL SUCCESS
+    // 4️⃣ Handle CHARGED
     if (order.status === "CHARGED") {
-      booking.paymentStatus = "completed";
-      booking.paidAmount = order.amount;
-      await booking.save();
+      if (bookingId) {
+        await Booking.findByIdAndUpdate(bookingId, {
+          paymentStatus: "completed",
+          paymentOrderId: orderId,
+          paidAmount: order.amount,
+        });
+      }
 
       return res.json({
         status: "completed",
-        bookingId: bookingId,
+        bookingId,
         amount: order.amount,
         transactionId: order.order_id,
       });
     }
 
-    // ⏳ PENDING (treat as success in UAT)
+    // 5️⃣ Handle pending states
     if (
       ["PENDING", "AUTHORIZING", "NEW", "PENDING_VBV"].includes(order.status)
     ) {
-      return res.json({
-        status: "completed", // Change to "pending" in production
-        bookingId: bookingId,
-        amount: booking.paidAmount,
-        transactionId: booking.paymentOrderId,
+      return res.json({ status: "pending" });
+    }
+
+    // 6️⃣ FAILED
+    if (bookingId) {
+      await Booking.findByIdAndUpdate(bookingId, {
+        paymentStatus: "failed",
       });
     }
 
-    // ❌ FAILED
-    booking.paymentStatus = "failed";
-    await booking.save();
-
     return res.json({
       status: "failed",
-      message: "Payment was not successful",
+      message: "Payment failed",
     });
+
   } catch (err) {
-    console.error("❌ Verification error:", err);
+    console.error("❌ Verify Error:", err.message);
     return res.json({
       status: "failed",
-      message: "Unable to verify payment",
+      message: "Verification error",
     });
   }
 };
