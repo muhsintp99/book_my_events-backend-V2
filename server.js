@@ -559,6 +559,7 @@ app.use("/api/portfolio", require("./routes/vendor/portfolioRoutes"));
 app.use("/api/photography-packages", require("./routes/vendor/photographyPackageRoutes"));
 app.use("/api/enquiries", require("./routes/vendor/enquiryRoutes"));
 app.use("/api/availability", require("./routes/vendor/availabilityRoutes"));
+app.use("/api/cakes", require("./routes/vendor/cakePackageRoutes"));
 
 
 
