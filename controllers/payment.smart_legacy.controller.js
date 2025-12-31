@@ -1032,3 +1032,38 @@ exports.verifyBookingPayment = async (req, res) => {
     return res.json({ status: "failed", message: "Verification error" });
   }
 };
+
+
+
+
+// ===============================
+// GET LATEST PAYMENT (FALLBACK)
+// ===============================
+exports.getLatestPayment = async (req, res) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ success: false });
+    }
+
+    const booking = await Booking.findOne({
+      userId,
+      paymentStatus: { $in: ["initiated", "pending", "completed"] }
+    }).sort({ updatedAt: -1 });
+
+    if (!booking) {
+      return res.json({ success: false });
+    }
+
+    return res.json({
+      success: true,
+      bookingId: booking._id,
+      orderId: booking.paymentOrderId
+    });
+
+  } catch (error) {
+    console.error("❌ getLatestPayment error:", error);
+    return res.status(500).json({ success: false });
+  }
+};

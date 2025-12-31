@@ -33,6 +33,9 @@ router.post(
 
 router.get("/verify", controller.verifyBookingPayment);
 
+router.get("/latest", controller.getLatestPayment);
+
+
 
 
 module.exports = router;
