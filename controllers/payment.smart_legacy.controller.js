@@ -989,23 +989,50 @@ exports.verifyBookingPayment = async (req, res) => {
   try {
     let { bookingId, orderId } = req.query;
 
-    // 🔐 orderId is SOURCE OF TRUTH
+    console.log("🔍 Verify request:", { bookingId, orderId });
+
+    /* ======================================
+       🔥 RECOVERY LOGIC (ADD THIS PART)
+    ====================================== */
+
+    // 1️⃣ Try bookingId → orderId
     if (!orderId && bookingId) {
       const booking = await Booking.findById(bookingId);
       orderId = booking?.paymentOrderId;
     }
 
+    // 2️⃣ FINAL SAFETY NET (HDFC STRIPS EVERYTHING)
     if (!orderId) {
-      return res.json({ status: "failed", message: "Invalid payment reference" });
+      const latest = await Booking.findOne({
+        paymentStatus: { $in: ["initiated", "pending"] }
+      }).sort({ createdAt: -1 });
+
+      orderId = latest?.paymentOrderId;
+      bookingId = latest?._id;
     }
+
+    // 3️⃣ Still missing → hard fail
+    if (!orderId) {
+      return res.json({
+        status: "failed",
+        message: "Payment reference not found"
+      });
+    }
+
+    /* ======================================
+       🔐 VERIFY WITH JUSPAY
+    ====================================== */
 
     const order = await juspay.order.status(orderId);
 
-    const booking = await Booking.findOne({ paymentOrderId: orderId });
+    const booking = await Booking.findOne({
+      paymentOrderId: orderId
+    });
 
     if (order.status === "CHARGED") {
       if (booking) {
         booking.paymentStatus = "completed";
+        booking.paidAmount = order.amount;
         await booking.save();
       }
 
@@ -1029,13 +1056,13 @@ exports.verifyBookingPayment = async (req, res) => {
     return res.json({ status: "failed" });
 
   } catch (err) {
-    return res.json({ status: "failed", message: "Verification error" });
+    console.error("❌ verifyBookingPayment error:", err);
+    return res.json({
+      status: "failed",
+      message: "Verification error"
+    });
   }
 };
-
-
-
-
 // ===============================
 // GET LATEST PAYMENT (FALLBACK)
 // ===============================
@@ -1066,4 +1093,15 @@ exports.getLatestPayment = async (req, res) => {
     console.error("❌ getLatestPayment error:", error);
     return res.status(500).json({ success: false });
   }
+};
+
+module.exports = {
+  testConnection: exports.testConnection,
+  createSmartGatewayPayment: exports.createSmartGatewayPayment,
+  juspayWebhook: exports.juspayWebhook,
+  createSubscriptionPayment: exports.createSubscriptionPayment,
+  verifySubscriptionPayment: exports.verifySubscriptionPayment,
+  handleJuspayResponse: exports.handleJuspayResponse,
+  verifyBookingPayment: exports.verifyBookingPayment,
+  getLatestPayment: exports.getLatestPayment,
 };

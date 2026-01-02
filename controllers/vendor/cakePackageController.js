@@ -1,365 +1,149 @@
-const CakePackage = require("../../models/vendor/cakePackageModel");
-const Category = require("../../models/admin/category");
-const mongoose = require("mongoose");
-const fs = require("fs");
-const path = require("path");
+const Cake = require("../../models/vendor/cakePackageModel");
 
-/* =====================================================
-   HELPERS
-===================================================== */
-
-const parseArray = (value) => {
-  if (!value) return [];
-  if (Array.isArray(value)) return value;
-
+/* ================= CREATE CAKE ================= */
+exports.createCake = async (req, res) => {
   try {
-    return JSON.parse(value);
-  } catch {
-    return value
-      .replace(/[\[\]"']/g, "")
-      .split(",")
-      .map((v) => v.trim())
-      .filter(Boolean);
-  }
-};
+    const body = req.body;
 
-const parseObject = (value) => {
-  if (!value) return {};
-  if (typeof value === "object") return value;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return {};
-  }
-};
+    const cake = await Cake.create({
+      name: body.name,
+      shortDescription: body.shortDescription,
+      category: body.category,
 
-const deleteFiles = (files = []) => {
-  files.forEach((file) => {
-    const filePath = path.join(__dirname, `../../${file}`);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-  });
-};
+      itemType: body.itemType,
+      isHalal: body.isHalal === "true",
+      isActive: body.isActive === "true",
+      isTopPick: body.isTopPick === "true",
 
-/* =====================================================
-   CREATE CAKE PACKAGE
-===================================================== */
-exports.createCakePackage = async (req, res) => {
-  try {
-    const body = { ...req.body };
+      nutrition: body.nutrition ? JSON.parse(body.nutrition) : [],
+      allergenIngredients: body.allergenIngredients
+        ? JSON.parse(body.allergenIngredients)
+        : [],
 
-    body.provider = req.user._id;
-    body.nutrition = parseArray(body.nutrition);
-    body.allergenIngredients = parseArray(body.allergenIngredients);
-    body.subCategories = parseArray(body.subCategories);
-    body.timeSchedule = parseObject(body.timeSchedule);
-    body.priceInfo = parseObject(body.priceInfo);
+      variations: body.variations ? JSON.parse(body.variations) : [],
+      searchTags: body.searchTags ? JSON.parse(body.searchTags) : [],
+      subCategories: body.subCategories ? JSON.parse(body.subCategories) : [],
 
-    /* ================= IMAGES ================= */
+      timeSchedule: body.timeSchedule
+        ? JSON.parse(body.timeSchedule)
+        : {},
 
-    if (req.files?.thumbnail?.[0]) {
-      body.thumbnail = `/uploads/cake/${req.files.thumbnail[0].filename}`;
-    }
+      priceInfo: body.priceInfo
+        ? JSON.parse(body.priceInfo)
+        : {},
 
-    if (req.files?.gallery) {
-      body.gallery = req.files.gallery.map(
-        (f) => `/uploads/cake/${f.filename}`
-      );
-    }
+      thumbnail: req.files?.thumbnail?.[0]?.path,
+      images: req.files?.images?.map(f => f.path) || []
+    });
 
-    /* ================= CATEGORY VALIDATION ================= */
-
-    const parentCategory = await Category.findById(body.category).lean();
-    if (!parentCategory) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid category",
-      });
-    }
-
-    if (body.subCategories?.length) {
-      const validSubIds = parentCategory.subCategories.map((s) =>
-        s._id.toString()
-      );
-
-      body.subCategories = body.subCategories.filter((id) =>
-        validSubIds.includes(id.toString())
-      );
-    }
-
-    const cake = await CakePackage.create(body);
-
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "Cake package created successfully",
-      data: cake,
+      data: cake
     });
-  } catch (err) {
-    console.error("Create Cake Error:", err);
-    res.status(500).json({ success: false, message: err.message });
+  } catch (error) {
+    console.error("CREATE CAKE ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
 
-/* =====================================================
-   GET ALL CAKES (VENDOR)
-===================================================== */
-exports.getAllCakePackages = async (req, res) => {
-  try {
-    const cakes = await CakePackage.find({ provider: req.user._id })
-      .populate({
-        path: "category",
-        select: "title image subCategories",
-      })
-      .lean();
 
-    for (const cake of cakes) {
-      if (cake.subCategories?.length) {
-        cake.subCategories = cake.category.subCategories
-          .filter((sub) =>
-            cake.subCategories.map(String).includes(sub._id.toString())
-          )
-          .map((sub) => ({
-            _id: sub._id,
-            title: sub.title,
-            image: sub.image,
-          }));
-      }
-      delete cake.category.subCategories;
-    }
+/* ================= GET ALL CAKES ================= */
+exports.getAllCakes = async (req, res) => {
+  try {
+    const cakes = await Cake.find()
+      .populate("store category subCategories provider")
+      .sort({ createdAt: -1 });
 
     res.json({
       success: true,
-      count: cakes.length,
-      data: cakes,
+      data: cakes
     });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
 
-/* =====================================================
-   GET CAKES BY PROVIDER (PUBLIC)
-===================================================== */
-exports.getCakesByProvider = async (req, res) => {
+/* ================= GET SINGLE CAKE ================= */
+exports.getCakeById = async (req, res) => {
   try {
-    const { providerId } = req.params;
+    const cake = await Cake.findById(req.params.id)
+      .populate("store category subCategories provider");
 
-    if (!mongoose.Types.ObjectId.isValid(providerId)) {
-      return res.status(400).json({
+    if (!cake) {
+      return res.status(404).json({
         success: false,
-        message: "Invalid provider ID",
+        message: "Cake not found"
       });
     }
 
-    const cakes = await CakePackage.find({
-      provider: providerId,
-      isActive: true,
-    })
-      .populate("category", "title image")
-      .lean();
-
     res.json({
       success: true,
-      count: cakes.length,
-      data: cakes,
+      data: cake
     });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-/* =====================================================
-   GET SINGLE CAKE
-===================================================== */
-exports.getCakePackageById = async (req, res) => {
-  try {
-    const cake = await CakePackage.findById(req.params.id)
-      .populate("category", "title image subCategories")
-      .lean();
-
-    if (!cake)
-      return res.status(404).json({ success: false, message: "Not found" });
-
-    if (cake.subCategories?.length) {
-      cake.subCategories = cake.category.subCategories
-        .filter((sub) =>
-          cake.subCategories.map(String).includes(sub._id.toString())
-        )
-        .map((sub) => ({
-          _id: sub._id,
-          title: sub.title,
-          image: sub.image,
-        }));
-    }
-
-    delete cake.category.subCategories;
-
-    res.json({ success: true, data: cake });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-/* =====================================================
-   SEARCH CAKES
-===================================================== */
-exports.searchCakePackages = async (req, res) => {
-  try {
-    const { keyword } = req.query;
-
-    const query = { isActive: true };
-
-    if (keyword) {
-      query.$or = [
-        { name: new RegExp(keyword, "i") },
-        { itemType: new RegExp(keyword, "i") },
-      ];
-    }
-
-    const cakes = await CakePackage.find(query)
-      .populate("category", "title image")
-      .lean();
-
-    res.json({
-      success: true,
-      count: cakes.length,
-      data: cakes,
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-/* =====================================================
-   TOGGLES
-===================================================== */
-exports.toggleTopPickStatus = async (req, res) => {
-  const cake = await CakePackage.findById(req.params.id);
-  if (!cake)
-    return res.status(404).json({ success: false, message: "Not found" });
-
-  cake.isTopPick = !cake.isTopPick;
-  await cake.save();
-
-  res.json({ success: true, isTopPick: cake.isTopPick });
-};
-/* =====================================================
-   GET TOP PICK CAKES (PUBLIC)
-===================================================== */
-exports.getTopPickCakes = async (req, res) => {
-  try {
-    const cakes = await CakePackage.find({
-      isTopPick: true,
-      isActive: true,
-    })
-      .populate("category", "title image")
-      .lean();
-
-    res.json({
-      success: true,
-      count: cakes.length,
-      data: cakes,
-    });
-  } catch (err) {
+  } catch (error) {
     res.status(500).json({
       success: false,
-      message: err.message,
+      message: error.message
     });
   }
 };
 
-exports.toggleActiveStatus = async (req, res) => {
-  const cake = await CakePackage.findById(req.params.id);
-  if (!cake)
-    return res.status(404).json({ success: false, message: "Not found" });
-
-  cake.isActive = !cake.isActive;
-  await cake.save();
-
-  res.json({ success: true, isActive: cake.isActive });
-};
-
-/* =====================================================
-   UPDATE CAKE
-===================================================== */
-exports.updateCakePackage = async (req, res) => {
+/* ================= UPDATE CAKE ================= */
+exports.updateCake = async (req, res) => {
   try {
-    const cake = await CakePackage.findById(req.params.id);
-    if (!cake)
-      return res.status(404).json({ success: false, message: "Not found" });
+    const cake = await Cake.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
 
-    if (cake.provider.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, message: "Unauthorized" });
+    if (!cake) {
+      return res.status(404).json({
+        success: false,
+        message: "Cake not found"
+      });
     }
-
-    const body = { ...req.body };
-    body.subCategories = parseArray(body.subCategories);
-    body.priceInfo = parseObject(body.priceInfo);
-
-    if (body.category) {
-      const parent = await Category.findById(body.category).lean();
-      if (!parent)
-        return res.status(400).json({
-          success: false,
-          message: "Invalid category",
-        });
-
-      if (body.subCategories?.length) {
-        const validSubIds = parent.subCategories.map((s) =>
-          s._id.toString()
-        );
-        body.subCategories = body.subCategories.filter((id) =>
-          validSubIds.includes(id.toString())
-        );
-      }
-    }
-
-    /* ================= IMAGE UPDATE ================= */
-
-    if (req.files?.thumbnail?.[0]) {
-      if (cake.thumbnail) deleteFiles([cake.thumbnail]);
-      body.thumbnail = `/uploads/cake/${req.files.thumbnail[0].filename}`;
-    }
-
-    if (req.files?.gallery) {
-      deleteFiles(cake.gallery || []);
-      body.gallery = req.files.gallery.map(
-        (f) => `/uploads/cake/${f.filename}`
-      );
-    }
-
-    Object.assign(cake, body);
-    await cake.save();
 
     res.json({
       success: true,
       message: "Cake updated successfully",
+      data: cake
     });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
 
-/* =====================================================
-   DELETE CAKE
-===================================================== */
-exports.deleteCakePackage = async (req, res) => {
-  const cake = await CakePackage.findById(req.params.id);
-  if (!cake)
-    return res.status(404).json({ success: false, message: "Not found" });
+/* ================= DELETE CAKE ================= */
+exports.deleteCake = async (req, res) => {
+  try {
+    const cake = await Cake.findByIdAndDelete(req.params.id);
 
-  if (cake.provider.toString() !== req.user._id.toString()) {
-    return res.status(403).json({ success: false, message: "Unauthorized" });
+    if (!cake) {
+      return res.status(404).json({
+        success: false,
+        message: "Cake not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Cake deleted successfully"
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
-
-  deleteFiles(cake.gallery || []);
-  if (cake.thumbnail) deleteFiles([cake.thumbnail]);
-
-  await cake.deleteOne();
-
-  res.json({
-    success: true,
-    message: "Cake deleted successfully",
-  });
 };

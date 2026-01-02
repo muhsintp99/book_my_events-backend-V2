@@ -6,108 +6,134 @@ const CakeSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
-      trim: true,
-      maxlength: 100,
+      trim: true
     },
 
-    description: {
+    shortDescription: {
       type: String,
-      trim: true,
-      maxlength: 500,
+      required: true
     },
 
-    /* ================= CATEGORY (SAME AS TRANSPORT) ================= */
+    /* ================= IMAGES ================= */
+    thumbnail: {
+      type: String, // /uploads/cake/xxx.jpg
+      required: true
+    },
+
+    images: [
+      {
+        type: String
+      }
+    ],
+
+    /* ================= STORE & CATEGORY ================= */
+    // store: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "Store",
+    //   required: true
+    // },
+
     category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
-      required: true,
+      required: true
     },
 
     subCategories: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Category",
-      },
+        ref: "SubCategory"
+      }
     ],
 
-    /* ================= IMAGES ================= */
-    thumbnail: {
+    itemType: {
       type: String,
+      enum: ["Veg", "Non-Veg"],
+      default: "Veg"
     },
 
-    images: [
+    /* ================= NUTRITION & ALLERGEN ================= */
+    nutrition: [
       {
-        type: String,
-      },
+        type: String
+      }
     ],
+
+    allergenIngredients: [
+      {
+        type: String
+      }
+    ],
+
+    isHalal: {
+      type: Boolean,
+      default: false
+    },
+
+    /* ================= TIME SCHEDULE ================= */
+    timeSchedule: {
+      startTime: {
+        type: String // "10:00"
+      },
+      endTime: {
+        type: String // "22:00"
+      }
+    },
 
     /* ================= PRICE INFO ================= */
     priceInfo: {
       unitPrice: {
         type: Number,
-        required: true,
-        min: 0,
+        required: true
+      },
+      discountType: {
+        type: String,
+        enum: ["Percent", "Amount"],
+        default: "Percent"
       },
       discount: {
         type: Number,
-        default: 0,
-        min: 0,
-        max: 100,
-      },
-      advanceBookingAmount: {
-        type: Number,
-        default: 0,
-        min: 0,
+        default: 0
       },
       maxPurchaseQty: {
-        type: Number,
-        min: 1,
-      },
+        type: Number
+      }
     },
 
-    /* ================= OPTIONAL FIELDS ================= */
-    itemType: {
-      type: String, // free text (NO ENUM)
-      trim: true,
-    },
+    /* ================= TAGS ================= */
+    searchTags: [
+      {
+        type: String
+      }
+    ],
 
-    nutrition: [{ type: String }],
-    allergenIngredients: [{ type: String }],
-
-    isHalal: {
-      type: Boolean,
-      default: false,
-    },
-
-    timeSchedule: {
-      startTime: String,
-      endTime: String,
-    },
+    /* ================= VARIATIONS ================= */
+    variations: [
+      {
+        name: String, // eg: "Half Kg", "1 Kg"
+        price: Number
+      }
+    ],
 
     /* ================= STATUS ================= */
-    isTopPick: {
-      type: Boolean,
-      default: false,
-    },
-
     isActive: {
       type: Boolean,
-      default: true,
+      default: true
+    },
+
+    isTopPick: {
+      type: Boolean,
+      default: false
     },
 
     /* ================= PROVIDER ================= */
-    provider: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
+    // provider: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "Provider",
+    //   required: true
+    // }
   },
   { timestamps: true }
 );
-
-/* ================= INDEXES ================= */
-CakeSchema.index({ provider: 1, isActive: 1 });
-CakeSchema.index({ category: 1 });
-CakeSchema.index({ name: "text", description: "text" });
 
 module.exports = mongoose.model("Cake", CakeSchema);
