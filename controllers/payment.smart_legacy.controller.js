@@ -822,10 +822,10 @@ exports.verifySubscriptionPayment = async (req, res) => {
       });
     }
 
-    // 1️⃣ Find subscription in database
+    // 1️⃣ Find subscription in database - populate userId and moduleId for frontend
     const subscription = await Subscription.findOne({
       paymentId: orderId,
-    }).populate("planId");
+    }).populate("planId").populate("userId", "_id email").populate("moduleId", "_id title");
 
     if (!subscription) {
       console.log("❌ Subscription not found for orderId:", orderId);
@@ -845,8 +845,9 @@ exports.verifySubscriptionPayment = async (req, res) => {
     if (subscription.status === "active") {
       console.log("✅ Subscription already active");
       return res.json({
-        status: "completed",
-        subscriptionId: subscription._id,
+        success: true,
+        subscription,
+        message: "Subscription is active",
       });
     }
 
@@ -936,6 +937,7 @@ exports.verifySubscriptionPayment = async (req, res) => {
     });
   }
 };
+
 /**
  * HANDLE PAYMENT RESPONSE (S2S Order Status Check)
  */
