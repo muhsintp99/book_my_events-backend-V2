@@ -54,10 +54,13 @@ const subscriptionSchema = new mongoose.Schema(
       default: "pending"
     },
 
-    paymentId: {
-      type: String,
-      required: true
-    },
+paymentId: {
+  type: String,
+  default: null,     // ✅ BEST PRACTICE
+  index: true        // ✅ Optional but recommended
+},
+
+
 
     // ✅ Payment session stored here
     paymentSession: {
@@ -76,6 +79,16 @@ const subscriptionSchema = new mongoose.Schema(
       type: Boolean,
       default: true
     },
+// Razorpay subscription id
+razorpaySubscriptionId: {
+  type: String,
+  index: true
+},
+
+// Razorpay payment id
+razorpayPaymentId: {
+  type: String
+},
 
     autoRenew: {
       type: Boolean,

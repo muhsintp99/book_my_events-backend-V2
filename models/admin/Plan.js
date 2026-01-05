@@ -57,6 +57,11 @@ const planSchema = new mongoose.Schema(
     },
 
     tags: [{ type: String }],
+// Razorpay Plan ID (created once & reused)
+razorpayPlanId: {
+  type: String,
+  index: true
+},
 
     isPopular: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },

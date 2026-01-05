@@ -11,6 +11,7 @@
     "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
+    "crypto": "^1.0.1",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "expresscheckout-nodejs": "^1.0.0",
@@ -19,6 +20,7 @@
     "mongoose": "^7.0.0",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.6",
+    "razorpay": "^2.9.6",
     "sanitize-filename": "^1.6.3",
     "socket.io": "^4.8.1"
   },

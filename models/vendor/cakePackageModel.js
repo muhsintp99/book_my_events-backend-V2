@@ -6,134 +6,130 @@ const CakeSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
-      trim: true
+      trim: true,
     },
 
     shortDescription: {
       type: String,
-      required: true
+      required: true,
+      trim: true,
     },
 
     /* ================= IMAGES ================= */
     thumbnail: {
-      type: String, // /uploads/cake/xxx.jpg
-      required: true
+      type: String,
+      required: true,
+    },
+
+    // ❌ REMOVED UNIQUE cakeId (THIS WAS CAUSING DUPLICATES)
+    cakeId: {
+      type: String,
+      default: null, // optional, NOT unique
     },
 
     images: [
       {
-        type: String
-      }
+        type: String,
+      },
     ],
 
-    /* ================= STORE & CATEGORY ================= */
-    // store: {
-    //   type: mongoose.Schema.Types.ObjectId,
-    //   ref: "Store",
-    //   required: true
-    // },
-
+    /* ================= CATEGORY ================= */
     category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
-      required: true
+      required: true,
     },
 
     subCategories: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "SubCategory"
-      }
+        ref: "Category",
+      },
     ],
 
+    /* ================= CAKE TYPE ================= */
     itemType: {
       type: String,
       enum: ["Veg", "Non-Veg"],
-      default: "Veg"
+      default: "Veg",
     },
 
-    /* ================= NUTRITION & ALLERGEN ================= */
-    nutrition: [
-      {
-        type: String
-      }
-    ],
-
-    allergenIngredients: [
-      {
-        type: String
-      }
-    ],
+    /* ================= NUTRITION ================= */
+    nutrition: [{ type: String }],
+    allergenIngredients: [{ type: String }],
 
     isHalal: {
       type: Boolean,
-      default: false
+      default: false,
     },
 
-    /* ================= TIME SCHEDULE ================= */
+    /* ================= TIME ================= */
     timeSchedule: {
-      startTime: {
-        type: String // "10:00"
-      },
-      endTime: {
-        type: String // "22:00"
-      }
+      startTime: String,
+      endTime: String,
     },
 
-    /* ================= PRICE INFO ================= */
+    /* ================= PRICE ================= */
     priceInfo: {
       unitPrice: {
         type: Number,
-        required: true
+        required: true,
       },
       discountType: {
         type: String,
         enum: ["Percent", "Amount"],
-        default: "Percent"
+        default: "Percent",
       },
       discount: {
         type: Number,
-        default: 0
+        default: 0,
       },
-      maxPurchaseQty: {
-        type: Number
-      }
+      maxPurchaseQty: Number,
     },
-
-    /* ================= TAGS ================= */
-    searchTags: [
-      {
-        type: String
-      }
-    ],
 
     /* ================= VARIATIONS ================= */
     variations: [
       {
-        name: String, // eg: "Half Kg", "1 Kg"
-        price: Number
-      }
+        name: String,
+        price: Number,
+      },
     ],
+
+    /* ================= TAGS ================= */
+    searchTags: [{ type: String }],
 
     /* ================= STATUS ================= */
     isActive: {
       type: Boolean,
-      default: true
+      default: true,
     },
 
     isTopPick: {
       type: Boolean,
-      default: false
+      default: false,
     },
 
     /* ================= PROVIDER ================= */
-    // provider: {
-    //   type: mongoose.Schema.Types.ObjectId,
-    //   ref: "Provider",
-    //   required: true
-    // }
+    provider: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
   },
   { timestamps: true }
 );
+
+/* ================= INDEXES (SAFE ONLY) ================= */
+
+// ✅ Fast provider listing
+CakeSchema.index({ provider: 1, isActive: 1 });
+
+// ✅ Category filter
+CakeSchema.index({ category: 1 });
+
+// ✅ Search support
+CakeSchema.index({ name: "text", searchTags: "text" });
+
+// ❌ NO unique indexes at all
 
 module.exports = mongoose.model("Cake", CakeSchema);

@@ -1919,56 +1919,56 @@ exports.login = async (req, res) => {
       ]);
     }
 
-  let upgradeDetails = {
-  isSubscribed: false,
-  status: "none",
-  plan: null,
-  module: null,
-  billing: null,
-  access: {
-    canAccess: false,
-    isExpired: false,
-    daysLeft: 0
-  }
-};
+    let upgradeDetails = {
+      isSubscribed: false,
+      status: "none",
+      plan: null,
+      module: null,
+      billing: null,
+      access: {
+        canAccess: false,
+        isExpired: false,
+        daysLeft: 0,
+      },
+    };
 
     if (user.role === "vendor") {
-     const subscription = await Subscription.findOne({
-  userId: user._id,
-  status: "active",
-  isCurrent: true,
-  planId: { $ne: null },      // 🔥 KEY FIX
-  endDate: { $gt: new Date() }
-})
-  .sort({ createdAt: -1 })
-  .populate("planId")
-  .populate("moduleId", "title icon");
+      const subscription = await Subscription.findOne({
+        userId: user._id,
+        status: "active",
+        isCurrent: true,
+        planId: { $ne: null }, // 🔥 KEY FIX
+        endDate: { $gt: new Date() },
+      })
+        .sort({ createdAt: -1 })
+        .populate("planId")
+        .populate("moduleId", "title icon");
 
       if (subscription) {
-  const now = new Date();
-  const isExpired = subscription.endDate < now;
-  const daysLeft = Math.max(
-    0,
-    Math.ceil((subscription.endDate - now) / (1000 * 60 * 60 * 24))
-  );
+        const now = new Date();
+        const isExpired = subscription.endDate < now;
+        const daysLeft = Math.max(
+          0,
+          Math.ceil((subscription.endDate - now) / (1000 * 60 * 60 * 24))
+        );
 
-         upgradeDetails = {
-    isSubscribed: subscription.status === "active",
-    status: subscription.status,
-    plan: subscription.planId,
-    module: subscription.moduleId,
-    billing: {
-      startDate: subscription.startDate,
-      endDate: subscription.endDate,
-      paymentId: subscription.paymentId,
-      autoRenew: subscription.autoRenew
-    },
-    access: {
-      canAccess: subscription.status === "active" && !isExpired,
-      isExpired,
-      daysLeft
-    }
-  };
+        upgradeDetails = {
+          isSubscribed: subscription.status === "active",
+          status: subscription.status,
+          plan: subscription.planId,
+          module: subscription.moduleId,
+          billing: {
+            startDate: subscription.startDate,
+            endDate: subscription.endDate,
+            paymentId: subscription.paymentId,
+            autoRenew: subscription.autoRenew,
+          },
+          access: {
+            canAccess: subscription.status === "active" && !isExpired,
+            isExpired,
+            daysLeft,
+          },
+        };
 
         if (vendorProfile) {
           vendorProfile.subscriptionPlan = subscription.planId?._id;
@@ -2154,8 +2154,8 @@ exports.register = async (req, res) => {
       const ModuleModel = mongoose.model("Module");
       const moduleData = await ModuleModel.findById(module);
       const moduleName = moduleData?.title?.toLowerCase() || "";
-const isCakeModule =
-  moduleName === "cake" || moduleName === "cake vendor";
+      const isCakeModule =
+        moduleName === "cake" || moduleName === "cake vendor";
 
       const isBioModule =
         moduleName === "makeup artist" || moduleName === "photography";
@@ -2202,12 +2202,12 @@ const isCakeModule =
             subscriptionEndDate: null,
             lastPaymentDate: null,
             estimatedDeliveryTime: isCakeModule
-  ? {
-      minDays: req.body.minDeliveryDays || null,
-      maxDays: req.body.maxDeliveryDays || null,
-      unit: req.body.deliveryUnit || "days"
-    }
-  : undefined,
+              ? {
+                  minDays: req.body.minDeliveryDays || null,
+                  maxDays: req.body.maxDeliveryDays || null,
+                  unit: req.body.deliveryUnit || "days",
+                }
+              : undefined,
 
             module: mongoose.Types.ObjectId.isValid(module)
               ? new mongoose.Types.ObjectId(module)
