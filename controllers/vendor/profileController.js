@@ -4,8 +4,6 @@ const User = require("../../models/User");
 
 // Create a new profile
 
-const VendorProfile = require("../../models/vendor/vendorProfile");
-
 exports.getAllVendors = async (req, res) => {
   try {
     const vendors = await VendorProfile.find()
