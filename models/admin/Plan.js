@@ -5,7 +5,6 @@ const planSchema = new mongoose.Schema(
     moduleId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Module",
-      required: false,
     },
 
     name: { type: String, required: true },
@@ -17,7 +16,7 @@ const planSchema = new mongoose.Schema(
     durationInDays: { type: Number, required: true },
 
     // -------------------------------
-    // DEFAULT BENEFITS FIELD (SEPARATE)
+    // DEFAULT BENEFITS
     // -------------------------------
     planBenefits: {
       type: [String],
@@ -32,17 +31,14 @@ const planSchema = new mongoose.Schema(
         "Full analytics access",
         "Multi-city listing option",
         "Visible customer contact details for incoming leads",
-        "Maximum photo and video uploads"
-      ]
+        "Maximum photo and video uploads",
+      ],
     },
 
-    // -------------------------------
-    // FEATURES (ADMIN CUSTOM FEATURES)
-    // -------------------------------
     features: { type: [String], default: [] },
 
     // -------------------------------
-    // USAGE LIMITS (OPTIONAL)
+    // LIMITS
     // -------------------------------
     maxUploads: { type: Number },
     maxStorage: { type: Number },
@@ -57,17 +53,28 @@ const planSchema = new mongoose.Schema(
     },
 
     tags: [{ type: String }],
-// Razorpay Plan ID (created once & reused)
-razorpayPlanId: {
-  type: String,
-  index: true
-},
+
+    // ✅ RAZORPAY (ENV SAFE)
+    razorpayPlanIdTest: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    razorpayPlanIdLive: {
+      type: String,
+      default: null,
+      index: true,
+    },
 
     isPopular: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     trialAvailable: { type: Boolean, default: false },
 
-    planType: { type: String, default: "yearly" },
+    planType: {
+      type: String,
+      enum: ["monthly", "yearly"],
+      default: "yearly",
+    },
   },
   { timestamps: true }
 );
