@@ -1,4 +1,5 @@
 const Profile = require("../../models/vendor/Profile");
+const VendorProfile = require("../../models/vendor/vendorProfile");
 const User = require("../../models/User");
 
 // Create a new profile
@@ -137,16 +138,61 @@ exports.getProfileById = async (req, res) => {
   }
 };
 
-// ✅ Get profile by Provider (userId)
+// Get Profile by Provider ID (userId) with Auto-Create
 exports.getProfileByProviderId = async (req, res) => {
   try {
     const { providerId } = req.params;
-    const profile = await Profile.findOne({ userId: providerId }).populate("userId", "name email");
-    if (!profile)
-      return res.status(404).json({ success: false, message: "Profile not found for this provider" });
 
-    res.status(200).json({ success: true, data: profile });
+    // 1. Try to find existing profile
+    let profile = await Profile.findOne({ userId: providerId });
+
+    if (profile) {
+      return res.status(200).json({ success: true, data: profile });
+    }
+
+    // 2. If no profile exists, checking if User exists to Auto-Create
+    const user = await User.findById(providerId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // 3. Check for VendorProfile to get better defaults
+    const vendorProfile = await VendorProfile.findOne({ user: providerId });
+
+    // 4. Prepare default data
+    let vendorName = `${user.firstName} ${user.lastName}`;
+    let mobileNumber = user.phone || "";
+    let businessAddress = "";
+
+    if (vendorProfile) {
+      // User preference: Use Owner Name instead of Store Name
+      vendorName = `${vendorProfile.ownerFirstName} ${vendorProfile.ownerLastName}`;
+      mobileNumber = vendorProfile.ownerPhone || mobileNumber;
+      if (vendorProfile.storeAddress && vendorProfile.storeAddress.fullAddress) {
+        businessAddress = vendorProfile.storeAddress.fullAddress;
+      }
+    }
+
+    // 5. Create new Profile
+    profile = new Profile({
+      userId: providerId,
+      vendorName: vendorName.trim(), // Ensure no extra spaces
+      mobileNumber: mobileNumber,
+      businessAddress: businessAddress,
+      email: user.email,
+      socialLinks: {}
+    });
+
+    await profile.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile created successfully",
+      data: profile
+    });
+
   } catch (error) {
+    console.error("Error fetching/creating profile:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
