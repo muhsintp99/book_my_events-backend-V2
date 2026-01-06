@@ -18,7 +18,7 @@ exports.createSubscription = async (req, res) => {
         message: "providerId and planId are required",
       });
     }
-
+       
     const plan = await Plan.findById(planId);
     if (!plan) {
       return res.status(404).json({
