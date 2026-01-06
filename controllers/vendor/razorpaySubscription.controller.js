@@ -3,8 +3,6 @@ const crypto = require("crypto");
 const Subscription = require("../../models/admin/Subscription");
 const Plan = require("../../models/admin/Plan");
 
-
-
 /**
  * =====================================================
  * CREATE RAZORPAY SUBSCRIPTION (NO PAYMENT YET)
@@ -60,12 +58,14 @@ exports.createSubscription = async (req, res) => {
       console.log("✅ Razorpay plan created:", razorpayPlan.id);
     }
 
+    const totalCount = Math.max(1, Math.ceil(plan.durationInDays / 30));
+
     // ✅ CREATE SUBSCRIPTION
     const razorpaySubscription = await razorpay.subscriptions.create({
-      plan_id: plan.razorpayPlanId,
-      customer_notify: 1,
-      total_count: Math.ceil(plan.durationInDays / 30),
-    });
+  plan_id: plan.razorpayPlanId,
+  customer_notify: 1,
+  total_count: totalCount,
+});
 
     const subscription = await Subscription.create({
       userId: providerId,
@@ -97,8 +97,6 @@ exports.createSubscription = async (req, res) => {
   }
 };
 
-
-
 /**
  * =====================================================
  * VERIFY RAZORPAY SUBSCRIPTION PAYMENT
@@ -126,9 +124,7 @@ exports.verifySubscription = async (req, res) => {
     // 1️⃣ Verify signature
     const expectedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(
-        razorpay_payment_id + "|" + razorpay_subscription_id
-      )
+      .update(razorpay_payment_id + "|" + razorpay_subscription_id)
       .digest("hex");
 
     if (expectedSignature !== razorpay_signature) {
@@ -166,14 +162,12 @@ exports.verifySubscription = async (req, res) => {
     // 4️⃣ Activate subscription
     const startDate = new Date();
     const endDate = new Date();
-    endDate.setDate(
-      endDate.getDate() + subscription.planId.durationInDays
-    );
+    endDate.setDate(endDate.getDate() + subscription.planId.durationInDays);
 
     subscription.status = "active";
     subscription.startDate = startDate;
     subscription.endDate = endDate;
-    subscription.paymentId = razorpay_payment_id;        // ✅ now saved AFTER payment
+    subscription.paymentId = razorpay_payment_id; // ✅ now saved AFTER payment
     subscription.razorpayPaymentId = razorpay_payment_id;
     subscription.isCurrent = true;
 
