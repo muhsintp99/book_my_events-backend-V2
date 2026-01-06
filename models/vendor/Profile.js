@@ -64,10 +64,6 @@
 // });
 
 
-module.exports = mongoose.model("Profile", profileSchema);
-
-
-
 
 
 
