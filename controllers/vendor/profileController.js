@@ -333,20 +333,29 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
-    // ✅ Case 2: User Update (if needed)
+    // ✅ Case 2: User Update
     if (role === "user") {
+      // Logic: The 'id' param is likely the PROFILE ID, not User ID.
+      // We need to resolve the User ID from the Profile first.
+
+      let targetUserId = id; // Default to assuming it's User ID (legacy fallback)
+
+      // Try to find the profile to get the real User ID
+      const profileDoc = await Profile.findById(id);
+      if (profileDoc && profileDoc.userId) {
+        targetUserId = profileDoc.userId;
+      }
+
       const updateFields = {
         firstName: firstName || vendorName, // fallback
         lastName: lastName || "",
         phone: mobileNumber || "",
-        // User model doesn't usually have address, but if yours does:
-        // address: businessAddress || "" 
       };
 
       if (updatedData.socialLinks) updateFields.socialMedia = updatedData.socialLinks;
       if (updatedData.profilePhoto) updateFields.profilePhoto = updatedData.profilePhoto;
 
-      const user = await User.findByIdAndUpdate(id, updateFields, { new: true });
+      const user = await User.findByIdAndUpdate(targetUserId, updateFields, { new: true });
 
       if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
