@@ -1,13 +1,13 @@
-// controllers/vendor/razorpaySubscription.controller.js
-
 const razorpay = require("../../config/razorpay");
 const crypto = require("crypto");
 const Subscription = require("../../models/admin/Subscription");
 const Plan = require("../../models/admin/Plan");
 
+
+
 /**
  * =====================================================
- * CREATE RAZORPAY SUBSCRIPTION
+ * CREATE RAZORPAY SUBSCRIPTION (NO PAYMENT YET)
  * =====================================================
  */
 exports.createSubscription = async (req, res) => {
@@ -21,6 +21,7 @@ exports.createSubscription = async (req, res) => {
       });
     }
 
+    // 1️⃣ Fetch plan from DB
     const plan = await Plan.findById(planId);
     if (!plan) {
       return res.status(404).json({
@@ -29,12 +30,9 @@ exports.createSubscription = async (req, res) => {
       });
     }
 
-    console.log("🧪 Razorpay Mode:",
-      process.env.RAZORPAY_KEY_ID.startsWith("rzp_test_") ? "TEST" : "LIVE"
-    );
-
     /**
-     * 1️⃣ Create Razorpay Plan if missing
+     * 2️⃣ AUTO-CREATE RAZORPAY PLAN (TEST MODE SAFE)
+     *    ✅ THIS IS THE CORRECT PLACE
      */
     if (!plan.razorpayPlanId) {
       const razorpayPlan = await razorpay.plans.create({
@@ -42,38 +40,26 @@ exports.createSubscription = async (req, res) => {
         interval: 1,
         item: {
           name: plan.name,
-          amount: plan.price * 100, // ₹ → paise
-          currency: "INR",
-          description: `${plan.name} (${plan.planType})`,
+          amount: plan.price * 100, // paise
+          currency: plan.currency || "INR",
+          description: `Auto plan for ${plan.name}`,
         },
       });
 
       plan.razorpayPlanId = razorpayPlan.id;
       await plan.save();
 
-      console.log("✅ Razorpay plan created:", razorpayPlan.id);
+      console.log("✅ Razorpay plan auto-created:", razorpayPlan.id);
     }
 
-    /**
-     * 2️⃣ Create Razorpay Subscription
-     * IMPORTANT:
-     * - monthly → total_count = 12 (1 year)
-     * - yearly  → total_count = 1
-     */
-    const totalCount =
-      plan.planType === "monthly" ? 12 : 1;
-
+    // 3️⃣ Create Razorpay subscription
     const razorpaySubscription = await razorpay.subscriptions.create({
       plan_id: plan.razorpayPlanId,
-      total_count: totalCount,
       customer_notify: 1,
+      total_count: Math.ceil(plan.durationInDays / 30),
     });
 
-    console.log("✅ Razorpay subscription created:", razorpaySubscription.id);
-
-    /**
-     * 3️⃣ Save in DB
-     */
+    // 4️⃣ Save subscription in DB
     const subscription = await Subscription.create({
       userId: providerId,
       planId: plan._id,
@@ -83,34 +69,46 @@ exports.createSubscription = async (req, res) => {
       isCurrent: false,
     });
 
-    return res.json({
-      success: true,
-      razorpay: {
-        key: process.env.RAZORPAY_KEY_ID,
-        subscriptionId: razorpaySubscription.id,
-      },
-      subscriptionDbId: subscription._id,
-      customer: {
-        email: customerEmail,
-        phone: customerPhone,
-      },
-    });
+    // 5️⃣ Respond
+   return res.json({
+  success: true,
+  message: "Subscription plan created successfully",
+
+  plan: {
+    id: plan._id,
+    name: plan.name,
+    price: plan.price,
+    currency: plan.currency,
+    durationInDays: plan.durationInDays,
+    planType: plan.planType,
+  },
+
+  razorpay: {
+    key: process.env.RAZORPAY_KEY_ID,
+    subscriptionId: razorpaySubscription.id,
+  },
+
+  subscriptionDbId: subscription._id,
+
+  customer: {
+    email: customerEmail,
+    phone: customerPhone,
+  },
+});
 
   } catch (err) {
-    console.error("❌ FULL RAZORPAY ERROR:");
-    console.error(JSON.stringify(err, null, 2));
-
+    console.error("❌ createSubscription error:", err);
     return res.status(500).json({
       success: false,
-      message: "Razorpay subscription creation failed",
-      error: err?.error || err?.message,
+      message: err.message,
     });
   }
 };
 
+
 /**
  * =====================================================
- * VERIFY SUBSCRIPTION PAYMENT
+ * VERIFY RAZORPAY SUBSCRIPTION PAYMENT
  * =====================================================
  */
 exports.verifySubscription = async (req, res) => {
@@ -121,10 +119,22 @@ exports.verifySubscription = async (req, res) => {
       razorpay_signature,
     } = req.body;
 
+    if (
+      !razorpay_payment_id ||
+      !razorpay_subscription_id ||
+      !razorpay_signature
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing Razorpay verification fields",
+      });
+    }
+
+    // 1️⃣ Verify signature
     const expectedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
       .update(
-        `${razorpay_payment_id}|${razorpay_subscription_id}`
+        razorpay_payment_id + "|" + razorpay_subscription_id
       )
       .digest("hex");
 
@@ -135,6 +145,7 @@ exports.verifySubscription = async (req, res) => {
       });
     }
 
+    // 2️⃣ Find subscription
     const subscription = await Subscription.findOne({
       razorpaySubscriptionId: razorpay_subscription_id,
     }).populate("planId");
@@ -146,16 +157,20 @@ exports.verifySubscription = async (req, res) => {
       });
     }
 
-    // cancel previous
+    // 3️⃣ Cancel previous subscriptions (same user + module)
     await Subscription.updateMany(
       {
         userId: subscription.userId,
         moduleId: subscription.moduleId,
         _id: { $ne: subscription._id },
       },
-      { status: "cancelled", isCurrent: false }
+      {
+        status: "cancelled",
+        isCurrent: false,
+      }
     );
 
+    // 4️⃣ Activate subscription
     const startDate = new Date();
     const endDate = new Date();
     endDate.setDate(
@@ -165,6 +180,7 @@ exports.verifySubscription = async (req, res) => {
     subscription.status = "active";
     subscription.startDate = startDate;
     subscription.endDate = endDate;
+    subscription.paymentId = razorpay_payment_id;        // ✅ now saved AFTER payment
     subscription.razorpayPaymentId = razorpay_payment_id;
     subscription.isCurrent = true;
 
@@ -175,7 +191,6 @@ exports.verifySubscription = async (req, res) => {
       message: "Subscription activated successfully",
       subscription,
     });
-
   } catch (err) {
     console.error("❌ verifySubscription error:", err);
     return res.status(500).json({
