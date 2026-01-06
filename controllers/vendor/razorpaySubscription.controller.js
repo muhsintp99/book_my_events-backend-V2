@@ -21,7 +21,6 @@ exports.createSubscription = async (req, res) => {
       });
     }
 
-    // 1️⃣ Fetch plan from DB
     const plan = await Plan.findById(planId);
     if (!plan) {
       return res.status(404).json({
@@ -30,36 +29,44 @@ exports.createSubscription = async (req, res) => {
       });
     }
 
-    /**
-     * 2️⃣ AUTO-CREATE RAZORPAY PLAN (TEST MODE SAFE)
-     *    ✅ THIS IS THE CORRECT PLACE
-     */
+    // 🔴 HARD VALIDATION (IMPORTANT)
+    if (!plan.price || isNaN(plan.price)) {
+      throw new Error("Plan price is invalid");
+    }
+
+    // 🧹 REMOVE OLD PLAN IF CREATED WITH LIVE KEY
+    if (plan.razorpayPlanId && plan.razorpayPlanId.startsWith("plan_")) {
+      console.log("ℹ Existing Razorpay Plan:", plan.razorpayPlanId);
+    } else {
+      plan.razorpayPlanId = null;
+    }
+
+    // ✅ CREATE PLAN IF NOT EXISTS
     if (!plan.razorpayPlanId) {
       const razorpayPlan = await razorpay.plans.create({
         period: plan.planType === "monthly" ? "monthly" : "yearly",
         interval: 1,
         item: {
           name: plan.name,
-          amount: plan.price * 100, // paise
-          currency: plan.currency || "INR",
-          description: `Auto plan for ${plan.name}`,
+          amount: Math.round(Number(plan.price) * 100), // MUST be number
+          currency: "INR",
+          description: `Subscription for ${plan.name}`,
         },
       });
 
       plan.razorpayPlanId = razorpayPlan.id;
       await plan.save();
 
-      console.log("✅ Razorpay plan auto-created:", razorpayPlan.id);
+      console.log("✅ Razorpay plan created:", razorpayPlan.id);
     }
 
-    // 3️⃣ Create Razorpay subscription
+    // ✅ CREATE SUBSCRIPTION
     const razorpaySubscription = await razorpay.subscriptions.create({
       plan_id: plan.razorpayPlanId,
       customer_notify: 1,
       total_count: Math.ceil(plan.durationInDays / 30),
     });
 
-    // 4️⃣ Save subscription in DB
     const subscription = await Subscription.create({
       userId: providerId,
       planId: plan._id,
@@ -69,41 +76,27 @@ exports.createSubscription = async (req, res) => {
       isCurrent: false,
     });
 
-    // 5️⃣ Respond
-   return res.json({
-  success: true,
-  message: "Subscription plan created successfully",
-
-  plan: {
-    id: plan._id,
-    name: plan.name,
-    price: plan.price,
-    currency: plan.currency,
-    durationInDays: plan.durationInDays,
-    planType: plan.planType,
-  },
-
-  razorpay: {
-    key: process.env.RAZORPAY_KEY_ID,
-    subscriptionId: razorpaySubscription.id,
-  },
-
-  subscriptionDbId: subscription._id,
-
-  customer: {
-    email: customerEmail,
-    phone: customerPhone,
-  },
-});
-
+    return res.json({
+      success: true,
+      razorpay: {
+        key: process.env.RAZORPAY_KEY_ID,
+        subscriptionId: razorpaySubscription.id,
+      },
+      subscriptionDbId: subscription._id,
+      customer: {
+        email: customerEmail,
+        phone: customerPhone,
+      },
+    });
   } catch (err) {
-    console.error("❌ createSubscription error:", err);
+    console.error("❌ createSubscription ERROR:", err);
     return res.status(500).json({
       success: false,
-      message: err.message,
+      message: err.error?.description || err.message,
     });
   }
 };
+
 
 
 /**
