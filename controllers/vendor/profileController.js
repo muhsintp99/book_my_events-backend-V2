@@ -1,5 +1,6 @@
 const Profile = require("../../models/vendor/Profile");
 const User = require("../../models/User");
+
 // Create a new profile
 
 const VendorProfile = require("../../models/vendor/vendorProfile");
@@ -63,20 +64,45 @@ exports.getSingleVendor = async (req, res) => {
   }
 };
 
+// exports.createProfile = async (req, res) => {
+//   try {
+//     const { userId, name, address, mobileNumber, socialLinks } = req.body;
+//     const profilePhoto = req.file ? `/uploads/profiles/${req.file.filename}` : "";
+
+//     const profile = await Profile.create({
+//       userId,
+//       name,
+//       address,
+//       mobileNumber,
+//       socialLinks: socialLinks ? JSON.parse(socialLinks) : {},
+//       profilePhoto,
+//     });
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Profile created successfully",
+//       data: profile,
+//     });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
+
+
 exports.createProfile = async (req, res) => {
   try {
-    const { userId, name, address, mobileNumber, socialLinks } = req.body;
+    // UPDATED: Accept vendorName and businessAddress
+    const { userId, vendorName, businessAddress, mobileNumber, socialLinks } = req.body;
     const profilePhoto = req.file ? `/uploads/profiles/${req.file.filename}` : "";
-
     const profile = await Profile.create({
       userId,
-      name,
-      address,
+      vendorName,      // Changed from name
+      businessAddress, // Changed from address
       mobileNumber,
       socialLinks: socialLinks ? JSON.parse(socialLinks) : {},
       profilePhoto,
     });
-
     res.status(201).json({
       success: true,
       message: "Profile created successfully",
@@ -86,6 +112,10 @@ exports.createProfile = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
+
+
 // Get all profiles
 exports.getProfiles = async (req, res) => {
   try {
@@ -123,85 +153,175 @@ exports.getProfileByProviderId = async (req, res) => {
 
 
 // Update profile
+// exports.updateProfile = async (req, res) => {
+//   try {
+//     const { role, name, firstName, lastName, address, mobileNumber, socialLinks } = req.body;
+//     const userId = req.params.id;
+
+//     let updatedData = {};
+
+//     // Parse social links safely
+//     if (socialLinks) {
+//       try {
+//         updatedData.socialLinks = JSON.parse(socialLinks);
+//       } catch (err) {
+//         return res.status(400).json({ success: false, message: "Invalid socialLinks format" });
+//       }
+//     }
+
+//     // Handle profile photo upload (from form-data)
+//     if (req.file) {
+//       updatedData.profilePhoto = `/uploads/profiles/${req.file.filename}`;
+//     }
+
+//     // ✅ Case 1: Vendor update
+//     if (role === "vendor") {
+//       updatedData.name = name;
+//       updatedData.address = address;
+//       updatedData.mobileNumber = mobileNumber;
+
+//       const profile = await Profile.findOneAndUpdate(
+//         { userId },
+//         updatedData,
+//         { new: true, upsert: true }
+//       ).populate("userId", "email role");
+
+//       if (!profile)
+//         return res.status(404).json({ success: false, message: "Vendor profile not found" });
+
+//       return res.status(200).json({
+//         success: true,
+//         message: "Vendor profile updated successfully",
+//         data: profile,
+//       });
+//     }
+
+//     // ✅ Case 2: User update
+//     if (role === "user") {
+//       const updateFields = {
+//         firstName: firstName || name,
+//         lastName: lastName || "",
+//         address: address || "",
+//         phone: mobileNumber || "",
+//         socialMedia: updatedData.socialLinks || {},
+//       };
+
+//       // Attach profile photo if uploaded
+//       if (updatedData.profilePhoto) {
+//         updateFields.profilePhoto = updatedData.profilePhoto;
+//       }
+
+//       const user = await User.findByIdAndUpdate(userId, updateFields, { new: true });
+
+//       if (!user)
+//         return res.status(404).json({ success: false, message: "User not found" });
+
+//       return res.status(200).json({
+//         success: true,
+//         message: "User profile updated successfully",
+//         data: user,
+//       });
+//     }
+
+//     return res.status(400).json({
+//       success: false,
+//       message: "Invalid role. Please provide role as 'vendor' or 'user'.",
+//     });
+//   } catch (error) {
+//     console.error("Update Profile Error:", error);
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
+
+
+
+
+
+// ... existing imports
+
+// Update profile
 exports.updateProfile = async (req, res) => {
   try {
-    const { role, name, firstName, lastName, address, mobileNumber, socialLinks } = req.body;
-    const userId = req.params.id;
+    // 1. Accept ONLY the fields sent by Frontend
+    const { role, vendorName, firstName, lastName, businessAddress, mobileNumber, socialLinks } = req.body;
+
+    // 2. The ID in the URL is the PROFILE ID (based on your frontend call)
+    const id = req.params.id;
 
     let updatedData = {};
 
-    // Parse social links safely
+    // 3. Parse social links safely
     if (socialLinks) {
       try {
-        updatedData.socialLinks = JSON.parse(socialLinks);
+        updatedData.socialLinks = typeof socialLinks === 'string' ? JSON.parse(socialLinks) : socialLinks;
       } catch (err) {
         return res.status(400).json({ success: false, message: "Invalid socialLinks format" });
       }
     }
 
-    // Handle profile photo upload (from form-data)
     if (req.file) {
       updatedData.profilePhoto = `/uploads/profiles/${req.file.filename}`;
     }
 
-    // ✅ Case 1: Vendor update
-    if (role === "vendor") {
-      updatedData.name = name;
-      updatedData.address = address;
-      updatedData.mobileNumber = mobileNumber;
+    // ✅ Case 1: Vendor Update
+    // We Map 'vendorName' -> 'name' and 'businessAddress' -> 'address' to preserve DB Schema
+    if (role === "vendor" || vendorName) {
+      if (vendorName) updatedData.vendorName = vendorName;
+      if (businessAddress) updatedData.businessAddress = businessAddress;
+      if (mobileNumber) updatedData.mobileNumber = mobileNumber;
 
-      const profile = await Profile.findOneAndUpdate(
-        { userId },
-        updatedData,
-        { new: true, upsert: true }
-      ).populate("userId", "email role");
+      // Try finding by ID first
+      let profile = await Profile.findByIdAndUpdate(id, updatedData, { new: true });
+
+      // Fallback: If not found by ID, try finding by userId (just in case)
+      if (!profile) {
+        profile = await Profile.findOneAndUpdate({ userId: id }, updatedData, { new: true });
+      }
 
       if (!profile)
         return res.status(404).json({ success: false, message: "Vendor profile not found" });
 
       return res.status(200).json({
         success: true,
-        message: "Vendor profile updated successfully",
+        message: "Vendor updated successfully",
         data: profile,
       });
     }
 
-    // ✅ Case 2: User update
+    // ✅ Case 2: User Update (if needed)
     if (role === "user") {
       const updateFields = {
-        firstName: firstName || name,
+        firstName: firstName || vendorName, // fallback
         lastName: lastName || "",
-        address: address || "",
         phone: mobileNumber || "",
-        socialMedia: updatedData.socialLinks || {},
+        // User model doesn't usually have address, but if yours does:
+        // address: businessAddress || "" 
       };
 
-      // Attach profile photo if uploaded
-      if (updatedData.profilePhoto) {
-        updateFields.profilePhoto = updatedData.profilePhoto;
-      }
+      if (updatedData.socialLinks) updateFields.socialMedia = updatedData.socialLinks;
+      if (updatedData.profilePhoto) updateFields.profilePhoto = updatedData.profilePhoto;
 
-      const user = await User.findByIdAndUpdate(userId, updateFields, { new: true });
+      const user = await User.findByIdAndUpdate(id, updateFields, { new: true });
 
-      if (!user)
-        return res.status(404).json({ success: false, message: "User not found" });
+      if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
       return res.status(200).json({
         success: true,
-        message: "User profile updated successfully",
+        message: "User updated successfully",
         data: user,
       });
     }
 
-    return res.status(400).json({
-      success: false,
-      message: "Invalid role. Please provide role as 'vendor' or 'user'.",
-    });
+    return res.status(400).json({ success: false, message: "Invalid request" });
+
   } catch (error) {
     console.error("Update Profile Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+
 
 // Delete profile
 exports.deleteProfile = async (req, res) => {
@@ -214,3 +334,5 @@ exports.deleteProfile = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+

@@ -1,18 +1,91 @@
-const mongoose = require("mongoose");
 
-// Social Links Schema
+
+
+// const mongoose = require("mongoose");
+
+// // Social Links Schema
+// const socialLinksSchema = new mongoose.Schema({
+//   facebook: { type: String, trim: true, default: '' },
+//   instagram: { type: String, trim: true, default: '' },
+//   twitter: { type: String, trim: true, default: '' },
+//   // linkedin: { type: String, trim: true, default: '' },
+//   youtube: { type: String, trim: true, default: '' },
+//   // github: { type: String, trim: true, default: '' },
+//   whatsapp: { type: String, trim: true, default: '' },
+//   website: { type: String, trim: true, default: '' },
+//   other: { type: String, trim: true, default: '' }
+// }, { _id: false });
+
+// const profileSchema = new mongoose.Schema(
+//   {
+//     userId: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: "User",
+//       required: true,
+//       unique: true,
+//       index: true
+//     },
+//     name: {
+//       type: String,
+//       trim: true,
+//       required: false,
+//       default: ""
+//     },
+//     address: {
+//       type: String,
+//       trim: true,
+//       required: false,
+//       default: ""
+//     },
+//     profilePhoto: {
+//       type: String,
+//       default: ""
+//     },
+//     mobileNumber: {
+//       type: String,
+//       required: true,
+//       trim: true
+//     },
+//     socialLinks: {
+//       type: socialLinksSchema,
+//       default: () => ({})
+//     },
+//   },
+//   { timestamps: true }
+// );
+// // Index for faster user lookups
+// profileSchema.index({ userId: 1 });
+
+// profileSchema.virtual('profile', {
+//   ref: 'Profile',
+//   localField: '_id',
+//   foreignField: 'userId',  
+//   justOne: true
+// });
+
+
+module.exports = mongoose.model("Profile", profileSchema);
+
+
+
+
+
+
+const mongoose = require("mongoose");
+// Social Links Schema - Updated to match frontend support
 const socialLinksSchema = new mongoose.Schema({
   facebook: { type: String, trim: true, default: '' },
   instagram: { type: String, trim: true, default: '' },
   twitter: { type: String, trim: true, default: '' },
-  // linkedin: { type: String, trim: true, default: '' },
+  linkedin: { type: String, trim: true, default: '' }, // Uncommented
   youtube: { type: String, trim: true, default: '' },
-  // github: { type: String, trim: true, default: '' },
+  pinterest: { type: String, trim: true, default: '' }, // Added
+  snapchat: { type: String, trim: true, default: '' }, // Added
+  telegram: { type: String, trim: true, default: '' }, // Added
   whatsapp: { type: String, trim: true, default: '' },
   website: { type: String, trim: true, default: '' },
   other: { type: String, trim: true, default: '' }
 }, { _id: false });
-
 const profileSchema = new mongoose.Schema(
   {
     userId: {
@@ -22,13 +95,15 @@ const profileSchema = new mongoose.Schema(
       unique: true,
       index: true
     },
-    name: {
+    // Changed 'name' to 'vendorName' to match frontend payload
+    vendorName: {
       type: String,
       trim: true,
       required: false,
       default: ""
     },
-    address: {
+    // Changed 'address' to 'businessAddress' to match frontend payload
+    businessAddress: {
       type: String,
       trim: true,
       required: false,
@@ -52,13 +127,13 @@ const profileSchema = new mongoose.Schema(
 );
 // Index for faster user lookups
 profileSchema.index({ userId: 1 });
-
 profileSchema.virtual('profile', {
   ref: 'Profile',
   localField: '_id',
   foreignField: 'userId',  
   justOne: true
 });
-
-
 module.exports = mongoose.model("Profile", profileSchema);
+
+
+
