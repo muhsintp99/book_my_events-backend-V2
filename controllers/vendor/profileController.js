@@ -285,105 +285,17 @@ exports.getProfileByProviderId = async (req, res) => {
 // ... existing imports
 
 // Update profile
-// exports.updateProfile = async (req, res) => {
-//   try {
-//     // 1. Accept ONLY the fields sent by Frontend
-//     const { role, vendorName, firstName, lastName, businessAddress, mobileNumber, socialLinks } = req.body;
-
-//     // 2. The ID in the URL is the PROFILE ID (based on your frontend call)
-//     const id = req.params.id;
-
-//     let updatedData = {};
-
-//     // 3. Parse social links safely
-//     if (socialLinks) {
-//       try {
-//         updatedData.socialLinks = typeof socialLinks === 'string' ? JSON.parse(socialLinks) : socialLinks;
-//       } catch (err) {
-//         return res.status(400).json({ success: false, message: "Invalid socialLinks format" });
-//       }
-//     }
-
-//     if (req.file) {
-//       updatedData.profilePhoto = `/uploads/profiles/${req.file.filename}`;
-//     }
-
-//     // ✅ Case 1: Vendor Update
-//     // We Map 'vendorName' -> 'name' and 'businessAddress' -> 'address' to preserve DB Schema
-//     if (role === "vendor" || vendorName) {
-//       if (vendorName) updatedData.vendorName = vendorName;
-//       if (businessAddress) updatedData.businessAddress = businessAddress;
-//       if (mobileNumber) updatedData.mobileNumber = mobileNumber;
-
-//       // Try finding by ID first
-//       let profile = await Profile.findByIdAndUpdate(id, updatedData, { new: true });
-
-//       // Fallback: If not found by ID, try finding by userId (just in case)
-//       if (!profile) {
-//         profile = await Profile.findOneAndUpdate({ userId: id }, updatedData, { new: true });
-//       }
-
-//       if (!profile)
-//         return res.status(404).json({ success: false, message: "Vendor profile not found" });
-
-//       return res.status(200).json({
-//         success: true,
-//         message: "Vendor updated successfully",
-//         data: profile,
-//       });
-//     }
-
-//     // ✅ Case 2: User Update
-//     if (role === "user") {
-//       // Logic: The 'id' param is likely the PROFILE ID, not User ID.
-//       // We need to resolve the User ID from the Profile first.
-
-//       let targetUserId = id; // Default to assuming it's User ID (legacy fallback)
-
-//       // Try to find the profile to get the real User ID
-//       const profileDoc = await Profile.findById(id);
-//       if (profileDoc && profileDoc.userId) {
-//         targetUserId = profileDoc.userId;
-//       }
-
-//       const updateFields = {
-//         firstName: firstName || vendorName, // fallback
-//         lastName: lastName || "",
-//         phone: mobileNumber || "",
-//       };
-
-//       if (updatedData.socialLinks) updateFields.socialMedia = updatedData.socialLinks;
-//       if (updatedData.profilePhoto) updateFields.profilePhoto = updatedData.profilePhoto;
-
-//       const user = await User.findByIdAndUpdate(targetUserId, updateFields, { new: true });
-
-//       if (!user) return res.status(404).json({ success: false, message: "User not found" });
-
-//       return res.status(200).json({
-//         success: true,
-//         message: "User updated successfully",
-//         data: user,
-//       });
-//     }
-
-//     return res.status(400).json({ success: false, message: "Invalid request" });
-
-//   } catch (error) {
-//     console.error("Update Profile Error:", error);
-//     res.status(500).json({ success: false, message: error.message });
-//   }
-// };
-
-
-
 exports.updateProfile = async (req, res) => {
   try {
+    // 1. Accept ONLY the fields sent by Frontend
     const { role, vendorName, firstName, lastName, businessAddress, mobileNumber, socialLinks } = req.body;
-    const id = req.params.id; // Could be Profile ID or User ID
+
+    // 2. The ID in the URL is the PROFILE ID (based on your frontend call)
+    const id = req.params.id;
 
     let updatedData = {};
 
-    // Parse social links safely
+    // 3. Parse social links safely
     if (socialLinks) {
       try {
         updatedData.socialLinks = typeof socialLinks === 'string' ? JSON.parse(socialLinks) : socialLinks;
@@ -392,60 +304,50 @@ exports.updateProfile = async (req, res) => {
       }
     }
 
-    // Handle profile photo upload
     if (req.file) {
       updatedData.profilePhoto = `/uploads/profiles/${req.file.filename}`;
     }
 
-    // ✅ VENDOR UPDATE
+    // ✅ Case 1: Vendor Update
+    // We Map 'vendorName' -> 'name' and 'businessAddress' -> 'address' to preserve DB Schema
     if (role === "vendor" || vendorName) {
       if (vendorName) updatedData.vendorName = vendorName;
       if (businessAddress) updatedData.businessAddress = businessAddress;
       if (mobileNumber) updatedData.mobileNumber = mobileNumber;
 
-      let profile;
+      // Try finding by ID first
+      let profile = await Profile.findByIdAndUpdate(id, updatedData, { new: true });
 
-      // STRATEGY: Try multiple approaches to find the profile
-      // 1. First try: Find by Profile ID
-      profile = await Profile.findByIdAndUpdate(id, updatedData, { new: true });
-
-      // 2. Second try: Find by User ID (userId field)
+      // Fallback: If not found by ID, try finding by userId (just in case)
       if (!profile) {
         profile = await Profile.findOneAndUpdate({ userId: id }, updatedData, { new: true });
       }
 
-      // 3. If STILL not found, provide helpful error
-      if (!profile) {
-        return res.status(404).json({
-          success: false,
-          message: "Profile not found. Make sure the ID is valid and the profile exists.",
-          debug: {
-            attemptedId: id,
-            searchedAsProfileId: true,
-            searchedAsUserId: true
-          }
-        });
-      }
+      if (!profile)
+        return res.status(404).json({ success: false, message: "Vendor profile not found" });
 
       return res.status(200).json({
         success: true,
-        message: "Vendor profile updated successfully",
+        message: "Vendor updated successfully",
         data: profile,
       });
     }
 
-    // ✅ USER UPDATE
+    // ✅ Case 2: User Update
     if (role === "user") {
-      let targetUserId = id; // Default assumption
+      // Logic: The 'id' param is likely the PROFILE ID, not User ID.
+      // We need to resolve the User ID from the Profile first.
 
-      // Try to find profile and extract the actual User ID
+      let targetUserId = id; // Default to assuming it's User ID (legacy fallback)
+
+      // Try to find the profile to get the real User ID
       const profileDoc = await Profile.findById(id);
       if (profileDoc && profileDoc.userId) {
         targetUserId = profileDoc.userId;
       }
 
       const updateFields = {
-        firstName: firstName || vendorName,
+        firstName: firstName || vendorName, // fallback
         lastName: lastName || "",
         phone: mobileNumber || "",
       };
@@ -455,31 +357,23 @@ exports.updateProfile = async (req, res) => {
 
       const user = await User.findByIdAndUpdate(targetUserId, updateFields, { new: true });
 
-      if (!user) {
-        return res.status(404).json({ 
-          success: false, 
-          message: "User not found",
-          debug: { attemptedUserId: targetUserId }
-        });
-      }
+      if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
       return res.status(200).json({
         success: true,
-        message: "User profile updated successfully",
+        message: "User updated successfully",
         data: user,
       });
     }
 
-    return res.status(400).json({ 
-      success: false, 
-      message: "Invalid request. Please provide a valid role (vendor or user)" 
-    });
+    return res.status(400).json({ success: false, message: "Invalid request" });
 
   } catch (error) {
     console.error("Update Profile Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
 
 
 // Delete profile
