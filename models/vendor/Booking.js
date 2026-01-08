@@ -296,10 +296,13 @@ const bookingSchema = new mongoose.Schema(
       required: true,
     },
 
-    timeSlot: {
-      type: String,
-    },
-
+   timeSlot: [
+  {
+    label: { type: String, required: true },
+    time: { type: String, required: true }
+  }
+]
+,
     location: {
       type: String,
     },
