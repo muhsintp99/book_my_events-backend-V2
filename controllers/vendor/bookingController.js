@@ -2521,6 +2521,46 @@ exports.getBookingsByPaymentStatus = async (req, res) => {
 };
 
 // =======================================================
+// DELETE BOOKING
+// =======================================================
+exports.deleteBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const booking = await Booking.findById(id);
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found"
+      });
+    }
+
+    // Optional: Add permission check
+    // Only allow deletion of Direct bookings or by the provider
+    if (booking.bookingType === "Indirect") {
+      return res.status(403).json({
+        success: false,
+        message: "Cannot delete indirect bookings"
+      });
+    }
+
+    await Booking.findByIdAndDelete(id);
+
+    res.json({
+      success: true,
+      message: "Booking deleted successfully"
+    });
+  } catch (error) {
+    console.error("Delete booking error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// =======================================================
 // CHECK BOOKING TIMELINE STATUS
 // =======================================================
 exports.checkBookingTimeline = async (req, res) => {
