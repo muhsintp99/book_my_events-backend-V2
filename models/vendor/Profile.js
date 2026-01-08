@@ -124,6 +124,19 @@ const profileSchema = new mongoose.Schema(
       type: socialLinksSchema,
       default: () => ({})
     },
+    bankDetails: {
+      accountHolderName: { type: String, default: '' },
+      accountNumber: { type: String, default: '' },
+      ifscCode: { type: String, default: '' },
+      bankName: { type: String, default: '' },
+      branchName: { type: String, default: '' },
+      accountType: {
+        type: String,
+        enum: ['savings', 'current'],
+        default: 'savings'
+      },
+      upiId: { type: String, default: '' }
+    },
   },
   { timestamps: true }
 );

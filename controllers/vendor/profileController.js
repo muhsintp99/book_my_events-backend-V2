@@ -208,7 +208,8 @@ exports.getProfileByProviderId = async (req, res) => {
       email: user.email, // Sync email
       mobileNumber: mobileNumber,
       businessAddress: businessAddress,
-      socialLinks: {}
+      socialLinks: {},
+      bankDetails: vendorProfile ? vendorProfile.bankDetails : {}
     });
 
     try {
@@ -423,7 +424,7 @@ exports.getProfileByProviderId = async (req, res) => {
 // ✅ FIXED: Update profile - handles BOTH Profile ID and User ID
 exports.updateProfile = async (req, res) => {
   try {
-    const { role, vendorName, firstName, lastName, businessAddress, mobileNumber, socialLinks } = req.body;
+    const { role, vendorName, firstName, lastName, businessAddress, mobileNumber, socialLinks, bankDetails } = req.body;
     const id = req.params.id; // Could be Profile ID or User ID
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -440,6 +441,15 @@ exports.updateProfile = async (req, res) => {
         updatedData.socialLinks = typeof socialLinks === 'string' ? JSON.parse(socialLinks) : socialLinks;
       } catch (err) {
         return res.status(400).json({ success: false, message: "Invalid socialLinks format" });
+      }
+    }
+
+    // Parse bank details safely
+    if (bankDetails) {
+      try {
+        updatedData.bankDetails = typeof bankDetails === 'string' ? JSON.parse(bankDetails) : bankDetails;
+      } catch (err) {
+        return res.status(400).json({ success: false, message: "Invalid bankDetails format" });
       }
     }
 
@@ -513,6 +523,7 @@ exports.updateProfile = async (req, res) => {
           mobileNumber: defaultMobileNumber,
           businessAddress: defaultBusinessAddress,
           socialLinks: updatedData.socialLinks || {},
+          bankDetails: updatedData.bankDetails || (vendorProfile ? vendorProfile.bankDetails : {}),
           profilePhoto: updatedData.profilePhoto || ""
         });
 
