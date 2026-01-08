@@ -1061,23 +1061,31 @@ const populateSubCategories = async (vehicle) => {
 
 const VEHICLE_UPLOAD_PATH = "/uploads/vehicles";
 
+const normalizeVehiclePath = (value) => {
+  if (!value) return value;
+
+  // Already absolute or already prefixed
+  if (value.startsWith("/uploads/")) {
+    return value;
+  }
+
+  // Only filename → prepend path
+  return `${VEHICLE_UPLOAD_PATH}/${value}`;
+};
+
 const attachVehicleImageUrls = (vehicle) => {
   if (!vehicle) return vehicle;
 
   if (vehicle.thumbnail) {
-    vehicle.thumbnail = `${VEHICLE_UPLOAD_PATH}/${vehicle.thumbnail}`;
+    vehicle.thumbnail = normalizeVehiclePath(vehicle.thumbnail);
   }
 
   if (Array.isArray(vehicle.images)) {
-    vehicle.images = vehicle.images.map(
-      (img) => `${VEHICLE_UPLOAD_PATH}/${img}`
-    );
+    vehicle.images = vehicle.images.map(normalizeVehiclePath);
   }
 
   if (Array.isArray(vehicle.documents)) {
-    vehicle.documents = vehicle.documents.map(
-      (doc) => `${VEHICLE_UPLOAD_PATH}/${doc}`
-    );
+    vehicle.documents = vehicle.documents.map(normalizeVehiclePath);
   }
 
   return vehicle;
