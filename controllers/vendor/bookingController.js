@@ -1017,60 +1017,569 @@ function calculateTimeline(bookingDate) {
   };
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // =======================================================
 // CREATE BOOKING (UNIFIED FOR ALL MODULES)
 // =======================================================
+// exports.createBooking = async (req, res) => {
+//   try {
+//     const {
+//       moduleId,
+//       venueId,
+//       makeupId,
+//       packageId,
+//       numberOfGuests,
+//       photographyId,
+//       bookingDate,
+//       timeSlot,
+//       bookingType,
+//       userId,
+//       couponId,
+//       fullName,
+//       contactNumber,
+//       emailAddress,
+//       address,
+//       paymentType, // NEW: Payment method
+//     } = req.body;
+
+//     // Validate common required fields
+//     // if (!moduleId  || !bookingDate ) {
+//     //   return res.status(400).json({
+//     //     success: false,
+//     //     message: "moduleId, packageId, bookingDate, and timeSlot are required"
+//     //   });
+//     // }
+//     if (!moduleId || !bookingDate) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "moduleId and bookingDate are required",
+//       });
+//     }
+
+//     // Validate MongoDB ObjectId format
+//     const mongoose = require("mongoose");
+//     if (!mongoose.Types.ObjectId.isValid(moduleId)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid moduleId format",
+//       });
+//     }
+//     // if (!mongoose.Types.ObjectId.isValid(packageId)) {
+//     //   return res.status(400).json({
+//     //     success: false,
+//     //     message: "Invalid packageId format"
+//     //   });
+//     // }
+
+//     // Get module information
+//     const moduleData = await Module.findById(moduleId);
+//     if (!moduleData) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid moduleId",
+//       });
+//     }
+
+//     const moduleType = moduleData.title; // e.g., "Venues", "Makeup", etc.
+
+//     // Module-specific validation and data fetching
+//     let serviceProvider = null;
+//     let pricingData = null;
+
+//     switch (moduleType) {
+//       case "Venues":
+//         if (!venueId) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "venueId is required for Venues module",
+//           });
+//         }
+//         if (!numberOfGuests) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "numberOfGuests is required for Venues module",
+//           });
+//         }
+
+//         serviceProvider = await Venue.findById(venueId).lean();
+//         if (!serviceProvider) {
+//           return res.status(404).json({
+//             success: false,
+//             message: "Venue not found",
+//           });
+//         }
+
+//         pricingData = await calculateVenuePricing(
+//           serviceProvider,
+//           bookingDate,
+//           timeSlot,
+//           numberOfGuests
+//         );
+//         break;
+
+//       case "Makeup":
+//       case "Makeup Artist":
+//         if (!makeupId) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "makeupId is required for Makeup module",
+//           });
+//         }
+
+//         serviceProvider = await Makeup.findById(makeupId).lean();
+//         if (!serviceProvider) {
+//           return res.status(404).json({
+//             success: false,
+//             message: "Makeup service not found",
+//           });
+//         }
+
+//         pricingData = await calculateMakeupPricing(
+//           serviceProvider,
+//           bookingDate,
+//           timeSlot
+//         );
+//         break;
+
+//       case "Photography":
+//         if (!photographyId) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "photographyId is required for Photography module",
+//           });
+//         }
+//         serviceProvider = await Photography.findById(
+//           req.body.photographyId
+//         ).lean();
+//         if (!serviceProvider) {
+//           return res.status(404).json({
+//             success: false,
+//             message: "Photography service not found",
+//           });
+//         }
+
+//         pricingData = {
+//           basePrice: Number(serviceProvider.price) || 0,
+//           perDayPrice: 0,
+//           perHourCharge: 0,
+//           perPersonCharge: 0,
+//           discount: 0,
+//         };
+
+//         break;
+
+//       case "Catering":
+//         if (!req.body.cateringId) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "cateringId is required for Catering module",
+//           });
+//         }
+
+//         serviceProvider = await Catering.findById(req.body.cateringId).lean();
+//         if (!serviceProvider) {
+//           return res.status(404).json({
+//             success: false,
+//             message: "Catering service not found",
+//           });
+//         }
+
+//         // Catering pricing (usually per plate × guests OR flat)
+//         pricingData = {
+//           basePrice: Number(serviceProvider.price) || 0,
+//           perDayPrice: 0,
+//           perHourCharge: 0,
+//           perPersonCharge: 0,
+//           discount: 0,
+//         };
+
+//         break;
+
+//       // Add more module types as needed
+//       default:
+//         return res.status(400).json({
+//           success: false,
+//           message: `Module type "${moduleType}" is not supported yet`,
+//         });
+//     }
+
+//     // -------------------------
+//     // USER HANDLING
+//     // -------------------------
+//     let user = null;
+//     let token = null;
+//     let finalUserDetails = {};
+
+//     if (bookingType === "Direct") {
+//       if (!fullName || !contactNumber || !emailAddress || !address) {
+//         return res.status(400).json({
+//           success: false,
+//           message:
+//             "fullName, contactNumber, emailAddress, and address are required for Direct booking",
+//         });
+//       }
+
+//       const [firstName, ...rest] = fullName.split(" ");
+//       const lastName = rest.join(" ");
+
+//       user = await User.findOne({ email: emailAddress });
+//       if (!user) {
+//         user = await User.create({
+//           firstName,
+//           lastName,
+//           email: emailAddress,
+//           password: "123456",
+//           userId: "USR-" + Date.now(),
+//         });
+//       }
+
+//       // Get auth token
+//       try {
+//         const resp = await axios.post(AUTH_API_URL, {
+//           email: emailAddress,
+//           password: "123456",
+//         });
+//         token = resp?.data?.token;
+//       } catch (error) {
+//         console.log("Auth token generation failed:", error.message);
+//       }
+
+//       finalUserDetails = { fullName, contactNumber, emailAddress, address };
+//     } else if (bookingType === "Indirect") {
+//       if (!userId) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "userId is required for Indirect booking",
+//         });
+//       }
+
+//       user = await User.findById(userId);
+//       if (!user) {
+//         return res.status(404).json({
+//           success: false,
+//           message: "User not found",
+//         });
+//       }
+
+//       const profile = await Profile.findOne({ userId: user._id });
+
+//       finalUserDetails = {
+//         fullName: `${user.firstName} ${user.lastName || ""}`.trim(),
+//         contactNumber: profile?.mobileNumber || "N/A",
+//         emailAddress: user.email,
+//         address: profile?.address || "N/A",
+//       };
+//     }
+
+//     // -------------------------
+//     // PACKAGE PRICING
+//     // -------------------------
+//     let pkg = null;
+//     let packagePrice = 0;
+
+//     if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+//       // Makeup uses service provider pricing directly
+//       pkg = serviceProvider;
+//       packagePrice =
+//         Number(pkg.finalPrice) ||
+//         Number(pkg.offerPrice) ||
+//         Number(pkg.basePrice) ||
+//         0;
+//       if (packagePrice < 0) packagePrice = 0;
+//     } else if (moduleType === "Photography" || moduleType === "Catering") {
+//       pkg = serviceProvider;
+//       packagePrice = Number(pkg.price) || 0;
+//     } else {
+//       // Venues and other modules use separate package
+//       if (!packageId) {
+//         pkg = null;
+//         packagePrice = 0;
+//       } else {
+//         pkg = await Package.findById(packageId).lean();
+
+//         if (!pkg) {
+//           return res.status(404).json({
+//             success: false,
+//             message: "Package not found",
+//           });
+//         }
+
+//         if (moduleType === "Venues") {
+//           packagePrice = Number(pkg.price || 0) * Number(numberOfGuests || 0);
+//         } else {
+//           packagePrice = Number(pkg.price || 0);
+//         }
+//       }
+//     }
+//     // -------------------------
+//     // CALCULATE TOTAL PRICING
+//     // -------------------------
+//     let totalBeforeDiscount = 0;
+
+//     if (
+//       moduleType === "Makeup" ||
+//       moduleType === "Makeup Artist" ||
+//       moduleType === "Photography"
+//     ) {
+//       // For Makeup and Photography, only package price counts
+//       totalBeforeDiscount = packagePrice;
+//     } else {
+//       // For Venues and others, combine base + package
+//       totalBeforeDiscount = pricingData.basePrice + packagePrice;
+//     }
+
+//     const discountValue = pricingData.discount || 0;
+//     let afterDiscount = totalBeforeDiscount - discountValue;
+//     if (afterDiscount < 0) afterDiscount = 0;
+
+//     // -------------------------
+//     // APPLY COUPON
+//     // -------------------------
+//     let couponDiscountValue = 0;
+//     if (couponId) {
+//       const coupon = await Coupon.findById(couponId);
+//       if (coupon && coupon.isActive) {
+//         if (coupon.type === "percentage") {
+//           couponDiscountValue = (afterDiscount * coupon.discount) / 100;
+//         } else {
+//           couponDiscountValue = coupon.discount;
+//         }
+//       }
+//     }
+
+//     const finalPrice = afterDiscount - couponDiscountValue;
+
+//     // -------------------------
+//     // ADVANCE BOOKING (Makeup Only)
+//     // -------------------------
+//     // let advanceAmount = 0;
+//     // let remainingAmount = finalPrice;
+
+//     // if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+//     //   const makeupAdvance = Number(serviceProvider.advanceBookingAmount) || 0;
+
+//     //   advanceAmount = makeupAdvance;
+//     //   remainingAmount = finalPrice - advanceAmount;
+
+//     //   if (remainingAmount < 0) remainingAmount = 0;
+//     // }
+//     // =============================
+//     // UNIVERSAL ADVANCE PAYMENT LOGIC
+//     // =============================
+//     let advanceAmount = 0;
+//     let remainingAmount = finalPrice;
+
+//     // 1️⃣ Venues → use advanceDeposit field
+//     if (moduleType === "Venues") {
+//       advanceAmount = Number(serviceProvider.advanceDeposit) || 0;
+//     }
+
+//     // 2️⃣ Makeup / Makeup Artist → use advanceBookingAmount
+//     else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+//       advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
+//     }
+
+//     // 3️⃣ Other modules → use their advanceBookingAmount field
+//     else {
+//       advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
+//     }
+
+//     // Prevent negative values
+//     if (advanceAmount < 0) advanceAmount = 0;
+
+//     remainingAmount = finalPrice - advanceAmount;
+//     if (remainingAmount < 0) remainingAmount = 0;
+
+//     // -------------------------
+//     // CREATE BOOKING DOCUMENT
+//     // -------------------------
+//     const bookingData = {
+//       moduleId,
+//       moduleType,
+//       packageId:
+//         moduleType === "Makeup" || moduleType === "Makeup Artist"
+//           ? null
+//           : packageId,
+
+//       providerId: serviceProvider.provider || serviceProvider?.createdBy,
+//       userId: user._id,
+//       bookingDate,
+//       timeSlot,
+//       bookingType,
+
+//       fullName: finalUserDetails.fullName,
+//       contactNumber: finalUserDetails.contactNumber,
+//       emailAddress: finalUserDetails.emailAddress,
+//       address: finalUserDetails.address,
+
+//       location: serviceProvider.location,
+
+//       perDayPrice: pricingData.perDayPrice || 0,
+//       perPersonCharge: pricingData.perPersonCharge || 0,
+//       perHourCharge: pricingData.perHourCharge || 0,
+//       packagePrice,
+
+//       totalBeforeDiscount,
+//       discountValue,
+//       discountType: discountValue > 0 ? "flat" : "none",
+//       couponDiscountValue,
+//       finalPrice,
+//       advanceAmount,
+//       remainingAmount,
+
+//       paymentType: paymentType || null,
+//     };
+
+//     // Add module-specific fields
+//    // Add module-specific fields
+// if (moduleType === "Venues") {
+//   bookingData.venueId = venueId;
+//   bookingData.numberOfGuests = numberOfGuests;
+// } else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+//   bookingData.makeupId = makeupId;
+// } else if (moduleType === "Photography") {
+//   bookingData.photographyId = photographyId;
+// } else if (moduleType === "Catering") {
+//   bookingData.cateringId = req.body.cateringId;
+//   bookingData.numberOfGuests = numberOfGuests; // ✅ FIX
+// }
+
+
+//     const booking = await Booking.create(bookingData);
+
+//     // Populate the booking
+//     let populateFields = ["userId", "moduleId"];
+
+//     // ⭐ KEY FIX: Only populate packageId for non-makeup modules
+//     if (moduleType === "Venues") {
+//       populateFields.push("venueId");
+//       populateFields.push("packageId");
+//     } else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
+//       populateFields.push("makeupId");
+//     } else if (moduleType === "Photography") {
+//       populateFields.push("photographyId");
+      
+//     } 
+//     else if (moduleType === "Catering") {
+//   populateFields.push("cateringId");
+// }
+
+//     else if (moduleType === "Catering") {
+//   bookingData.cateringId = req.body.cateringId;
+// }
+
+// else {
+//       // Other modules
+//       if (packageId) populateFields.push("packageId");
+//     }
+
+//     const populated = await Booking.findById(booking._id)
+//       .populate(populateFields)
+//       .select(
+//         "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount +discountValue +couponDiscountValue"
+//       )
+//       .lean();
+
+//     // Add timeline info
+//     const timeline = calculateTimeline(booking.bookingDate);
+
+//     // ⭐ ENHANCED RESPONSE: Include makeup package details
+//     return res.status(201).json({
+//       success: true,
+//       message: "Booking created successfully",
+//       data: {
+//         ...populated,
+//         timeline,
+//         pricing: {
+//           packagePrice,
+//           finalPrice,
+//           advanceAmount,
+//           remainingAmount,
+//         },
+//       },
+//       token,
+//     });
+//   } catch (error) {
+//     console.error("Create Booking Error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// };
+
+
+
+
+
+
+
+
 exports.createBooking = async (req, res) => {
   try {
     const {
       moduleId,
-      venueId,
-      makeupId,
-      packageId,
-      numberOfGuests,
-      photographyId,
+      bookingType, // Direct | Indirect
       bookingDate,
       timeSlot,
-      bookingType,
-      userId,
-      couponId,
+
+      // customer (Direct)
       fullName,
       contactNumber,
       emailAddress,
       address,
-      paymentType, // NEW: Payment method
+
+      // user (Indirect)
+      userId,
+
+      // module ids
+      venueId,
+      makeupId,
+      photographyId,
+      cateringId,
+      packageId,
+
+      numberOfGuests,
+      couponId,
+      paymentType,
     } = req.body;
 
-    // Validate common required fields
-    // if (!moduleId  || !bookingDate ) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "moduleId, packageId, bookingDate, and timeSlot are required"
-    //   });
-    // }
-    if (!moduleId || !bookingDate) {
+    /* ===================================================
+       BASIC VALIDATION
+    =================================================== */
+    if (!moduleId || !bookingDate || !bookingType) {
       return res.status(400).json({
         success: false,
-        message: "moduleId and bookingDate are required",
+        message: "moduleId, bookingDate, bookingType are required",
       });
     }
 
-    // Validate MongoDB ObjectId format
-    const mongoose = require("mongoose");
-    if (!mongoose.Types.ObjectId.isValid(moduleId)) {
+    if (!["Direct", "Indirect"].includes(bookingType)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid moduleId format",
+        message: "Invalid bookingType",
       });
     }
-    // if (!mongoose.Types.ObjectId.isValid(packageId)) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "Invalid packageId format"
-    //   });
-    // }
 
-    // Get module information
+    /* ===================================================
+       MODULE
+    =================================================== */
     const moduleData = await Module.findById(moduleId);
     if (!moduleData) {
       return res.status(400).json({
@@ -1079,146 +1588,24 @@ exports.createBooking = async (req, res) => {
       });
     }
 
-    const moduleType = moduleData.title; // e.g., "Venues", "Makeup", etc.
+    const moduleType = moduleData.title;
 
-    // Module-specific validation and data fetching
-    let serviceProvider = null;
-    let pricingData = null;
-
-    switch (moduleType) {
-      case "Venues":
-        if (!venueId) {
-          return res.status(400).json({
-            success: false,
-            message: "venueId is required for Venues module",
-          });
-        }
-        if (!numberOfGuests) {
-          return res.status(400).json({
-            success: false,
-            message: "numberOfGuests is required for Venues module",
-          });
-        }
-
-        serviceProvider = await Venue.findById(venueId).lean();
-        if (!serviceProvider) {
-          return res.status(404).json({
-            success: false,
-            message: "Venue not found",
-          });
-        }
-
-        pricingData = await calculateVenuePricing(
-          serviceProvider,
-          bookingDate,
-          timeSlot,
-          numberOfGuests
-        );
-        break;
-
-      case "Makeup":
-      case "Makeup Artist":
-        if (!makeupId) {
-          return res.status(400).json({
-            success: false,
-            message: "makeupId is required for Makeup module",
-          });
-        }
-
-        serviceProvider = await Makeup.findById(makeupId).lean();
-        if (!serviceProvider) {
-          return res.status(404).json({
-            success: false,
-            message: "Makeup service not found",
-          });
-        }
-
-        pricingData = await calculateMakeupPricing(
-          serviceProvider,
-          bookingDate,
-          timeSlot
-        );
-        break;
-
-      case "Photography":
-        if (!photographyId) {
-          return res.status(400).json({
-            success: false,
-            message: "photographyId is required for Photography module",
-          });
-        }
-        serviceProvider = await Photography.findById(
-          req.body.photographyId
-        ).lean();
-        if (!serviceProvider) {
-          return res.status(404).json({
-            success: false,
-            message: "Photography service not found",
-          });
-        }
-
-        pricingData = {
-          basePrice: Number(serviceProvider.price) || 0,
-          perDayPrice: 0,
-          perHourCharge: 0,
-          perPersonCharge: 0,
-          discount: 0,
-        };
-
-        break;
-
-      case "Catering":
-        if (!req.body.cateringId) {
-          return res.status(400).json({
-            success: false,
-            message: "cateringId is required for Catering module",
-          });
-        }
-
-        serviceProvider = await Catering.findById(req.body.cateringId).lean();
-        if (!serviceProvider) {
-          return res.status(404).json({
-            success: false,
-            message: "Catering service not found",
-          });
-        }
-
-        // Catering pricing (usually per plate × guests OR flat)
-        pricingData = {
-          basePrice: Number(serviceProvider.price) || 0,
-          perDayPrice: 0,
-          perHourCharge: 0,
-          perPersonCharge: 0,
-          discount: 0,
-        };
-
-        break;
-
-      // Add more module types as needed
-      default:
-        return res.status(400).json({
-          success: false,
-          message: `Module type "${moduleType}" is not supported yet`,
-        });
-    }
-
-    // -------------------------
-    // USER HANDLING
-    // -------------------------
-    let user = null;
+    /* ===================================================
+       USER HANDLING
+    =================================================== */
+    let user;
     let token = null;
-    let finalUserDetails = {};
+    let userDetails = {};
 
     if (bookingType === "Direct") {
       if (!fullName || !contactNumber || !emailAddress || !address) {
         return res.status(400).json({
           success: false,
-          message:
-            "fullName, contactNumber, emailAddress, and address are required for Direct booking",
+          message: "Customer details required for Direct booking",
         });
       }
 
-      const [firstName, ...rest] = fullName.split(" ");
+      const [firstName, ...rest] = fullName.trim().split(" ");
       const lastName = rest.join(" ");
 
       user = await User.findOne({ email: emailAddress });
@@ -1232,23 +1619,23 @@ exports.createBooking = async (req, res) => {
         });
       }
 
-      // Get auth token
+      // Optional auto-login token
       try {
         const resp = await axios.post(AUTH_API_URL, {
           email: emailAddress,
           password: "123456",
         });
-        token = resp?.data?.token;
-      } catch (error) {
-        console.log("Auth token generation failed:", error.message);
-      }
+        token = resp?.data?.token || null;
+      } catch (_) {}
 
-      finalUserDetails = { fullName, contactNumber, emailAddress, address };
-    } else if (bookingType === "Indirect") {
+      userDetails = { fullName, contactNumber, emailAddress, address };
+    }
+
+    if (bookingType === "Indirect") {
       if (!userId) {
         return res.status(400).json({
           success: false,
-          message: "userId is required for Indirect booking",
+          message: "userId required for Indirect booking",
         });
       }
 
@@ -1262,7 +1649,7 @@ exports.createBooking = async (req, res) => {
 
       const profile = await Profile.findOne({ userId: user._id });
 
-      finalUserDetails = {
+      userDetails = {
         fullName: `${user.firstName} ${user.lastName || ""}`.trim(),
         contactNumber: profile?.mobileNumber || "N/A",
         emailAddress: user.email,
@@ -1270,157 +1657,154 @@ exports.createBooking = async (req, res) => {
       };
     }
 
-    // -------------------------
-    // PACKAGE PRICING
-    // -------------------------
-    let pkg = null;
-    let packagePrice = 0;
+    /* ===================================================
+       SERVICE PROVIDER + PRICING
+    =================================================== */
+    let serviceProvider;
+    let pricing = {
+      basePrice: 0,
+      discount: 0,
+      perDayPrice: 0,
+      perPersonCharge: 0,
+      perHourCharge: 0,
+    };
 
-    if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
-      // Makeup uses service provider pricing directly
-      pkg = serviceProvider;
-      packagePrice =
-        Number(pkg.finalPrice) ||
-        Number(pkg.offerPrice) ||
-        Number(pkg.basePrice) ||
-        0;
-      if (packagePrice < 0) packagePrice = 0;
-    } else if (moduleType === "Photography" || moduleType === "Catering") {
-      pkg = serviceProvider;
-      packagePrice = Number(pkg.price) || 0;
-    } else {
-      // Venues and other modules use separate package
-      if (!packageId) {
-        pkg = null;
-        packagePrice = 0;
-      } else {
-        pkg = await Package.findById(packageId).lean();
-
-        if (!pkg) {
-          return res.status(404).json({
+    switch (moduleType) {
+      case "Venues":
+        if (!venueId || !numberOfGuests) {
+          return res.status(400).json({
             success: false,
-            message: "Package not found",
+            message: "venueId & numberOfGuests required",
           });
         }
 
-        if (moduleType === "Venues") {
-          packagePrice = Number(pkg.price || 0) * Number(numberOfGuests || 0);
-        } else {
-          packagePrice = Number(pkg.price || 0);
-        }
-      }
+        serviceProvider = await Venue.findById(venueId).lean();
+        if (!serviceProvider) throw new Error("Venue not found");
+
+        pricing = await calculateVenuePricing(
+          serviceProvider,
+          bookingDate,
+          timeSlot,
+          numberOfGuests
+        );
+        break;
+
+      case "Makeup":
+      case "Makeup Artist":
+        serviceProvider = await Makeup.findById(makeupId).lean();
+        if (!serviceProvider) throw new Error("Makeup service not found");
+
+        pricing.basePrice =
+          Number(serviceProvider.finalPrice) ||
+          Number(serviceProvider.offerPrice) ||
+          Number(serviceProvider.basePrice) ||
+          0;
+        break;
+
+      case "Photography":
+        serviceProvider = await Photography.findById(photographyId).lean();
+        if (!serviceProvider) throw new Error("Photography service not found");
+
+        pricing.basePrice = Number(serviceProvider.price) || 0;
+        break;
+
+      case "Catering":
+        serviceProvider = await Catering.findById(cateringId).lean();
+        if (!serviceProvider) throw new Error("Catering service not found");
+
+        pricing.basePrice = Number(serviceProvider.price) || 0;
+        break;
+
+      default:
+        return res.status(400).json({
+          success: false,
+          message: `Unsupported module ${moduleType}`,
+        });
     }
-    // -------------------------
-    // CALCULATE TOTAL PRICING
-    // -------------------------
-    let totalBeforeDiscount = 0;
 
-    if (
-      moduleType === "Makeup" ||
-      moduleType === "Makeup Artist" ||
-      moduleType === "Photography"
-    ) {
-      // For Makeup and Photography, only package price counts
-      totalBeforeDiscount = packagePrice;
-    } else {
-      // For Venues and others, combine base + package
-      totalBeforeDiscount = pricingData.basePrice + packagePrice;
+    /* ===================================================
+       PACKAGE PRICING (VENUES ONLY)
+    =================================================== */
+    let packagePrice = 0;
+    if (moduleType === "Venues" && packageId) {
+      const pkg = await Package.findById(packageId).lean();
+      if (!pkg) throw new Error("Package not found");
+
+      packagePrice = Number(pkg.price || 0) * numberOfGuests;
     }
 
-    const discountValue = pricingData.discount || 0;
-    let afterDiscount = totalBeforeDiscount - discountValue;
-    if (afterDiscount < 0) afterDiscount = 0;
+    /* ===================================================
+       TOTAL CALCULATION
+    =================================================== */
+    let totalBeforeDiscount =
+      pricing.basePrice +
+      (moduleType === "Venues" ? packagePrice : 0);
 
-    // -------------------------
-    // APPLY COUPON
-    // -------------------------
+    let afterDiscount = Math.max(
+      totalBeforeDiscount - (pricing.discount || 0),
+      0
+    );
+
     let couponDiscountValue = 0;
     if (couponId) {
       const coupon = await Coupon.findById(couponId);
-      if (coupon && coupon.isActive) {
-        if (coupon.type === "percentage") {
-          couponDiscountValue = (afterDiscount * coupon.discount) / 100;
-        } else {
-          couponDiscountValue = coupon.discount;
-        }
+      if (coupon?.isActive) {
+        couponDiscountValue =
+          coupon.type === "percentage"
+            ? (afterDiscount * coupon.discount) / 100
+            : coupon.discount;
       }
     }
 
-    const finalPrice = afterDiscount - couponDiscountValue;
+    const finalPrice = Math.max(afterDiscount - couponDiscountValue, 0);
 
-    // -------------------------
-    // ADVANCE BOOKING (Makeup Only)
-    // -------------------------
-    // let advanceAmount = 0;
-    // let remainingAmount = finalPrice;
+    /* ===================================================
+       ADVANCE PAYMENT
+    =================================================== */
+    let advanceAmount =
+      Number(
+        moduleType === "Venues"
+          ? serviceProvider.advanceDeposit
+          : serviceProvider.advanceBookingAmount
+      ) || 0;
 
-    // if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
-    //   const makeupAdvance = Number(serviceProvider.advanceBookingAmount) || 0;
+    advanceAmount = Math.max(advanceAmount, 0);
+    const remainingAmount = Math.max(finalPrice - advanceAmount, 0);
 
-    //   advanceAmount = makeupAdvance;
-    //   remainingAmount = finalPrice - advanceAmount;
-
-    //   if (remainingAmount < 0) remainingAmount = 0;
-    // }
-    // =============================
-    // UNIVERSAL ADVANCE PAYMENT LOGIC
-    // =============================
-    let advanceAmount = 0;
-    let remainingAmount = finalPrice;
-
-    // 1️⃣ Venues → use advanceDeposit field
-    if (moduleType === "Venues") {
-      advanceAmount = Number(serviceProvider.advanceDeposit) || 0;
-    }
-
-    // 2️⃣ Makeup / Makeup Artist → use advanceBookingAmount
-    else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
-      advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
-    }
-
-    // 3️⃣ Other modules → use their advanceBookingAmount field
-    else {
-      advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
-    }
-
-    // Prevent negative values
-    if (advanceAmount < 0) advanceAmount = 0;
-
-    remainingAmount = finalPrice - advanceAmount;
-    if (remainingAmount < 0) remainingAmount = 0;
-
-    // -------------------------
-    // CREATE BOOKING DOCUMENT
-    // -------------------------
+    /* ===================================================
+       CREATE BOOKING
+    =================================================== */
     const bookingData = {
       moduleId,
       moduleType,
-      packageId:
-        moduleType === "Makeup" || moduleType === "Makeup Artist"
-          ? null
-          : packageId,
-
-      providerId: serviceProvider.provider || serviceProvider?.createdBy,
-      userId: user._id,
-      bookingDate,
-      timeSlot,
       bookingType,
 
-      fullName: finalUserDetails.fullName,
-      contactNumber: finalUserDetails.contactNumber,
-      emailAddress: finalUserDetails.emailAddress,
-      address: finalUserDetails.address,
+      providerId: serviceProvider.provider || serviceProvider.createdBy,
+      userId: user._id,
 
-      location: serviceProvider.location,
+      bookingDate,
+      timeSlot,
+      numberOfGuests: numberOfGuests || null,
 
-      perDayPrice: pricingData.perDayPrice || 0,
-      perPersonCharge: pricingData.perPersonCharge || 0,
-      perHourCharge: pricingData.perHourCharge || 0,
+      ...userDetails,
+
+      venueId: moduleType === "Venues" ? venueId : null,
+      makeupId:
+        moduleType === "Makeup" || moduleType === "Makeup Artist"
+          ? makeupId
+          : null,
+      photographyId: moduleType === "Photography" ? photographyId : null,
+      cateringId: moduleType === "Catering" ? cateringId : null,
+      packageId: moduleType === "Venues" ? packageId : null,
+
+      perDayPrice: pricing.perDayPrice,
+      perPersonCharge: pricing.perPersonCharge,
+      perHourCharge: pricing.perHourCharge,
       packagePrice,
 
       totalBeforeDiscount,
-      discountValue,
-      discountType: discountValue > 0 ? "flat" : "none",
+      discountValue: pricing.discount || 0,
+      discountType: pricing.discount ? "flat" : "none",
       couponDiscountValue,
       finalPrice,
       advanceAmount,
@@ -1429,83 +1813,39 @@ exports.createBooking = async (req, res) => {
       paymentType: paymentType || null,
     };
 
-    // Add module-specific fields
-   // Add module-specific fields
-if (moduleType === "Venues") {
-  bookingData.venueId = venueId;
-  bookingData.numberOfGuests = numberOfGuests;
-} else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
-  bookingData.makeupId = makeupId;
-} else if (moduleType === "Photography") {
-  bookingData.photographyId = photographyId;
-} else if (moduleType === "Catering") {
-  bookingData.cateringId = req.body.cateringId;
-  bookingData.numberOfGuests = numberOfGuests; // ✅ FIX
-}
-
-
     const booking = await Booking.create(bookingData);
 
-    // Populate the booking
-    let populateFields = ["userId", "moduleId"];
-
-    // ⭐ KEY FIX: Only populate packageId for non-makeup modules
-    if (moduleType === "Venues") {
-      populateFields.push("venueId");
-      populateFields.push("packageId");
-    } else if (moduleType === "Makeup" || moduleType === "Makeup Artist") {
-      populateFields.push("makeupId");
-    } else if (moduleType === "Photography") {
-      populateFields.push("photographyId");
-      
-    } 
-    else if (moduleType === "Catering") {
-  populateFields.push("cateringId");
-}
-
-    else if (moduleType === "Catering") {
-  bookingData.cateringId = req.body.cateringId;
-}
-
-else {
-      // Other modules
-      if (packageId) populateFields.push("packageId");
-    }
-
-    const populated = await Booking.findById(booking._id)
-      .populate(populateFields)
-      .select(
-        "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount +discountValue +couponDiscountValue"
-      )
-      .lean();
-
-    // Add timeline info
-    const timeline = calculateTimeline(booking.bookingDate);
-
-    // ⭐ ENHANCED RESPONSE: Include makeup package details
     return res.status(201).json({
       success: true,
       message: "Booking created successfully",
-      data: {
-        ...populated,
-        timeline,
-        pricing: {
-          packagePrice,
-          finalPrice,
-          advanceAmount,
-          remainingAmount,
-        },
-      },
+      data: booking,
       token,
     });
   } catch (error) {
     console.error("Create Booking Error:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message,
     });
   }
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // GET BOOKINGS BY USER ID
 exports.getBookingsByUser = async (req, res) => {

@@ -1030,6 +1030,7 @@ const path = require("path");
 const mongoose = require("mongoose");
 const Category = require("../../models/admin/category");
 
+
 // ================= HELPERS =================
 const deleteFiles = async (files = []) => {
   if (!files.length) return;
@@ -1045,6 +1046,32 @@ const deleteFiles = async (files = []) => {
     })
   );
 };
+
+
+const VEHICLE_UPLOAD_PATH = "/uploads/vehicles";
+
+const attachVehicleImageUrls = (vehicle) => {
+  if (!vehicle) return vehicle;
+
+  if (vehicle.thumbnail) {
+    vehicle.thumbnail = `${VEHICLE_UPLOAD_PATH}/${vehicle.thumbnail}`;
+  }
+
+  if (Array.isArray(vehicle.images)) {
+    vehicle.images = vehicle.images.map(
+      (img) => `${VEHICLE_UPLOAD_PATH}/${img}`
+    );
+  }
+
+  if (Array.isArray(vehicle.documents)) {
+    vehicle.documents = vehicle.documents.map(
+      (doc) => `${VEHICLE_UPLOAD_PATH}/${doc}`
+    );
+  }
+
+  return vehicle;
+};
+
 
 const sendResponse = (
   res,
@@ -1469,6 +1496,8 @@ exports.createVehicle = async (req, res) => {
       .populate(populateProvider)
       .populate("zone")
       .lean();
+      attachVehicleImageUrls(populatedVehicle);
+
 
     // ✅ MANUAL subCategory population (THIS IS THE KEY)
     // ✅ MANUAL subCategory population (CORRECT WAY)
