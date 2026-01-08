@@ -1527,6 +1527,10 @@ function calculateTimeline(bookingDate) {
 
 
 
+const TIME_SLOT_MAP = {
+  Morning: "9:00 AM - 1:00 PM",
+  Evening: "6:00 PM - 10:00 PM",
+};
 
 
 
@@ -1783,7 +1787,15 @@ exports.createBooking = async (req, res) => {
       userId: user._id,
 
       bookingDate,
-      timeSlot,
+timeSlot: Array.isArray(timeSlot)
+  ? timeSlot.map(slot => ({
+      label: slot,
+      time: TIME_SLOT_MAP[slot] || null
+    }))
+  : {
+      label: timeSlot,
+      time: TIME_SLOT_MAP[timeSlot] || null
+    },
       numberOfGuests: numberOfGuests || null,
 
       ...userDetails,

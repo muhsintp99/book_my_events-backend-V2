@@ -7,6 +7,18 @@ const Category = require("../../models/admin/category");
 /* =====================================================
    HELPERS
 ===================================================== */
+
+const normalizeUploadPath = (filePath) => {
+  if (!filePath) return filePath;
+
+  // Convert Windows backslashes → forward slashes
+  const normalized = filePath.replace(/\\/g, "/");
+
+  // Extract from /Uploads onward
+  const index = normalized.toLowerCase().indexOf("/uploads");
+  return index !== -1 ? normalized.substring(index) : normalized;
+};
+ 
 const generateCakeId = () => {
   return `CAKE-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 };
@@ -109,8 +121,12 @@ body.cakeId = generateCakeId();
 const cake = await Cake.create(body);
 
     const populatedCake = await Cake.findById(cake._id)
-      .populate("category subCategories provider")
-      .lean();
+  .populate("category subCategories provider")
+  .lean();
+
+// ✅ Normalize image paths
+populatedCake.thumbnail = normalizeUploadPath(populatedCake.thumbnail);
+populatedCake.images = populatedCake.images?.map(normalizeUploadPath);
 
     sendResponse(res, 201, true, "Cake created successfully", populatedCake);
   } catch (error) {
@@ -132,7 +148,10 @@ exports.getAllCakes = async (req, res) => {
       .populate("category subCategories provider")
       .sort({ createdAt: -1 })
       .lean();
-
+ cakes.forEach((cake) => {
+      cake.thumbnail = normalizeUploadPath(cake.thumbnail);
+      cake.images = cake.images?.map(normalizeUploadPath);
+    });
     sendResponse(res, 200, true, "Cakes fetched", cakes, {
       count: cakes.length
     });
@@ -158,7 +177,8 @@ exports.getCakeById = async (req, res) => {
     if (!cake) {
       return sendResponse(res, 404, false, "Cake not found");
     }
-
+ cake.thumbnail = normalizeUploadPath(cake.thumbnail);
+    cake.images = cake.images?.map(normalizeUploadPath);
     sendResponse(res, 200, true, "Cake fetched", cake);
   } catch (error) {
     sendResponse(res, 500, false, error.message);
@@ -194,7 +214,10 @@ exports.getCakesByProvider = async (req, res) => {
         .lean(),
       Cake.countDocuments(query),
     ]);
-
+ cakes.forEach((cake) => {
+      cake.thumbnail = normalizeUploadPath(cake.thumbnail);
+      cake.images = cake.images?.map(normalizeUploadPath);
+    });
     sendResponse(res, 200, true, "Provider cakes fetched", cakes, {
       total,
       page: Number(page),
@@ -245,6 +268,8 @@ exports.updateCake = async (req, res) => {
     const updatedCake = await Cake.findById(cake._id)
       .populate("category subCategories provider")
       .lean();
+updatedCake.thumbnail = normalizeUploadPath(updatedCake.thumbnail);
+updatedCake.images = updatedCake.images?.map(normalizeUploadPath);
 
     sendResponse(res, 200, true, "Cake updated", updatedCake);
   } catch (error) {
