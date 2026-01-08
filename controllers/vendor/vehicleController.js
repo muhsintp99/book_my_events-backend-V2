@@ -1030,7 +1030,6 @@ const path = require("path");
 const mongoose = require("mongoose");
 const Category = require("../../models/admin/category");
 
-
 // ================= HELPERS =================
 const deleteFiles = async (files = []) => {
   if (!files.length) return;
@@ -1046,7 +1045,19 @@ const deleteFiles = async (files = []) => {
     })
   );
 };
+const populateSubCategories = async (vehicle) => {
+  if (!vehicle || !vehicle.subCategories?.length || !vehicle.category?._id) {
+    return;
+  }
 
+  const subCategoryDocs = await Category.find({
+    _id: { $in: vehicle.subCategories },
+    parentCategory: vehicle.category._id,
+    isActive: true,
+  }).select("title image isActive");
+
+  vehicle.subCategories = subCategoryDocs;
+};
 
 const VEHICLE_UPLOAD_PATH = "/uploads/vehicles";
 
@@ -1071,7 +1082,6 @@ const attachVehicleImageUrls = (vehicle) => {
 
   return vehicle;
 };
-
 
 const sendResponse = (
   res,
@@ -1438,10 +1448,9 @@ exports.createVehicle = async (req, res) => {
       }
 
       // Extract valid subcategory IDs from parent's embedded subdocuments
-     const validSubIds = Array.isArray(parentCategory.subCategories)
-  ? parentCategory.subCategories.map((id) => id.toString())
-  : [];
-
+      const validSubIds = Array.isArray(parentCategory.subCategories)
+        ? parentCategory.subCategories.map((id) => id.toString())
+        : [];
 
       console.log("✅ Valid subcategory IDs:", validSubIds);
 
@@ -1496,8 +1505,7 @@ exports.createVehicle = async (req, res) => {
       .populate(populateProvider)
       .populate("zone")
       .lean();
-      attachVehicleImageUrls(populatedVehicle);
-
+    attachVehicleImageUrls(populatedVehicle);
 
     // ✅ MANUAL subCategory population (THIS IS THE KEY)
     // ✅ MANUAL subCategory population (CORRECT WAY)
@@ -1513,8 +1521,6 @@ exports.createVehicle = async (req, res) => {
       }).select("title image isActive");
 
       populatedVehicle.subCategories = subCategoryDocs;
-
- 
     }
 
     // Remove nested subCategories from category (clean response)
@@ -1643,18 +1649,17 @@ exports.getVehicles = async (req, res) => {
         const subCategoryIds = vehicle.subCategories.map((id) => id.toString());
 
         const categorySubs = Array.isArray(vehicle.category?.subCategories)
-  ? vehicle.category.subCategories
-  : [];
+          ? vehicle.category.subCategories
+          : [];
 
-vehicle.subCategories = categorySubs
-  .filter((sub) => subCategoryIds.includes(sub._id.toString()))
-  .map((sub) => ({
-    _id: sub._id,
-    title: sub.title,
-    image: sub.image,
-    isActive: sub.isActive,
-  }));
-
+        vehicle.subCategories = categorySubs
+          .filter((sub) => subCategoryIds.includes(sub._id.toString()))
+          .map((sub) => ({
+            _id: sub._id,
+            title: sub.title,
+            image: sub.image,
+            isActive: sub.isActive,
+          }));
 
         delete vehicle.category.subCategories;
       }
@@ -1666,7 +1671,13 @@ vehicle.subCategories = categorySubs
       limit: Number(limit),
       totalPages: Math.ceil(total / Number(limit)),
     };
-
+    for (let vehicle of vehicles) {
+      attachVehicleImageUrls(vehicle);
+    }
+    for (let vehicle of vehicles) {
+      attachVehicleImageUrls(vehicle);
+      await populateSubCategories(vehicle);
+    }
     sendResponse(
       res,
       200,
@@ -1698,23 +1709,25 @@ exports.getVehicle = async (req, res) => {
     if (!vehicle) {
       return sendResponse(res, 404, false, "Vehicle not found");
     }
+    attachVehicleImageUrls(vehicle);
+    await populateSubCategories(vehicle);
 
     // Manually populate subcategories
     if (vehicle.category && vehicle.subCategories?.length) {
       const subCategoryIds = vehicle.subCategories.map((id) => id.toString());
 
-   const categorySubs = Array.isArray(vehicle.category?.subCategories)
-  ? vehicle.category.subCategories
-  : [];
+      const categorySubs = Array.isArray(vehicle.category?.subCategories)
+        ? vehicle.category.subCategories
+        : [];
 
-vehicle.subCategories = categorySubs
-  .filter((sub) => subCategoryIds.includes(sub._id.toString()))
-  .map((sub) => ({
-    _id: sub._id,
-    title: sub.title,
-    image: sub.image,
-    isActive: sub.isActive,
-  }));
+      vehicle.subCategories = categorySubs
+        .filter((sub) => subCategoryIds.includes(sub._id.toString()))
+        .map((sub) => ({
+          _id: sub._id,
+          title: sub.title,
+          image: sub.image,
+          isActive: sub.isActive,
+        }));
 
       delete vehicle.category.subCategories;
     }
@@ -1743,7 +1756,7 @@ exports.getVehiclesByProvider = async (req, res) => {
         .populate({
           path: "category",
           model: "Category",
-          select: "title image isActive subCategories",
+          select: "title image isActive",
         })
         .populate(populateProvider)
         .populate("zone")
@@ -1754,26 +1767,10 @@ exports.getVehiclesByProvider = async (req, res) => {
       Vehicle.countDocuments(query),
     ]);
 
-    // Manually populate subcategories for each vehicle
+    // ✅ FIX: process each vehicle correctly
     for (let vehicle of vehicles) {
-      if (vehicle.category && vehicle.subCategories?.length) {
-        const subCategoryIds = vehicle.subCategories.map((id) => id.toString());
-
-      const categorySubs = Array.isArray(vehicle.category?.subCategories)
-  ? vehicle.category.subCategories
-  : [];
-
-vehicle.subCategories = categorySubs
-  .filter((sub) => subCategoryIds.includes(sub._id.toString()))
-  .map((sub) => ({
-    _id: sub._id,
-    title: sub.title,
-    image: sub.image,
-    isActive: sub.isActive,
-  }));
-
-        delete vehicle.category.subCategories;
-      }
+      attachVehicleImageUrls(vehicle);
+      await populateSubCategories(vehicle);
     }
 
     const meta = {
@@ -1857,12 +1854,11 @@ exports.updateVehicle = async (req, res) => {
       const parentCategory = await Category.findById(body.category).lean();
 
       if (parentCategory) {
-       const validSubIds = Array.isArray(parentCategory.subCategories)
-  ? parentCategory.subCategories
-      .filter((sub) => sub.isActive)
-      .map((s) => s._id.toString())
-  : [];
-
+        const validSubIds = Array.isArray(parentCategory.subCategories)
+          ? parentCategory.subCategories
+              .filter((sub) => sub.isActive)
+              .map((s) => s._id.toString())
+          : [];
 
         body.subCategories = body.subCategories.filter((id) =>
           validSubIds.includes(id.toString())
@@ -1930,8 +1926,6 @@ exports.updateVehicle = async (req, res) => {
     sendResponse(res, 500, false, error.message);
   }
 };
-
-
 
 // ================= DELETE VEHICLE =================
 exports.deleteVehicle = async (req, res) => {
