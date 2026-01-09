@@ -21,10 +21,9 @@ const CakeSchema = new mongoose.Schema(
       required: true,
     },
 
-    // ❌ REMOVED UNIQUE cakeId (THIS WAS CAUSING DUPLICATES)
     cakeId: {
       type: String,
-      default: null, // optional, NOT unique
+      default: null,
     },
 
     images: [
@@ -33,7 +32,15 @@ const CakeSchema = new mongoose.Schema(
       },
     ],
 
-    /* ================= CATEGORY ================= */
+    /* ================= MODULE & CATEGORY ================= */
+    module: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Module",
+  required: true,
+  index: true,
+},
+
+
     category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
@@ -102,11 +109,13 @@ const CakeSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true,
+      index: true,
     },
 
     isTopPick: {
       type: Boolean,
       default: false,
+      index: true,
     },
 
     /* ================= PROVIDER ================= */
@@ -114,22 +123,24 @@ const CakeSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
     },
   },
   { timestamps: true }
 );
 
-/* ================= INDEXES (SAFE ONLY) ================= */
+/* ================= INDEXES ================= */
 
-// ✅ Fast provider listing
+// Fast provider listing
 CakeSchema.index({ provider: 1, isActive: 1 });
 
-// ✅ Category filter
+// Category filter
 CakeSchema.index({ category: 1 });
 
-// ✅ Search support
+// Search support
 CakeSchema.index({ name: "text", searchTags: "text" });
 
-// ❌ NO unique indexes at all
+// Top picks query
+CakeSchema.index({ isTopPick: 1, isActive: 1 });
 
 module.exports = mongoose.model("Cake", CakeSchema);

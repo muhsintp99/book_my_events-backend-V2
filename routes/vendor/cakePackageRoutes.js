@@ -4,10 +4,39 @@ const router = express.Router();
 const cakeController = require("../../controllers/vendor/cakePackageController");
 const createUpload = require("../../middlewares/upload");
 
-// ✅ create multer instance (SAME AS VEHICLE)
+// Create multer instance
 const upload = createUpload("cake");
 
-/* ================= CAKE ROUTES ================= */
+/* =====================================================
+   SPECIAL ROUTES (Before dynamic :id routes)
+===================================================== */
+
+// Search cakes
+router.get("/search", cakeController.searchCakes);
+
+// Get vendors for a module (EXACT SAME AS MAKEUP)
+// Example: /api/cakes/vendors/68e5fbc33a5a05dde7500c89
+// Example: /api/cakes/vendors/68e5fbc33a5a05dde7500c89?providerId=693c2359d84d171bba553460
+router.get("/vendors/:moduleId", cakeController.getVendorsForCakeModule);
+
+// Get cakes by module
+router.get("/module/:moduleId", cakeController.getCakesByModule);
+
+// Get cakes by provider
+router.get("/provider/:providerId", cakeController.getCakesByProvider);
+
+// Get top pick cakes
+router.get("/top-picks", cakeController.getTopPickCakes);
+
+// Toggle top pick status
+router.patch("/:id/toggle-top-pick", cakeController.toggleTopPickStatus);
+
+// Toggle active status
+router.patch("/:id/toggle-active", cakeController.toggleActiveStatus);
+
+/* =====================================================
+   CRUD ROUTES
+===================================================== */
 
 // Create cake
 router.post(
@@ -22,10 +51,7 @@ router.post(
 // Get all cakes
 router.get("/", cakeController.getAllCakes);
 
-// Get cakes by provider
-router.get("/provider/:providerId", cakeController.getCakesByProvider);
-
-// Get single cake
+// Get single cake by ID
 router.get("/:id", cakeController.getCakeById);
 
 // Update cake
