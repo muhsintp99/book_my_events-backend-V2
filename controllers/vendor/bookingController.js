@@ -585,6 +585,8 @@ exports.createBooking = async (req, res) => {
         message: "moduleId, bookingDate, bookingType are required",
       });
     }
+    // ✅ TIME SLOT VALIDATION (VERY IMPORTANT)
+
 
     if (!["Direct", "Indirect"].includes(bookingType)) {
       return res.status(400).json({
@@ -592,72 +594,50 @@ exports.createBooking = async (req, res) => {
         message: "Invalid bookingType",
       });
     }
+// ===================================================
+// NORMALIZE TIME SLOT (FIX ALL FORMATS)
+// ===================================================
+let normalizedTimeSlot = [];
 
-    // ===================================================
-    // TIME SLOT MAP - UPDATED TO HANDLE ALL FORMATS
-    // ===================================================
-    const TIME_SLOT_MAP = {
-      Morning: "9:00 AM - 1:00 PM",
-      "morning": "9:00 AM - 1:00 PM",
-      Evening: "6:00 PM - 10:00 PM",
-      "evening": "6:00 PM - 10:00 PM",
-      "Morning Section": "9:00 AM - 1:00 PM",
-      "morning section": "9:00 AM - 1:00 PM",
-      "Evening Section": "6:00 PM - 10:00 PM",
-      "evening section": "6:00 PM - 10:00 PM",
-    };
-
-    // ===================================================
-    // NORMALIZE TIME SLOT (FIX ALL FORMATS)
-    // ===================================================
-    let normalizedTimeSlot = [];
-
-    if (Array.isArray(timeSlot)) {
-      // ["Morning"] OR [{label,time}]
-      normalizedTimeSlot = timeSlot.map((slot) => {
-        if (typeof slot === "string") {
-          // ✅ CRITICAL FIX: Remove .toLowerCase() check issue
-          const mappedTime = TIME_SLOT_MAP[slot] || TIME_SLOT_MAP[slot.toLowerCase()];
-          
-          if (!mappedTime) {
-            throw new Error(`Invalid timeSlot value: ${slot}`);
-          }
-          
-          return {
-            label: slot,
-            time: mappedTime,
-          };
-        }
-
-        if (slot.label && slot.time) {
-          return slot;
-        }
-
-        throw new Error("Invalid timeSlot format");
-      });
-    } else if (typeof timeSlot === "string") {
-      // ✅ CRITICAL FIX: Check both original and lowercase
-      const mappedTime = TIME_SLOT_MAP[timeSlot] || TIME_SLOT_MAP[timeSlot.toLowerCase()];
-      
-      if (!mappedTime) {
-        throw new Error(`Invalid timeSlot value: ${timeSlot}`);
+if (Array.isArray(timeSlot)) {
+  // ["Morning"] OR [{label,time}]
+  normalizedTimeSlot = timeSlot.map((slot) => {
+    if (typeof slot === "string") {
+      if (!TIME_SLOT_MAP[slot]) {
+        throw new Error("Invalid timeSlot value");
       }
-
-      normalizedTimeSlot = [
-        {
-          label: timeSlot,
-          time: mappedTime,
-        },
-      ];
-    } else if (timeSlot?.label && timeSlot?.time) {
-      normalizedTimeSlot = [timeSlot];
-    } else {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Invalid timeSlot. Use 'Morning', 'Evening', or valid timeSlot object",
-      });
+      return {
+        label: slot,
+        time: TIME_SLOT_MAP[slot],
+      };
     }
+
+    if (slot.label && slot.time) {
+      return slot;
+    }
+
+    throw new Error("Invalid timeSlot format");
+  });
+} else if (typeof timeSlot === "string") {
+  if (!TIME_SLOT_MAP[timeSlot]) {
+    throw new Error("Invalid timeSlot value");
+  }
+
+  normalizedTimeSlot = [
+    {
+      label: timeSlot,
+      time: TIME_SLOT_MAP[timeSlot],
+    },
+  ];
+} else if (timeSlot?.label && timeSlot?.time) {
+  normalizedTimeSlot = [timeSlot];
+} else {
+  return res.status(400).json({
+    success: false,
+    message:
+      "Invalid timeSlot. Use 'Morning', 'Evening', or valid timeSlot object",
+  });
+}
 
     /* ===================================================
        MODULE
@@ -803,7 +783,7 @@ exports.createBooking = async (req, res) => {
         pricing = await calculateVenuePricing(
           serviceProvider,
           bookingDate,
-          normalizedTimeSlot, // ✅ Use normalized timeSlot
+          timeSlot,
           numberOfGuests
         );
         break;
@@ -912,8 +892,9 @@ exports.createBooking = async (req, res) => {
       userId: user._id,
 
       bookingDate,
-      // ✅ ALWAYS SEND ARRAY (matches schema)
-      timeSlot: normalizedTimeSlot,
+     // ✅ ALWAYS SEND ARRAY (matches schema)
+timeSlot: normalizedTimeSlot,
+
 
       numberOfGuests: numberOfGuests || null,
 
@@ -960,6 +941,7 @@ exports.createBooking = async (req, res) => {
     });
   }
 };
+
 // GET BOOKINGS BY USER ID
 exports.getBookingsByUser = async (req, res) => {
   try {
