@@ -1961,7 +1961,9 @@ async function calculateVenuePricing(
     .toLocaleDateString("en-US", { weekday: "long" })
     .toLowerCase();
 
-  const slot = timeSlot.toLowerCase();
+const slot = Array.isArray(timeSlot)
+  ? timeSlot[0].toLowerCase()
+  : timeSlot.toLowerCase();
 
   const priceData = venue.pricingSchedule?.[bookingDay]?.[slot];
   // if (!priceData) {
