@@ -321,6 +321,19 @@ const bookingSchema = new mongoose.Schema(
       default: "Direct",
     },
 
+
+    vehicleId: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Vehicle",
+},
+
+transportDetails: {
+  tripType: String,
+  hours: Number,
+  days: Number,
+  distanceKm: Number,
+},
+
     // ===============================
     // STATUS
     // ===============================
