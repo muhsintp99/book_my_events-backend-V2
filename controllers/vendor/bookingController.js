@@ -542,51 +542,53 @@ const TIME_SLOT_MAP = {
   "Evening Section": "6:00 PM - 10:00 PM",
 };
 
+// =======================================================
+// CREATE BOOKING - COMPLETE FIX
+// =======================================================
+
 exports.createBooking = async (req, res) => {
   try {
     const {
       moduleId,
-      bookingType, // Direct | Indirect
+      bookingType,
       bookingDate,
       timeSlot,
-
-      // customer (Direct)
       fullName,
       contactNumber,
       emailAddress,
       address,
       vehicleId,
-      tripType, // hourly | perDay | distanceWise
+      tripType,
       hours,
       days,
       distanceKm,
-
-      // user (Indirect)
       userId,
-
-      // module ids
       venueId,
       makeupId,
       photographyId,
       cateringId,
       packageId,
-
       numberOfGuests,
       couponId,
       paymentType,
     } = req.body;
 
-    /* ===================================================
-       BASIC VALIDATION
-    =================================================== */
+    console.log("=".repeat(60));
+    console.log("📥 BOOKING REQUEST RECEIVED");
+    console.log("=".repeat(60));
+    console.log("📌 Module Type:", moduleId);
+    console.log("📌 Booking Date:", bookingDate);
+    console.log("📌 Time Slot (RAW):", JSON.stringify(timeSlot));
+    console.log("📌 Type of timeSlot:", typeof timeSlot);
+    console.log("📌 Is Array:", Array.isArray(timeSlot));
+
+    // BASIC VALIDATION
     if (!moduleId || !bookingDate || !bookingType) {
       return res.status(400).json({
         success: false,
         message: "moduleId, bookingDate, bookingType are required",
       });
     }
-    // ✅ TIME SLOT VALIDATION (VERY IMPORTANT)
-
 
     if (!["Direct", "Indirect"].includes(bookingType)) {
       return res.status(400).json({
@@ -594,54 +596,114 @@ exports.createBooking = async (req, res) => {
         message: "Invalid bookingType",
       });
     }
-// ===================================================
-// NORMALIZE TIME SLOT (FIX ALL FORMATS)
-// ===================================================
-let normalizedTimeSlot = [];
 
-if (Array.isArray(timeSlot)) {
-  // ["Morning"] OR [{label,time}]
-  normalizedTimeSlot = timeSlot.map((slot) => {
-    if (typeof slot === "string") {
-      if (!TIME_SLOT_MAP[slot]) {
-        throw new Error("Invalid timeSlot value");
+    // =======================================================
+    // TIME SLOT NORMALIZATION - COMPLETE FIX
+    // =======================================================
+    
+    const TIME_SLOT_MAP = {
+      "Morning": "9:00 AM - 1:00 PM",
+      "morning": "9:00 AM - 1:00 PM",
+      "MORNING": "9:00 AM - 1:00 PM",
+      "Evening": "6:00 PM - 10:00 PM",
+      "evening": "6:00 PM - 10:00 PM",
+      "EVENING": "6:00 PM - 10:00 PM",
+      "Morning Section": "9:00 AM - 1:00 PM",
+      "morning section": "9:00 AM - 1:00 PM",
+      "MORNING SECTION": "9:00 AM - 1:00 PM",
+      "Evening Section": "6:00 PM - 10:00 PM",
+      "evening section": "6:00 PM - 10:00 PM",
+      "EVENING SECTION": "6:00 PM - 10:00 PM",
+    };
+
+    let normalizedTimeSlot = [];
+
+    // Handle undefined or null timeSlot
+    if (!timeSlot) {
+      console.log("⚠️ No timeSlot provided, using default");
+      normalizedTimeSlot = [{
+        label: "Morning",
+        time: "9:00 AM - 1:00 PM"
+      }];
+    }
+    // Handle array
+    else if (Array.isArray(timeSlot)) {
+      console.log("🔄 Processing ARRAY timeSlot");
+      
+      normalizedTimeSlot = timeSlot.map((slot, index) => {
+        console.log(`  → Processing slot[${index}]:`, JSON.stringify(slot));
+        
+        // Already formatted {label, time}
+        if (slot && typeof slot === "object" && slot.label && slot.time) {
+          console.log(`  ✅ Already formatted`);
+          return slot;
+        }
+        
+        // String slot
+        if (typeof slot === "string") {
+          const trimmed = slot.trim();
+          const mappedTime = TIME_SLOT_MAP[trimmed] || 
+                            TIME_SLOT_MAP[trimmed.toLowerCase()] ||
+                            TIME_SLOT_MAP[trimmed.toUpperCase()];
+          
+          if (!mappedTime) {
+            console.error(`  ❌ No mapping for: "${trimmed}"`);
+            console.error(`  Available keys:`, Object.keys(TIME_SLOT_MAP));
+            throw new Error(`Invalid timeSlot: "${trimmed}"`);
+          }
+          
+          console.log(`  ✅ Mapped "${trimmed}" → "${mappedTime}"`);
+          return {
+            label: trimmed,
+            time: mappedTime
+          };
+        }
+        
+        throw new Error(`Invalid slot format at index ${index}`);
+      });
+    }
+    // Handle string
+    else if (typeof timeSlot === "string") {
+      console.log("🔄 Processing STRING timeSlot:", timeSlot);
+      
+      const trimmed = timeSlot.trim();
+      const mappedTime = TIME_SLOT_MAP[trimmed] || 
+                        TIME_SLOT_MAP[trimmed.toLowerCase()] ||
+                        TIME_SLOT_MAP[trimmed.toUpperCase()];
+      
+      if (!mappedTime) {
+        console.error(`❌ No mapping for: "${trimmed}"`);
+        console.error(`Available keys:`, Object.keys(TIME_SLOT_MAP));
+        return res.status(400).json({
+          success: false,
+          message: `Invalid timeSlot: "${trimmed}". Use "Morning" or "Evening"`,
+        });
       }
-      return {
-        label: slot,
-        time: TIME_SLOT_MAP[slot],
-      };
+      
+      console.log(`✅ Mapped "${trimmed}" → "${mappedTime}"`);
+      normalizedTimeSlot = [{
+        label: trimmed,
+        time: mappedTime
+      }];
+    }
+    // Handle object {label, time}
+    else if (timeSlot && typeof timeSlot === "object" && timeSlot.label && timeSlot.time) {
+      console.log("🔄 Processing OBJECT timeSlot");
+      normalizedTimeSlot = [timeSlot];
+    }
+    // Invalid format
+    else {
+      console.error("❌ Invalid timeSlot format:", timeSlot);
+      return res.status(400).json({
+        success: false,
+        message: "Invalid timeSlot format",
+      });
     }
 
-    if (slot.label && slot.time) {
-      return slot;
-    }
+    console.log("✅ NORMALIZED TIMESLOT:", JSON.stringify(normalizedTimeSlot));
+    console.log("=".repeat(60));
 
-    throw new Error("Invalid timeSlot format");
-  });
-} else if (typeof timeSlot === "string") {
-  if (!TIME_SLOT_MAP[timeSlot]) {
-    throw new Error("Invalid timeSlot value");
-  }
-
-  normalizedTimeSlot = [
-    {
-      label: timeSlot,
-      time: TIME_SLOT_MAP[timeSlot],
-    },
-  ];
-} else if (timeSlot?.label && timeSlot?.time) {
-  normalizedTimeSlot = [timeSlot];
-} else {
-  return res.status(400).json({
-    success: false,
-    message:
-      "Invalid timeSlot. Use 'Morning', 'Evening', or valid timeSlot object",
-  });
-}
-
-    /* ===================================================
-       MODULE
-    =================================================== */
+    // MODULE
     const moduleData = await Module.findById(moduleId);
     if (!moduleData) {
       return res.status(400).json({
@@ -651,11 +713,9 @@ if (Array.isArray(timeSlot)) {
     }
 
     const moduleType = moduleData.title;
-    console.log("🔥 MODULE TITLE FROM DB:", moduleType);
+    console.log("🔥 MODULE TYPE:", moduleType);
 
-    /* ===================================================
-       USER HANDLING
-    =================================================== */
+    // USER HANDLING
     let user;
     let token = null;
     let userDetails = {};
@@ -682,7 +742,6 @@ if (Array.isArray(timeSlot)) {
         });
       }
 
-      // Optional auto-login token
       try {
         const resp = await axios.post(AUTH_API_URL, {
           email: emailAddress,
@@ -720,9 +779,7 @@ if (Array.isArray(timeSlot)) {
       };
     }
 
-    /* ===================================================
-       SERVICE PROVIDER + PRICING
-    =================================================== */
+    // SERVICE PROVIDER + PRICING
     let serviceProvider;
     let pricing = {
       basePrice: 0,
@@ -737,15 +794,12 @@ if (Array.isArray(timeSlot)) {
         if (!vehicleId || !tripType) {
           return res.status(400).json({
             success: false,
-            message:
-              "vehicleId and tripType are required for Transport booking",
+            message: "vehicleId and tripType required for Transport",
           });
         }
 
         serviceProvider = await Vehicle.findById(vehicleId).lean();
-        if (!serviceProvider) {
-          throw new Error("Vehicle not found");
-        }
+        if (!serviceProvider) throw new Error("Vehicle not found");
 
         const pricingMap = serviceProvider.pricing || {};
         let transportPrice = 0;
@@ -753,14 +807,10 @@ if (Array.isArray(timeSlot)) {
         if (tripType === "hourly") {
           if (!hours) throw new Error("hours required");
           transportPrice = pricingMap.hourly * hours;
-        }
-
-        if (tripType === "perDay") {
+        } else if (tripType === "perDay") {
           if (!days) throw new Error("days required");
           transportPrice = pricingMap.perDay * days;
-        }
-
-        if (tripType === "distanceWise") {
+        } else if (tripType === "distanceWise") {
           if (!distanceKm) throw new Error("distanceKm required");
           transportPrice = pricingMap.distanceWise * distanceKm;
         }
@@ -783,7 +833,7 @@ if (Array.isArray(timeSlot)) {
         pricing = await calculateVenuePricing(
           serviceProvider,
           bookingDate,
-          timeSlot,
+          normalizedTimeSlot,
           numberOfGuests
         );
         break;
@@ -821,9 +871,7 @@ if (Array.isArray(timeSlot)) {
         });
     }
 
-    /* ===================================================
-       PACKAGE PRICING (VENUES ONLY)
-    =================================================== */
+    // PACKAGE PRICING (VENUES ONLY)
     let packagePrice = 0;
     if (moduleType === "Venues" && packageId) {
       const pkg = await Package.findById(packageId).lean();
@@ -832,9 +880,7 @@ if (Array.isArray(timeSlot)) {
       packagePrice = Number(pkg.price || 0) * numberOfGuests;
     }
 
-    /* ===================================================
-       TOTAL CALCULATION
-    =================================================== */
+    // TOTAL CALCULATION
     let totalBeforeDiscount =
       pricing.basePrice + (moduleType === "Venues" ? packagePrice : 0);
 
@@ -856,9 +902,7 @@ if (Array.isArray(timeSlot)) {
 
     const finalPrice = Math.max(afterDiscount - couponDiscountValue, 0);
 
-    /* ===================================================
-       ADVANCE PAYMENT
-    =================================================== */
+    // ADVANCE PAYMENT
     let advanceAmount =
       Number(
         moduleType === "Venues"
@@ -869,9 +913,7 @@ if (Array.isArray(timeSlot)) {
     advanceAmount = Math.max(advanceAmount, 0);
     const remainingAmount = Math.max(finalPrice - advanceAmount, 0);
 
-    /* ===================================================
-       CREATE BOOKING
-    =================================================== */
+    // CREATE BOOKING
     const bookingData = {
       moduleId,
       moduleType,
@@ -892,9 +934,7 @@ if (Array.isArray(timeSlot)) {
       userId: user._id,
 
       bookingDate,
-     // ✅ ALWAYS SEND ARRAY (matches schema)
-timeSlot: normalizedTimeSlot,
-
+      timeSlot: normalizedTimeSlot,
 
       numberOfGuests: numberOfGuests || null,
 
@@ -925,7 +965,9 @@ timeSlot: normalizedTimeSlot,
       paymentType: paymentType || null,
     };
 
+    console.log("💾 Creating booking...");
     const booking = await Booking.create(bookingData);
+    console.log("✅ Booking created:", booking._id);
 
     return res.status(201).json({
       success: true,
@@ -934,14 +976,19 @@ timeSlot: normalizedTimeSlot,
       token,
     });
   } catch (error) {
-    console.error("Create Booking Error:", error);
+    console.error("=" .repeat(60));
+    console.error("❌ BOOKING ERROR");
+    console.error("=".repeat(60));
+    console.error("Error message:", error.message);
+    console.error("Error stack:", error.stack);
+    console.error("=".repeat(60));
+    
     return res.status(500).json({
       success: false,
       message: error.message,
     });
   }
 };
-
 // GET BOOKINGS BY USER ID
 exports.getBookingsByUser = async (req, res) => {
   try {
