@@ -538,6 +538,8 @@ function calculateTimeline(bookingDate) {
 const TIME_SLOT_MAP = {
   Morning: "9:00 AM - 1:00 PM",
   Evening: "6:00 PM - 10:00 PM",
+  "Morning Section": "9:00 AM - 1:00 PM",
+  "Evening Section": "6:00 PM - 10:00 PM",
 };
 
 exports.createBooking = async (req, res) => {
