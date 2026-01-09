@@ -600,14 +600,14 @@ exports.createBooking = async (req, res) => {
     // =======================================================
     // TIME SLOT NORMALIZATION - COMPLETE FIX
     // =======================================================
-    
+
     const TIME_SLOT_MAP = {
-      "Morning": "9:00 AM - 1:00 PM",
-      "morning": "9:00 AM - 1:00 PM",
-      "MORNING": "9:00 AM - 1:00 PM",
-      "Evening": "6:00 PM - 10:00 PM",
-      "evening": "6:00 PM - 10:00 PM",
-      "EVENING": "6:00 PM - 10:00 PM",
+      Morning: "9:00 AM - 1:00 PM",
+      morning: "9:00 AM - 1:00 PM",
+      MORNING: "9:00 AM - 1:00 PM",
+      Evening: "6:00 PM - 10:00 PM",
+      evening: "6:00 PM - 10:00 PM",
+      EVENING: "6:00 PM - 10:00 PM",
       "Morning Section": "9:00 AM - 1:00 PM",
       "morning section": "9:00 AM - 1:00 PM",
       "MORNING SECTION": "9:00 AM - 1:00 PM",
@@ -621,56 +621,60 @@ exports.createBooking = async (req, res) => {
     // Handle undefined or null timeSlot
     if (!timeSlot) {
       console.log("⚠️ No timeSlot provided, using default");
-      normalizedTimeSlot = [{
-        label: "Morning",
-        time: "9:00 AM - 1:00 PM"
-      }];
+      normalizedTimeSlot = [
+        {
+          label: "Morning",
+          time: "9:00 AM - 1:00 PM",
+        },
+      ];
     }
     // Handle array
     else if (Array.isArray(timeSlot)) {
       console.log("🔄 Processing ARRAY timeSlot");
-      
+
       normalizedTimeSlot = timeSlot.map((slot, index) => {
         console.log(`  → Processing slot[${index}]:`, JSON.stringify(slot));
-        
+
         // Already formatted {label, time}
         if (slot && typeof slot === "object" && slot.label && slot.time) {
           console.log(`  ✅ Already formatted`);
           return slot;
         }
-        
+
         // String slot
         if (typeof slot === "string") {
           const trimmed = slot.trim();
-          const mappedTime = TIME_SLOT_MAP[trimmed] || 
-                            TIME_SLOT_MAP[trimmed.toLowerCase()] ||
-                            TIME_SLOT_MAP[trimmed.toUpperCase()];
-          
+          const mappedTime =
+            TIME_SLOT_MAP[trimmed] ||
+            TIME_SLOT_MAP[trimmed.toLowerCase()] ||
+            TIME_SLOT_MAP[trimmed.toUpperCase()];
+
           if (!mappedTime) {
             console.error(`  ❌ No mapping for: "${trimmed}"`);
             console.error(`  Available keys:`, Object.keys(TIME_SLOT_MAP));
             throw new Error(`Invalid timeSlot: "${trimmed}"`);
           }
-          
+
           console.log(`  ✅ Mapped "${trimmed}" → "${mappedTime}"`);
           return {
             label: trimmed,
-            time: mappedTime
+            time: mappedTime,
           };
         }
-        
+
         throw new Error(`Invalid slot format at index ${index}`);
       });
     }
     // Handle string
     else if (typeof timeSlot === "string") {
       console.log("🔄 Processing STRING timeSlot:", timeSlot);
-      
+
       const trimmed = timeSlot.trim();
-      const mappedTime = TIME_SLOT_MAP[trimmed] || 
-                        TIME_SLOT_MAP[trimmed.toLowerCase()] ||
-                        TIME_SLOT_MAP[trimmed.toUpperCase()];
-      
+      const mappedTime =
+        TIME_SLOT_MAP[trimmed] ||
+        TIME_SLOT_MAP[trimmed.toLowerCase()] ||
+        TIME_SLOT_MAP[trimmed.toUpperCase()];
+
       if (!mappedTime) {
         console.error(`❌ No mapping for: "${trimmed}"`);
         console.error(`Available keys:`, Object.keys(TIME_SLOT_MAP));
@@ -679,15 +683,22 @@ exports.createBooking = async (req, res) => {
           message: `Invalid timeSlot: "${trimmed}". Use "Morning" or "Evening"`,
         });
       }
-      
+
       console.log(`✅ Mapped "${trimmed}" → "${mappedTime}"`);
-      normalizedTimeSlot = [{
-        label: trimmed,
-        time: mappedTime
-      }];
+      normalizedTimeSlot = [
+        {
+          label: trimmed,
+          time: mappedTime,
+        },
+      ];
     }
     // Handle object {label, time}
-    else if (timeSlot && typeof timeSlot === "object" && timeSlot.label && timeSlot.time) {
+    else if (
+      timeSlot &&
+      typeof timeSlot === "object" &&
+      timeSlot.label &&
+      timeSlot.time
+    ) {
       console.log("🔄 Processing OBJECT timeSlot");
       normalizedTimeSlot = [timeSlot];
     }
@@ -730,10 +741,9 @@ exports.createBooking = async (req, res) => {
 
       const nameParts = fullName.trim().split(" ");
 
-const firstName = nameParts[0];
-const lastName =
-  nameParts.length > 1 ? nameParts.slice(1).join(" ") : "NA";
-
+      const firstName = nameParts[0];
+      const lastName =
+        nameParts.length > 1 ? nameParts.slice(1).join(" ") : "NA";
 
       user = await User.findOne({ email: emailAddress });
       if (!user) {
@@ -980,13 +990,13 @@ const lastName =
       token,
     });
   } catch (error) {
-    console.error("=" .repeat(60));
+    console.error("=".repeat(60));
     console.error("❌ BOOKING ERROR");
     console.error("=".repeat(60));
     console.error("Error message:", error.message);
     console.error("Error stack:", error.stack);
     console.error("=".repeat(60));
-    
+
     return res.status(500).json({
       success: false,
       message: error.message,
@@ -1102,13 +1112,15 @@ async function calculateVenuePricing(
     .toLowerCase();
 
   const slot = Array.isArray(timeSlot)
-    ? timeSlot[0].toLowerCase()
-    : timeSlot.toLowerCase();
+    ? timeSlot[0]?.label?.toLowerCase()
+    : timeSlot?.toLowerCase();
+
+  if (!slot) {
+    throw new Error("Invalid timeSlot format in venue pricing");
+  }
 
   const priceData = venue.pricingSchedule?.[bookingDay]?.[slot];
-  // if (!priceData) {
-  //   throw new Error(`No pricing found for ${bookingDay} - ${slot}`);
-  // }
+
   if (!priceData) {
     return {
       basePrice: venue.basePrice || 0,
@@ -1121,7 +1133,8 @@ async function calculateVenuePricing(
   const perDayPrice = priceData.perDay || 0;
   const perPerson = priceData.perPerson || 0;
 
-  const basePrice = perDayPrice > 0 ? perDayPrice : perPerson * numberOfGuests;
+  const basePrice =
+    perDayPrice > 0 ? perDayPrice : perPerson * numberOfGuests;
 
   const discount = venue.discount?.nonAc || 0;
 
