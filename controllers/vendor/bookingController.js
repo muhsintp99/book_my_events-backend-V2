@@ -728,8 +728,12 @@ exports.createBooking = async (req, res) => {
         });
       }
 
-      const [firstName, ...rest] = fullName.trim().split(" ");
-      const lastName = rest.join(" ");
+      const nameParts = fullName.trim().split(" ");
+
+const firstName = nameParts[0];
+const lastName =
+  nameParts.length > 1 ? nameParts.slice(1).join(" ") : "NA";
+
 
       user = await User.findOne({ email: emailAddress });
       if (!user) {
