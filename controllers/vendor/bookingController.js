@@ -584,16 +584,6 @@ exports.createBooking = async (req, res) => {
       });
     }
     // ✅ TIME SLOT VALIDATION (VERY IMPORTANT)
-if (
-  !timeSlot ||
-  (Array.isArray(timeSlot) && timeSlot.length === 0) ||
-  (!Array.isArray(timeSlot) && !TIME_SLOT_MAP[timeSlot])
-) {
-  return res.status(400).json({
-    success: false,
-    message: "Invalid timeSlot. Allowed values: Morning, Evening",
-  });
-}
 
 
     if (!["Direct", "Indirect"].includes(bookingType)) {
@@ -602,6 +592,50 @@ if (
         message: "Invalid bookingType",
       });
     }
+// ===================================================
+// NORMALIZE TIME SLOT (FIX ALL FORMATS)
+// ===================================================
+let normalizedTimeSlot = [];
+
+if (Array.isArray(timeSlot)) {
+  // ["Morning"] OR [{label,time}]
+  normalizedTimeSlot = timeSlot.map((slot) => {
+    if (typeof slot === "string") {
+      if (!TIME_SLOT_MAP[slot]) {
+        throw new Error("Invalid timeSlot value");
+      }
+      return {
+        label: slot,
+        time: TIME_SLOT_MAP[slot],
+      };
+    }
+
+    if (slot.label && slot.time) {
+      return slot;
+    }
+
+    throw new Error("Invalid timeSlot format");
+  });
+} else if (typeof timeSlot === "string") {
+  if (!TIME_SLOT_MAP[timeSlot]) {
+    throw new Error("Invalid timeSlot value");
+  }
+
+  normalizedTimeSlot = [
+    {
+      label: timeSlot,
+      time: TIME_SLOT_MAP[timeSlot],
+    },
+  ];
+} else if (timeSlot?.label && timeSlot?.time) {
+  normalizedTimeSlot = [timeSlot];
+} else {
+  return res.status(400).json({
+    success: false,
+    message:
+      "Invalid timeSlot. Use 'Morning', 'Evening', or valid timeSlot object",
+  });
+}
 
     /* ===================================================
        MODULE
@@ -857,17 +891,8 @@ if (
 
       bookingDate,
      // ✅ ALWAYS SEND ARRAY (matches schema)
-timeSlot: Array.isArray(timeSlot)
-  ? timeSlot.map(slot => ({
-      label: slot,
-      time: TIME_SLOT_MAP[slot],
-    }))
-  : [
-      {
-        label: timeSlot,
-        time: TIME_SLOT_MAP[timeSlot],
-      },
-    ],
+timeSlot: normalizedTimeSlot,
+
 
       numberOfGuests: numberOfGuests || null,
 
