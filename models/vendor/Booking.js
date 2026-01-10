@@ -55,8 +55,6 @@
 
 // module.exports = mongoose.model("Booking", bookingSchema);
 
-
-
 // const mongoose = require("mongoose");
 
 // const bookingSchema = new mongoose.Schema(
@@ -67,24 +65,24 @@
 //       ref: "Module",
 //       required: true
 //     },
-    
+
 //     // Module-specific reference fields (only one will be populated based on module)
-//     venueId: { 
-//       type: mongoose.Schema.Types.ObjectId, 
+//     venueId: {
+//       type: mongoose.Schema.Types.ObjectId,
 //       ref: "Venue",
 //       required: function() {
 //         return this.moduleType === "Venues";
 //       }
 //     },
-//     makeupId: { 
-//       type: mongoose.Schema.Types.ObjectId, 
+//     makeupId: {
+//       type: mongoose.Schema.Types.ObjectId,
 //       ref: "Makeup",
 //       required: function() {
 //         return this.moduleType === "Makeup";
 //       }
 //     },
-//     photographyId: { 
-//   type: mongoose.Schema.Types.ObjectId, 
+//     photographyId: {
+//   type: mongoose.Schema.Types.ObjectId,
 //   ref: "Photography",
 //   required: function() {
 //     return this.moduleType === "Photography";
@@ -105,20 +103,20 @@
 //     // photographyId: { type: mongoose.Schema.Types.ObjectId, ref: "Photography" },
 //     // cateringId: { type: mongoose.Schema.Types.ObjectId, ref: "Catering" },
 
-//     packageId: { 
-//       type: mongoose.Schema.Types.ObjectId, 
-//       ref: "Package", 
-//       // required: true 
+//     packageId: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: "Package",
+//       // required: true
 //     },
 
-//     providerId: { 
-//       type: mongoose.Schema.Types.ObjectId, 
-//       ref: "User" 
+//     providerId: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: "User"
 //     },
-    
-//     userId: { 
-//       type: mongoose.Schema.Types.ObjectId, 
-//       ref: "User" 
+
+//     userId: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: "User"
 //     },
 
 //     // User details (for direct booking)
@@ -128,27 +126,27 @@
 //     address: { type: String },
 
 //     // Common booking fields
-//     numberOfGuests: { 
-//       type: Number, 
+//     numberOfGuests: {
+//       type: Number,
 //       required: function() {
 //         return this.moduleType === "Venues"; // Only required for venues
 //       }
 //     },
 //     bookingDate: { type: Date, required: true },
-//     timeSlot: { type: String, }, 
+//     timeSlot: { type: String, },
 //     location: { type: String },
-    
-//     bookingType: { 
-//       type: String, 
-//       enum: ["Direct", "Indirect"], 
-//       default: "Direct" 
+
+//     bookingType: {
+//       type: String,
+//       enum: ["Direct", "Indirect"],
+//       default: "Direct"
 //     },
 
 //     // Status fields
-//     status: { 
-//       type: String, 
-//       enum: ["Pending", "Accepted", "Rejected"], 
-//       default: "Pending" 
+//     status: {
+//       type: String,
+//       enum: ["Pending", "Accepted", "Rejected"],
+//       default: "Pending"
 //     },
 
 //     paymentStatus: {
@@ -156,7 +154,6 @@
 //   enum: ["pending", "failed", "completed", "ongoing"],
 //   default: "pending"
 // },
-
 
 //     paymentType: {
 //       type: String,
@@ -174,10 +171,10 @@
 
 //     totalBeforeDiscount: { type: Number, default: 0 },
 //     discountValue: { type: Number, default: 0 },
-//     discountType: { 
-//       type: String, 
-//       enum: ["flat", "percentage", "none"], 
-//       default: "none" 
+//     discountType: {
+//       type: String,
+//       enum: ["flat", "percentage", "none"],
+//       default: "none"
 //     },
 
 //     couponDiscountValue: { type: Number, default: 0 },
@@ -194,13 +191,6 @@
 // bookingSchema.index({ providerId: 1, status: 1 });
 
 // module.exports = mongoose.model("Booking", bookingSchema);
-
-
-
-
-
-
-
 
 const mongoose = require("mongoose");
 
@@ -236,7 +226,9 @@ const bookingSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Makeup",
       required: function () {
-        return this.moduleType === "Makeup" || this.moduleType === "Makeup Artist";
+        return (
+          this.moduleType === "Makeup" || this.moduleType === "Makeup Artist"
+        );
       },
       default: null,
     },
@@ -255,6 +247,14 @@ const bookingSchema = new mongoose.Schema(
       ref: "Catering",
       required: function () {
         return this.moduleType === "Catering";
+      },
+      default: null,
+    },
+    cakeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Cake",
+      required: function () {
+        return this.moduleType === "Cake";
       },
       default: null,
     },
@@ -296,13 +296,12 @@ const bookingSchema = new mongoose.Schema(
       required: true,
     },
 
-   timeSlot: [
-  {
-    label: { type: String, required: true },
-    time: { type: String, required: true }
-  }
-]
-,
+    timeSlot: [
+      {
+        label: { type: String, required: true },
+        time: { type: String, required: true },
+      },
+    ],
     location: {
       type: String,
     },
@@ -321,18 +320,47 @@ const bookingSchema = new mongoose.Schema(
       default: "Direct",
     },
 
-
     vehicleId: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "Vehicle",
-},
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Vehicle",
+    },
 
-transportDetails: {
-  tripType: String,
-  hours: Number,
-  days: Number,
-  distanceKm: Number,
-},
+    transportDetails: {
+      tripType: String,
+      hours: Number,
+      days: Number,
+      distanceKm: Number,
+    },
+
+
+    // ===============================
+// CAKE VARIATIONS (MULTI SELECT)
+// ===============================
+cakeVariations: [
+  {
+    variationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+    },
+    name: {
+      type: String,
+      required: true,
+    },
+    price: {
+      type: Number,
+      required: true,
+    },
+    quantity: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+    totalPrice: {
+      type: Number,
+      required: true,
+    },
+  },
+],
 
     // ===============================
     // STATUS
@@ -342,19 +370,29 @@ transportDetails: {
       enum: ["Pending", "Accepted", "Rejected"],
       default: "Pending",
     },
-paymentOrderId: {
-  type: String,
-  index: true,
-},
-paidAmount: {
-  type: Number,
-  default: 0,
-},
+    paymentOrderId: {
+      type: String,
+      index: true,
+    },
+    paidAmount: {
+      type: Number,
+      default: 0,
+    },
 
     paymentStatus: {
       type: String,
-      enum: ["pending", "initiated","failed", "completed", "ongoing"],
+      enum: ["pending", "initiated", "failed", "completed", "ongoing"],
       default: "pending",
+    },
+    deliveryType: {
+      type: String,
+      enum: ["Takeaway", "Home Delivery"],
+      default: null,
+    },
+
+    customerMessage: {
+      type: String,
+      default: "",
     },
 
     paymentType: {

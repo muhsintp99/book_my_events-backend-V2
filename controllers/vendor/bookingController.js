@@ -10,6 +10,7 @@ const Module = require("../../models/admin/module");
 const Photography = require("../../models/vendor/PhotographyPackage");
 const Catering = require("../../models/vendor/Catering");
 const Vehicle = require("../../models/vendor/Vehicle");
+const Cake = require("../../models/vendor/cakePackageModel");
 
 const AUTH_API_URL = "https://api.bookmyevent.ae/api/auth/login";
 
@@ -571,6 +572,10 @@ exports.createBooking = async (req, res) => {
       numberOfGuests,
       couponId,
       paymentType,
+      cakeId,
+      deliveryType,
+      customerMessage,
+      variations,
     } = req.body;
 
     console.log("=".repeat(60));
@@ -725,6 +730,16 @@ exports.createBooking = async (req, res) => {
 
     const moduleType = moduleData.title;
     console.log("🔥 MODULE TYPE:", moduleType);
+    // ===============================
+    // PAYMENT TYPE NORMALIZATION (FIX)
+    // ===============================
+    let normalizedPaymentType = paymentType;
+
+    if (moduleType === "Cake") {
+      if (paymentType === "COD") {
+        normalizedPaymentType = "Cash";
+      }
+    }
 
     // USER HANDLING
     let user;
@@ -801,9 +816,66 @@ exports.createBooking = async (req, res) => {
       perDayPrice: 0,
       perPersonCharge: 0,
       perHourCharge: 0,
+      
     };
+let calculatedVariations = []; // ✅ FIX: declare in function scope
 
     switch (moduleType) {
+      case "Cake":
+        if (!cakeId) {
+          return res.status(400).json({
+            success: false,
+            message: "cakeId is required for Cake booking",
+          });
+        }
+
+        if (!Array.isArray(variations) || variations.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: "At least one cake variation must be selected",
+          });
+        }
+
+        serviceProvider = await Cake.findById(cakeId).lean();
+        if (!serviceProvider) {
+          return res.status(404).json({
+            success: false,
+            message: "Cake not found",
+          });
+        }
+
+        let basePrice = 0;
+
+        for (const selected of variations) {
+          const cakeVar = serviceProvider.variations.find(
+            (v) => v._id.toString() === selected._id
+          );
+
+          if (!cakeVar) {
+            return res.status(400).json({
+              success: false,
+              message: "Invalid cake variation selected",
+            });
+          }
+
+          const qty = selected.quantity || 1;
+          const total = cakeVar.price * qty;
+
+          calculatedVariations.push({
+            variationId: cakeVar._id,
+            name: cakeVar.name,
+            price: cakeVar.price,
+            quantity: qty,
+            totalPrice: total,
+          });
+
+          basePrice += total;
+        }
+
+        pricing.basePrice = basePrice;
+        pricing.discount = Number(serviceProvider.priceInfo?.discount) || 0;
+        break;
+
       case "Transport":
         if (!vehicleId || !tripType) {
           return res.status(400).json({
@@ -921,6 +993,8 @@ exports.createBooking = async (req, res) => {
       Number(
         moduleType === "Venues"
           ? serviceProvider.advanceDeposit
+          : moduleType === "Cake"
+          ? serviceProvider.priceInfo?.advanceBookingAmount
           : serviceProvider.advanceBookingAmount
       ) || 0;
 
@@ -932,6 +1006,9 @@ exports.createBooking = async (req, res) => {
       moduleId,
       moduleType,
       bookingType,
+      paymentType: normalizedPaymentType || null,
+
+      // ================= TRANSPORT =================
       vehicleId: moduleType === "Transport" ? vehicleId : null,
 
       transportDetails:
@@ -944,6 +1021,7 @@ exports.createBooking = async (req, res) => {
             }
           : null,
 
+      // ================= COMMON =================
       providerId: serviceProvider.provider || serviceProvider.createdBy,
       userId: user._id,
 
@@ -951,32 +1029,45 @@ exports.createBooking = async (req, res) => {
       timeSlot: normalizedTimeSlot,
 
       numberOfGuests: numberOfGuests || null,
-
       ...userDetails,
 
+      // ================= VENUES =================
       venueId: moduleType === "Venues" ? venueId : null,
+      packageId: moduleType === "Venues" ? packageId : null,
+
+      // ================= MAKEUP =================
       makeupId:
         moduleType === "Makeup" || moduleType === "Makeup Artist"
           ? makeupId
           : null,
-      photographyId: moduleType === "Photography" ? photographyId : null,
-      cateringId: moduleType === "Catering" ? cateringId : null,
-      packageId: moduleType === "Venues" ? packageId : null,
 
-      perDayPrice: pricing.perDayPrice,
-      perPersonCharge: pricing.perPersonCharge,
-      perHourCharge: pricing.perHourCharge,
-      packagePrice,
+      // ================= PHOTOGRAPHY =================
+      photographyId: moduleType === "Photography" ? photographyId : null,
+
+      // ================= CATERING =================
+      cateringId: moduleType === "Catering" ? cateringId : null,
+
+      // ================= CAKE =================
+      cakeId: moduleType === "Cake" ? cakeId : null,
+      cakeVariations: moduleType === "Cake" ? calculatedVariations : [], // ✅ ADD HERE
+
+      deliveryType: moduleType === "Cake" ? deliveryType : null,
+      customerMessage: moduleType === "Cake" ? customerMessage : null,
+
+      // ================= PRICING =================
+      perDayPrice: pricing.perDayPrice || null,
+      perPersonCharge: pricing.perPersonCharge || null,
+      perHourCharge: pricing.perHourCharge || null,
+      packagePrice: packagePrice || null,
 
       totalBeforeDiscount,
       discountValue: pricing.discount || 0,
       discountType: pricing.discount ? "flat" : "none",
       couponDiscountValue,
+
       finalPrice,
       advanceAmount,
       remainingAmount,
-
-      paymentType: paymentType || null,
     };
 
     console.log("💾 Creating booking...");
@@ -1023,6 +1114,8 @@ exports.getBookingsByUser = async (req, res) => {
 
       .populate("packageId")
       .populate("moduleId")
+      .populate("cakeId")
+
       .select(
         "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount"
       )
@@ -1133,8 +1226,7 @@ async function calculateVenuePricing(
   const perDayPrice = priceData.perDay || 0;
   const perPerson = priceData.perPerson || 0;
 
-  const basePrice =
-    perDayPrice > 0 ? perDayPrice : perPerson * numberOfGuests;
+  const basePrice = perDayPrice > 0 ? perDayPrice : perPerson * numberOfGuests;
 
   const discount = venue.discount?.nonAc || 0;
 
