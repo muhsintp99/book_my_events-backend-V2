@@ -1,4 +1,7 @@
 const Vehicle = require("../../models/vendor/Vehicle");
+const VendorProfile = require("../../models/vendor/vendorProfile");
+const User = require("../../models/User");
+const Subscription = require("../../models/admin/Subscription");
 const fs = require("fs").promises;
 const path = require("path");
 const mongoose = require("mongoose");
@@ -773,6 +776,143 @@ exports.getVehiclesByProvider = async (req, res) => {
   } catch (error) {
     console.error("Error fetching provider vehicles:", error);
     sendResponse(res, 500, false, error.message);
+  }
+};
+
+
+
+/* =====================================================
+   GET VENDORS FOR VEHICLE MODULE (LIKE CAKES)
+===================================================== */
+
+exports.getVendorsForVehicleModule = async (req, res) => {
+  try {
+    const { moduleId } = req.params;
+    const providerId = req.query.providerId || req.query.providerid || null;
+
+    if (!mongoose.Types.ObjectId.isValid(moduleId)) {
+      return sendResponse(res, 400, false, "Invalid module ID");
+    }
+
+    // Vendor profiles filtered by module
+    let query = { module: moduleId };
+    if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
+      query.user = providerId;
+    }
+
+    const vendorProfiles = await VendorProfile.find(query)
+      .select("user storeName logo coverImage")
+      .lean();
+
+    if (!vendorProfiles.length) {
+      return res.json({
+        success: true,
+        message: providerId
+          ? "Vendor not found for this module"
+          : "No vendors found for this module",
+        data: providerId ? null : [],
+      });
+    }
+
+    const vendorIds = vendorProfiles.map(v => v.user);
+
+    // Fetch user info
+    const users = await User.find({ _id: { $in: vendorIds } })
+      .select("firstName lastName email phone profilePhoto")
+      .lean();
+
+    // Fetch subscriptions
+    const subscriptions = await Subscription.find({
+      userId: { $in: vendorIds },
+      isCurrent: true,
+    })
+      .populate("planId")
+      .populate("moduleId", "title icon")
+      .lean();
+
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+    const final = users.map(user => {
+      const vp = vendorProfiles.find(
+        v => v.user.toString() === user._id.toString()
+      );
+      const sub = subscriptions.find(
+        s => s.userId.toString() === user._id.toString()
+      );
+
+      const now = new Date();
+      const isExpired = sub ? sub.endDate < now : true;
+      const daysLeft = sub
+        ? Math.max(0, Math.ceil((sub.endDate - now) / (1000 * 60 * 60 * 24)))
+        : 0;
+
+      return {
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        profilePhoto: user.profilePhoto
+          ? `${baseUrl}${user.profilePhoto}`
+          : null,
+        storeName: vp?.storeName || `${user.firstName} ${user.lastName}`,
+        logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
+        coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
+        hasVendorProfile: true,
+        subscription: sub
+          ? {
+              isSubscribed: sub.status === "active",
+              status: sub.status,
+              plan: sub.planId,
+              module: sub.moduleId,
+              billing: {
+                startDate: sub.startDate,
+                endDate: sub.endDate,
+                autoRenew: sub.autoRenew,
+              },
+              access: {
+                canAccess: sub.status === "active" && !isExpired,
+                isExpired,
+                daysLeft,
+              },
+            }
+          : {
+              isSubscribed: false,
+              status: "none",
+              plan: null,
+              module: null,
+              billing: null,
+              access: {
+                canAccess: false,
+                isExpired: true,
+                daysLeft: 0,
+              },
+            },
+      };
+    });
+
+    // SINGLE vendor
+    if (providerId) {
+      return res.json({
+        success: true,
+        message: "Vendor details fetched successfully",
+        data: final[0] || null,
+      });
+    }
+
+    // ALL vendors
+    return res.json({
+      success: true,
+      message: "Vendors fetched successfully",
+      count: final.length,
+      data: final,
+    });
+  } catch (error) {
+    console.error("GET VEHICLE VENDORS ERROR:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 

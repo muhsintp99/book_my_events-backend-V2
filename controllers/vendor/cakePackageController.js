@@ -95,17 +95,23 @@ const sanitizeCakeData = (body) => {
   data.searchTags = parseJSON(data.searchTags, []);
   data.variations = parseJSON(data.variations, []);
   data.timeSchedule = parseJSON(data.timeSchedule, {});
+  
+  // ✅ FIXED: Parse priceInfo first, then convert advanceBookingAmount
   data.priceInfo = parseJSON(data.priceInfo, {});
+  
+  // ✅ Convert advanceBookingAmount to number if it exists
+  if (data.priceInfo.advanceBookingAmount !== undefined) {
+    data.priceInfo.advanceBookingAmount = Number(data.priceInfo.advanceBookingAmount);
+  }
 
   return data;
 };
-
 /* =====================================================
    POPULATE CAKE HELPER
 ===================================================== */
 
 const populateCake = async (id, req = null) => {
-  const baseUrl = req 
+  const baseUrl = req
     ? `${req.protocol}://${req.get("host")}`
     : "http://api.bookmyevent.ae";
 
@@ -120,14 +126,14 @@ const populateCake = async (id, req = null) => {
 
   // Normalize image paths for cake
   if (cake.thumbnail) {
-    cake.thumbnail = cake.thumbnail.startsWith('http') 
-      ? cake.thumbnail 
+    cake.thumbnail = cake.thumbnail.startsWith("http")
+      ? cake.thumbnail
       : `${baseUrl}${normalizeUploadPath(cake.thumbnail)}`;
   }
-  
+
   if (cake.images && cake.images.length > 0) {
-    cake.images = cake.images.map(img => 
-      img.startsWith('http') ? img : `${baseUrl}${normalizeUploadPath(img)}`
+    cake.images = cake.images.map((img) =>
+      img.startsWith("http") ? img : `${baseUrl}${normalizeUploadPath(img)}`
     );
   }
 
@@ -143,7 +149,7 @@ const populateCake = async (id, req = null) => {
       storeName: null,
       logo: null,
       coverImage: null,
-      hasVendorProfile: false
+      hasVendorProfile: false,
     };
     return cake;
   }
@@ -155,16 +161,21 @@ const populateCake = async (id, req = null) => {
 
   if (vendorProfile) {
     cake.provider.storeName = vendorProfile.storeName;
-    cake.provider.logo = vendorProfile.logo ? `${baseUrl}${vendorProfile.logo}` : null;
-    cake.provider.coverImage = vendorProfile.coverImage ? `${baseUrl}${vendorProfile.coverImage}` : null;
+    cake.provider.logo = vendorProfile.logo
+      ? `${baseUrl}${vendorProfile.logo}`
+      : null;
+    cake.provider.coverImage = vendorProfile.coverImage
+      ? `${baseUrl}${vendorProfile.coverImage}`
+      : null;
     cake.provider.hasVendorProfile = true;
   } else {
-    cake.provider.storeName =
-      `${cake.provider.firstName || ""} ${cake.provider.lastName || ""}`.trim();
-    cake.provider.logo = cake.provider.profilePhoto 
-      ? (cake.provider.profilePhoto.startsWith('http') 
-          ? cake.provider.profilePhoto 
-          : `${baseUrl}${cake.provider.profilePhoto}`)
+    cake.provider.storeName = `${cake.provider.firstName || ""} ${
+      cake.provider.lastName || ""
+    }`.trim();
+    cake.provider.logo = cake.provider.profilePhoto
+      ? cake.provider.profilePhoto.startsWith("http")
+        ? cake.provider.profilePhoto
+        : `${baseUrl}${cake.provider.profilePhoto}`
       : null;
     cake.provider.coverImage = null;
     cake.provider.hasVendorProfile = false;
@@ -181,8 +192,7 @@ exports.createCake = async (req, res) => {
   const body = sanitizeCakeData(req.body);
 
   try {
-
-     if (!body.module) {
+    if (!body.module) {
       return sendResponse(res, 400, false, "Module is required");
     }
 
@@ -243,15 +253,14 @@ exports.getAllCakes = async (req, res) => {
     let query = {};
 
     if (search && search.trim()) query.$text = { $search: search };
-    if (category && mongoose.Types.ObjectId.isValid(category)) query.category = category;
-    if (module && mongoose.Types.ObjectId.isValid(module)) query.module = module;
+    if (category && mongoose.Types.ObjectId.isValid(category))
+      query.category = category;
+    if (module && mongoose.Types.ObjectId.isValid(module))
+      query.module = module;
 
-    const cakes = await Cake.find(query)
-      .sort({ isTopPick: -1, createdAt: -1 });
+    const cakes = await Cake.find(query).sort({ isTopPick: -1, createdAt: -1 });
 
-    const final = await Promise.all(
-      cakes.map(c => populateCake(c._id, req))
-    );
+    const final = await Promise.all(cakes.map((c) => populateCake(c._id, req)));
 
     sendResponse(res, 200, true, "Cakes fetched successfully", final, {
       count: final.length,
@@ -312,16 +321,11 @@ exports.getCakesByProvider = async (req, res) => {
     const skip = (Number(page) - 1) * Number(limit);
 
     const [cakes, total] = await Promise.all([
-      Cake.find(query)
-        .skip(skip)
-        .limit(Number(limit))
-        .sort({ createdAt: -1 }),
+      Cake.find(query).skip(skip).limit(Number(limit)).sort({ createdAt: -1 }),
       Cake.countDocuments(query),
     ]);
 
-    const final = await Promise.all(
-      cakes.map(c => populateCake(c._id, req))
-    );
+    const final = await Promise.all(cakes.map((c) => populateCake(c._id, req)));
 
     sendResponse(res, 200, true, "Provider cakes fetched successfully", final, {
       total,
@@ -342,7 +346,12 @@ exports.getCakesByProvider = async (req, res) => {
 exports.getCakesByModule = async (req, res) => {
   try {
     const { moduleId } = req.params;
-    const { page = 1, limit = 20, sortBy = "createdAt", sortOrder = "desc" } = req.query;
+    const {
+      page = 1,
+      limit = 20,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+    } = req.query;
 
     if (!mongoose.Types.ObjectId.isValid(moduleId)) {
       return sendResponse(res, 400, false, "Invalid module ID");
@@ -369,16 +378,21 @@ exports.getCakesByModule = async (req, res) => {
       Cake.countDocuments(query),
     ]);
 
-    const final = await Promise.all(
-      cakes.map(c => populateCake(c._id, req))
-    );
+    const final = await Promise.all(cakes.map((c) => populateCake(c._id, req)));
 
-    sendResponse(res, 200, true, "Cakes fetched by module successfully", final, {
-      total,
-      page: Number(page),
-      limit: Number(limit),
-      totalPages: Math.ceil(total / Number(limit)),
-    });
+    sendResponse(
+      res,
+      200,
+      true,
+      "Cakes fetched by module successfully",
+      final,
+      {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / Number(limit)),
+      }
+    );
   } catch (error) {
     console.error("GET CAKES BY MODULE ERROR:", error);
     sendResponse(res, 500, false, error.message);
@@ -392,7 +406,12 @@ exports.getCakesByModule = async (req, res) => {
 exports.getCakesByCategory = async (req, res) => {
   try {
     const { categoryId } = req.params;
-    const { page = 1, limit = 20, sortBy = "createdAt", sortOrder = "desc" } = req.query;
+    const {
+      page = 1,
+      limit = 20,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+    } = req.query;
 
     if (!mongoose.Types.ObjectId.isValid(categoryId)) {
       return sendResponse(res, 400, false, "Invalid category ID");
@@ -419,16 +438,21 @@ exports.getCakesByCategory = async (req, res) => {
       Cake.countDocuments(query),
     ]);
 
-    const final = await Promise.all(
-      cakes.map(c => populateCake(c._id, req))
-    );
+    const final = await Promise.all(cakes.map((c) => populateCake(c._id, req)));
 
-    sendResponse(res, 200, true, "Cakes fetched by category successfully", final, {
-      total,
-      page: Number(page),
-      limit: Number(limit),
-      totalPages: Math.ceil(total / Number(limit)),
-    });
+    sendResponse(
+      res,
+      200,
+      true,
+      "Cakes fetched by category successfully",
+      final,
+      {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / Number(limit)),
+      }
+    );
   } catch (error) {
     console.error("GET CAKES BY CATEGORY ERROR:", error);
     sendResponse(res, 500, false, error.message);
@@ -460,12 +484,14 @@ exports.getVendorsForCakeModule = async (req, res) => {
     if (!vendorProfiles.length) {
       return res.json({
         success: true,
-        message: providerId ? "Vendor not found for this module" : "No vendors found for this module",
-        data: providerId ? null : []
+        message: providerId
+          ? "Vendor not found for this module"
+          : "No vendors found for this module",
+        data: providerId ? null : [],
       });
     }
 
-    const vendorIds = vendorProfiles.map(v => v.user);
+    const vendorIds = vendorProfiles.map((v) => v.user);
 
     const users = await User.find({ _id: { $in: vendorIds } })
       .select("firstName lastName email phone profilePhoto")
@@ -473,7 +499,7 @@ exports.getVendorsForCakeModule = async (req, res) => {
 
     const subscriptions = await Subscription.find({
       userId: { $in: vendorIds },
-      isCurrent: true
+      isCurrent: true,
     })
       .populate("planId")
       .populate("moduleId", "title icon")
@@ -481,9 +507,13 @@ exports.getVendorsForCakeModule = async (req, res) => {
 
     const baseUrl = `${req.protocol}://${req.get("host")}`;
 
-    const final = users.map(u => {
-      const vp = vendorProfiles.find(v => v.user.toString() === u._id.toString());
-      const sub = subscriptions.find(s => s.userId.toString() === u._id.toString());
+    const final = users.map((u) => {
+      const vp = vendorProfiles.find(
+        (v) => v.user.toString() === u._id.toString()
+      );
+      const sub = subscriptions.find(
+        (s) => s.userId.toString() === u._id.toString()
+      );
 
       const now = new Date();
       const isExpired = sub ? sub.endDate < now : true;
@@ -512,13 +542,13 @@ exports.getVendorsForCakeModule = async (req, res) => {
                 startDate: sub.startDate,
                 endDate: sub.endDate,
                 paymentId: sub.paymentId,
-                autoRenew: sub.autoRenew
+                autoRenew: sub.autoRenew,
               },
               access: {
                 canAccess: sub.status === "active" && !isExpired,
                 isExpired,
-                daysLeft
-              }
+                daysLeft,
+              },
             }
           : {
               isSubscribed: false,
@@ -529,18 +559,18 @@ exports.getVendorsForCakeModule = async (req, res) => {
               access: {
                 canAccess: false,
                 isExpired: true,
-                daysLeft: 0
-              }
-            }
+                daysLeft: 0,
+              },
+            },
       };
     });
 
     // ✅ SINGLE VENDOR
     if (providerId) {
-      return res.json({ 
-        success: true, 
+      return res.json({
+        success: true,
         message: "Vendor details fetched successfully",
-        data: final[0] || null 
+        data: final[0] || null,
       });
     }
 
@@ -549,9 +579,8 @@ exports.getVendorsForCakeModule = async (req, res) => {
       success: true,
       message: "Vendors fetched successfully",
       count: final.length,
-      data: final
+      data: final,
     });
-
   } catch (err) {
     console.error("GET VENDORS FOR CAKE MODULE ERROR:", err);
     res.status(500).json({ success: false, message: err.message });
@@ -573,13 +602,13 @@ exports.listCakeVendors = async (req, res) => {
     const vendorProfiles = await VendorProfile.find({ module: moduleId })
       .populate({
         path: "user",
-        select: "firstName lastName email phone role"
+        select: "firstName lastName email phone role",
       })
       .select("storeName logo coverImage module user");
 
     const baseUrl = `${req.protocol}://${req.get("host")}`;
 
-    const formatted = vendorProfiles.map(v => ({
+    const formatted = vendorProfiles.map((v) => ({
       _id: v.user?._id,
       firstName: v.user?.firstName,
       lastName: v.user?.lastName,
@@ -589,7 +618,7 @@ exports.listCakeVendors = async (req, res) => {
       logo: v.logo ? `${baseUrl}${v.logo}` : null,
       coverImage: v.coverImage ? `${baseUrl}${v.coverImage}` : null,
       vendorProfileId: v._id,
-      module: v.module
+      module: v.module,
     }));
 
     res.status(200).json({
@@ -598,13 +627,12 @@ exports.listCakeVendors = async (req, res) => {
       count: formatted.length,
       data: formatted,
     });
-
   } catch (err) {
     console.error("LIST CAKE VENDORS ERROR:", err);
     res.status(500).json({
       success: false,
       message: "Failed to fetch cake vendors",
-      error: err.message
+      error: err.message,
     });
   }
 };
@@ -652,21 +680,15 @@ exports.toggleTopPickStatus = async (req, res) => {
 
 exports.getTopPickCakes = async (req, res) => {
   try {
-    const cakes = await Cake.find({ isTopPick: true, isActive: true })
-      .sort({ createdAt: -1 });
+    const cakes = await Cake.find({ isTopPick: true, isActive: true }).sort({
+      createdAt: -1,
+    });
 
-    const final = await Promise.all(
-      cakes.map(c => populateCake(c._id, req))
-    );
+    const final = await Promise.all(cakes.map((c) => populateCake(c._id, req)));
 
-    sendResponse(
-      res,
-      200,
-      true,
-      "Top pick cakes fetched successfully",
-      final,
-      { count: final.length }
-    );
+    sendResponse(res, 200, true, "Top pick cakes fetched successfully", final, {
+      count: final.length,
+    });
   } catch (error) {
     console.error("GET TOP PICK CAKES ERROR:", error);
     sendResponse(res, 500, false, error.message);
@@ -739,7 +761,7 @@ exports.searchCakes = async (req, res) => {
       query.$or = [
         { name: regex },
         { shortDescription: regex },
-        { searchTags: regex }
+        { searchTags: regex },
       ];
     }
 
@@ -770,15 +792,15 @@ exports.searchCakes = async (req, res) => {
 
     // Price filtering (using unitPrice from priceInfo)
     if (minPrice !== undefined) {
-      query["priceInfo.unitPrice"] = { 
-        ...query["priceInfo.unitPrice"], 
-        $gte: Number(minPrice) 
+      query["priceInfo.unitPrice"] = {
+        ...query["priceInfo.unitPrice"],
+        $gte: Number(minPrice),
       };
     }
     if (maxPrice !== undefined) {
-      query["priceInfo.unitPrice"] = { 
-        ...query["priceInfo.unitPrice"], 
-        $lte: Number(maxPrice) 
+      query["priceInfo.unitPrice"] = {
+        ...query["priceInfo.unitPrice"],
+        $lte: Number(maxPrice),
       };
     }
 
@@ -801,12 +823,10 @@ exports.searchCakes = async (req, res) => {
         .sort({ [sortField]: order })
         .skip(skip)
         .limit(Number(limit)),
-      Cake.countDocuments(query)
+      Cake.countDocuments(query),
     ]);
 
-    const final = await Promise.all(
-      cakes.map(c => populateCake(c._id, req))
-    );
+    const final = await Promise.all(cakes.map((c) => populateCake(c._id, req)));
 
     res.json({
       success: true,
@@ -817,7 +837,6 @@ exports.searchCakes = async (req, res) => {
       page: Number(page),
       data: final,
     });
-
   } catch (err) {
     console.error("SEARCH CAKES ERROR:", err);
     res.status(500).json({ success: false, message: err.message });

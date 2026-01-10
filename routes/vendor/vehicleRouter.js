@@ -164,6 +164,11 @@ router.get('/sort', optionalAuth, vehicleController.sortVehicles);
 router.get('/location', optionalAuth, vehicleController.getVehiclesByLocation);
 router.get('/provider/:providerId', optionalAuth, vehicleController.getVehiclesByProvider);
 router.get('/category/:categoryId', optionalAuth, vehicleController.getVehiclesByCategory);
+router.get(
+  "/vendors/:moduleId",
+  optionalAuth,
+  vehicleController.getVendorsForVehicleModule
+);
 router.get('/counts', protect, authorizeRoles('admin'), vehicleController.getVehicleCounts);
 router.get('/:id', optionalAuth, vehicleController.getVehicle);
 
@@ -183,6 +188,8 @@ router.put(
   uploadFields,
   vehicleController.updateVehicle
 );
+
+
 
 router.delete(
   '/:id',
