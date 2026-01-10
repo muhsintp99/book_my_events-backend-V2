@@ -543,6 +543,7 @@ app.use("/api/vehicle-attributes", require("./routes/admin/vehicleAttributeRoute
 app.use("/api/makeup-packages", require("./routes/admin/makeupPackageRoutes"));
 app.use("/api/makeup-types", require("./routes/admin/makeupTypeRoutes"));
 app.use("/api/packages", require("./routes/admin/packageRoutes"));
+app.use("/api/admin/kyc", require("./routes/admin/kycRoutes"));
 
 // ===== Vendor =====
 app.use("/api/vendorprofiles", require("./routes/vendor/vendorProfileRoutes"));

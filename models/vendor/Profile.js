@@ -159,6 +159,7 @@ const profileSchema = new mongoose.Schema(
         enum: ['pending', 'verified', 'rejected', 'not_submitted'],
         default: 'not_submitted'
       },
+      rejectionReason: { type: String, default: '' },
       submittedAt: { type: Date }
     },
   },
