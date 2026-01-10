@@ -137,6 +137,30 @@ const profileSchema = new mongoose.Schema(
       },
       upiId: { type: String, default: '' }
     },
+    kycDetails: {
+      personalInfo: {
+        fullName: { type: String, default: '' },
+        email: { type: String, default: '' },
+        address: { type: String, default: '' }
+      },
+      documentInfo: {
+        documentType: { type: String, default: '' },
+        frontImage: { type: String, default: '' },
+        backImage: { type: String, default: '' }
+      },
+      bankDetails: {
+        accountHolder: { type: String, default: '' },
+        accountNumber: { type: String, default: '' },
+        ifsc: { type: String, default: '' },
+        bankName: { type: String, default: '' }
+      },
+      status: {
+        type: String,
+        enum: ['pending', 'verified', 'rejected', 'not_submitted'],
+        default: 'not_submitted'
+      },
+      submittedAt: { type: Date }
+    },
   },
   { timestamps: true }
 );

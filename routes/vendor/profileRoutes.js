@@ -34,6 +34,14 @@ router.get("/:id", profileController.getProfileById);
 // Update Profile
 router.put("/:id", upload.single("profilePhoto"), profileController.updateProfile);
 
+// KYC Routes
+router.post("/kyc", upload.fields([
+  { name: 'frontImage', maxCount: 1 },
+  { name: 'backImage', maxCount: 1 }
+]), profileController.saveKyc);
+
+router.get("/kyc/:userId", profileController.getKyc);
+
 // Delete Profile
 router.delete("/:id", profileController.deleteProfile);
 

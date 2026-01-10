@@ -622,4 +622,83 @@ exports.deleteProfile = async (req, res) => {
   }
 };
 
+// --- KYC CONTROLLERS ---
+
+// Save KYC details
+exports.saveKyc = async (req, res) => {
+  try {
+    const { userId, personalInfo, documentInfo, bankDetails } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
+    // Parse JSON strings if they come as strings (from form-data)
+    let parsedPersonalInfo = typeof personalInfo === 'string' ? JSON.parse(personalInfo) : personalInfo;
+    let parsedDocumentInfo = typeof documentInfo === 'string' ? JSON.parse(documentInfo) : documentInfo;
+    let parsedBankDetails = typeof bankDetails === 'string' ? JSON.parse(bankDetails) : bankDetails;
+
+    // Handle files
+    const frontImage = req.files?.frontImage ? `/uploads/profiles/${req.files.frontImage[0].filename}` : null;
+    const backImage = req.files?.backImage ? `/uploads/profiles/${req.files.backImage[0].filename}` : null;
+
+    if (frontImage) parsedDocumentInfo.frontImage = frontImage;
+    if (backImage) parsedDocumentInfo.backImage = backImage;
+
+    const updateData = {
+      kycDetails: {
+        personalInfo: parsedPersonalInfo,
+        documentInfo: parsedDocumentInfo,
+        bankDetails: parsedBankDetails,
+        status: 'pending',
+        submittedAt: new Date()
+      }
+    };
+
+    let profile = await Profile.findOneAndUpdate(
+      { userId },
+      updateData,
+      { new: true, upsert: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "KYC details submitted successfully",
+      data: profile.kycDetails
+    });
+  } catch (error) {
+    console.error("Save KYC Error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Get KYC details
+exports.getKyc = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
+    const profile = await Profile.findOne({ userId });
+
+    if (!profile || !profile.kycDetails) {
+      return res.status(404).json({
+        success: false,
+        message: "KYC details not found",
+        data: { status: 'not_submitted' }
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: profile.kycDetails
+    });
+  } catch (error) {
+    console.error("Get KYC Error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 
