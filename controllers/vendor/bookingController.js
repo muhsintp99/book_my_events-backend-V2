@@ -1003,72 +1003,63 @@ let calculatedVariations = []; // ✅ FIX: declare in function scope
 
     // CREATE BOOKING
     const bookingData = {
-      moduleId,
-      moduleType,
-      bookingType,
-      paymentType: normalizedPaymentType || null,
+  moduleId,
+  moduleType,
+  bookingType,
+  paymentType: normalizedPaymentType || null,
 
-      // ================= TRANSPORT =================
-      vehicleId: moduleType === "Transport" ? vehicleId : null,
+  providerId: serviceProvider.provider || serviceProvider.createdBy,
+  userId: user._id,
 
-      transportDetails:
-        moduleType === "Transport"
-          ? {
-              tripType,
-              hours: hours || null,
-              days: days || null,
-              distanceKm: distanceKm || null,
-            }
-          : null,
+  bookingDate,
+  timeSlot: normalizedTimeSlot,
 
-      // ================= COMMON =================
-      providerId: serviceProvider.provider || serviceProvider.createdBy,
-      userId: user._id,
+  ...userDetails,
 
-      bookingDate,
-      timeSlot: normalizedTimeSlot,
+  // ================= CAKE =================
+  ...(moduleType === "Cake" && {
+    cakeId,
+    cakeVariations: calculatedVariations,
+    deliveryType,
+    customerMessage,
+  }),
 
-      numberOfGuests: numberOfGuests || null,
-      ...userDetails,
+  // ================= TRANSPORT =================
+  ...(moduleType === "Transport" && {
+    vehicleId,
+    transportDetails: {
+      tripType,
+      hours: hours || null,
+      days: days || null,
+      distanceKm: distanceKm || null,
+    },
+  }),
 
-      // ================= VENUES =================
-      venueId: moduleType === "Venues" ? venueId : null,
-      packageId: moduleType === "Venues" ? packageId : null,
+  // ================= OTHER MODULES =================
+  venueId: moduleType === "Venues" ? venueId : undefined,
+  makeupId:
+    moduleType === "Makeup" || moduleType === "Makeup Artist"
+      ? makeupId
+      : undefined,
+  photographyId: moduleType === "Photography" ? photographyId : undefined,
+  cateringId: moduleType === "Catering" ? cateringId : undefined,
 
-      // ================= MAKEUP =================
-      makeupId:
-        moduleType === "Makeup" || moduleType === "Makeup Artist"
-          ? makeupId
-          : null,
+  // ================= PRICING =================
+  perDayPrice: pricing.perDayPrice || 0,
+  perPersonCharge: pricing.perPersonCharge || 0,
+  perHourCharge: pricing.perHourCharge || 0,
+  packagePrice: packagePrice || 0,
 
-      // ================= PHOTOGRAPHY =================
-      photographyId: moduleType === "Photography" ? photographyId : null,
+  totalBeforeDiscount,
+  discountValue: pricing.discount || 0,
+  discountType: pricing.discount ? "flat" : "none",
+  couponDiscountValue,
 
-      // ================= CATERING =================
-      cateringId: moduleType === "Catering" ? cateringId : null,
+  finalPrice,
+  advanceAmount,
+  remainingAmount,
+};
 
-      // ================= CAKE =================
-      cakeId: moduleType === "Cake" ? cakeId : null,
-      cakeVariations: moduleType === "Cake" ? calculatedVariations : [], // ✅ ADD HERE
-
-      deliveryType: moduleType === "Cake" ? deliveryType : null,
-      customerMessage: moduleType === "Cake" ? customerMessage : null,
-
-      // ================= PRICING =================
-      perDayPrice: pricing.perDayPrice || null,
-      perPersonCharge: pricing.perPersonCharge || null,
-      perHourCharge: pricing.perHourCharge || null,
-      packagePrice: packagePrice || null,
-
-      totalBeforeDiscount,
-      discountValue: pricing.discount || 0,
-      discountType: pricing.discount ? "flat" : "none",
-      couponDiscountValue,
-
-      finalPrice,
-      advanceAmount,
-      remainingAmount,
-    };
 
     console.log("💾 Creating booking...");
     const booking = await Booking.create(bookingData);

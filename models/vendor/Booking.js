@@ -384,11 +384,14 @@ cakeVariations: [
       enum: ["pending", "initiated", "failed", "completed", "ongoing"],
       default: "pending",
     },
-    deliveryType: {
-      type: String,
-      enum: ["Takeaway", "Home Delivery"],
-      default: null,
-    },
+deliveryType: {
+  type: String,
+  enum: ["Takeaway", "Home Delivery"],
+  required: function () {
+    return this.moduleType === "Cake";
+  },
+},
+
 
     customerMessage: {
       type: String,
