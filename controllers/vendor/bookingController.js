@@ -816,65 +816,73 @@ exports.createBooking = async (req, res) => {
       perDayPrice: 0,
       perPersonCharge: 0,
       perHourCharge: 0,
-      
     };
-let calculatedVariations = []; // ✅ FIX: declare in function scope
+    let calculatedVariations = []; // ✅ FIX: declare in function scope
 
     switch (moduleType) {
       case "Cake":
-        if (!cakeId) {
-          return res.status(400).json({
-            success: false,
-            message: "cakeId is required for Cake booking",
-          });
-        }
+  if (!cakeId) {
+    return res.status(400).json({
+      success: false,
+      message: "cakeId is required for Cake booking",
+    });
+  }
 
-        if (!Array.isArray(variations) || variations.length === 0) {
-          return res.status(400).json({
-            success: false,
-            message: "At least one cake variation must be selected",
-          });
-        }
+  if (!Array.isArray(variations) || variations.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "At least one cake variation must be selected",
+    });
+  }
 
-        serviceProvider = await Cake.findById(cakeId).lean();
-        if (!serviceProvider) {
-          return res.status(404).json({
-            success: false,
-            message: "Cake not found",
-          });
-        }
+  serviceProvider = await Cake.findById(cakeId).lean();
+  if (!serviceProvider) {
+    return res.status(404).json({
+      success: false,
+      message: "Cake not found",
+    });
+  }
 
-        let basePrice = 0;
+  let basePrice = 0;
+  calculatedVariations = [];
 
-        for (const selected of variations) {
-          const cakeVar = serviceProvider.variations.find(
-            (v) => v._id.toString() === selected._id
-          );
+  for (const selected of variations) {
+    if (!selected._id) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid variation payload",
+      });
+    }
 
-          if (!cakeVar) {
-            return res.status(400).json({
-              success: false,
-              message: "Invalid cake variation selected",
-            });
-          }
+    const cakeVar = serviceProvider.variations.find(
+      (v) => v._id.toString() === selected._id.toString()
+    );
 
-          const qty = selected.quantity || 1;
-          const total = cakeVar.price * qty;
+    if (!cakeVar) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid cake variation selected: ${selected._id}`,
+      });
+    }
 
-          calculatedVariations.push({
-            variationId: cakeVar._id,
-            name: cakeVar.name,
-            price: cakeVar.price,
-            quantity: qty,
-            totalPrice: total,
-          });
+    const qty = Number(selected.quantity) > 0 ? Number(selected.quantity) : 1;
+    const total = cakeVar.price * qty;
 
-          basePrice += total;
-        }
+    calculatedVariations.push({
+      variationId: cakeVar._id,
+      name: cakeVar.name,
+      price: cakeVar.price,
+      quantity: qty,
+      totalPrice: total,
+    });
 
-        pricing.basePrice = basePrice;
-        pricing.discount = Number(serviceProvider.priceInfo?.discount) || 0;
-        break;
+    basePrice += total;
+  }
+
+  pricing.basePrice = basePrice;
+  pricing.discount = Number(serviceProvider.priceInfo?.discount) || 0;
+  break;
+
 
       case "Transport":
         if (!vehicleId || !tripType) {
@@ -1003,63 +1011,62 @@ let calculatedVariations = []; // ✅ FIX: declare in function scope
 
     // CREATE BOOKING
     const bookingData = {
-  moduleId,
-  moduleType,
-  bookingType,
-  paymentType: normalizedPaymentType || null,
+      moduleId,
+      moduleType,
+      bookingType,
+      paymentType: normalizedPaymentType || null,
 
-  providerId: serviceProvider.provider || serviceProvider.createdBy,
-  userId: user._id,
+      providerId: serviceProvider.provider || serviceProvider.createdBy,
+      userId: user._id,
 
-  bookingDate,
-  timeSlot: normalizedTimeSlot,
+      bookingDate,
+      timeSlot: normalizedTimeSlot,
 
-  ...userDetails,
+      ...userDetails,
 
-  // ================= CAKE =================
-  ...(moduleType === "Cake" && {
-    cakeId,
-    cakeVariations: calculatedVariations,
-    deliveryType,
-    customerMessage,
-  }),
+      // ================= CAKE =================
+      ...(moduleType === "Cake" && {
+        cakeId,
+        cakeVariations: calculatedVariations,
+        deliveryType,
+        customerMessage,
+      }),
 
-  // ================= TRANSPORT =================
-  ...(moduleType === "Transport" && {
-    vehicleId,
-    transportDetails: {
-      tripType,
-      hours: hours || null,
-      days: days || null,
-      distanceKm: distanceKm || null,
-    },
-  }),
+      // ================= TRANSPORT =================
+      ...(moduleType === "Transport" && {
+        vehicleId,
+        transportDetails: {
+          tripType,
+          hours: hours || null,
+          days: days || null,
+          distanceKm: distanceKm || null,
+        },
+      }),
 
-  // ================= OTHER MODULES =================
-  venueId: moduleType === "Venues" ? venueId : undefined,
-  makeupId:
-    moduleType === "Makeup" || moduleType === "Makeup Artist"
-      ? makeupId
-      : undefined,
-  photographyId: moduleType === "Photography" ? photographyId : undefined,
-  cateringId: moduleType === "Catering" ? cateringId : undefined,
+      // ================= OTHER MODULES =================
+      venueId: moduleType === "Venues" ? venueId : undefined,
+      makeupId:
+        moduleType === "Makeup" || moduleType === "Makeup Artist"
+          ? makeupId
+          : undefined,
+      photographyId: moduleType === "Photography" ? photographyId : undefined,
+      cateringId: moduleType === "Catering" ? cateringId : undefined,
 
-  // ================= PRICING =================
-  perDayPrice: pricing.perDayPrice || 0,
-  perPersonCharge: pricing.perPersonCharge || 0,
-  perHourCharge: pricing.perHourCharge || 0,
-  packagePrice: packagePrice || 0,
+      // ================= PRICING =================
+      perDayPrice: pricing.perDayPrice || 0,
+      perPersonCharge: pricing.perPersonCharge || 0,
+      perHourCharge: pricing.perHourCharge || 0,
+      packagePrice: packagePrice || 0,
 
-  totalBeforeDiscount,
-  discountValue: pricing.discount || 0,
-  discountType: pricing.discount ? "flat" : "none",
-  couponDiscountValue,
+      totalBeforeDiscount,
+      discountValue: pricing.discount || 0,
+      discountType: pricing.discount ? "flat" : "none",
+      couponDiscountValue,
 
-  finalPrice,
-  advanceAmount,
-  remainingAmount,
-};
-
+      finalPrice,
+      advanceAmount,
+      remainingAmount,
+    };
 
     console.log("💾 Creating booking...");
     const booking = await Booking.create(bookingData);
