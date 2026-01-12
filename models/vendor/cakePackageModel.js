@@ -70,7 +70,6 @@ const CakeSchema = new mongoose.Schema(
     //   default: false,
     // },
 
-    /* ================= TIME ================= */
 /* ================= TIME ================= */
 // timeSchedule: {
 //   startTime: {
