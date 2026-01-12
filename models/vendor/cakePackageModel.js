@@ -55,11 +55,11 @@ const CakeSchema = new mongoose.Schema(
     ],
 
     /* ================= CAKE TYPE ================= */
-    itemType: {
-      type: String,
-      enum: ["Veg", "Non-Veg"],
-      default: "Veg",
-    },
+   itemType: {
+  type: String,
+  enum: ["Eggless", "Egg"],
+  default: "Eggless"
+},
 
     /* ================= NUTRITION ================= */
     nutrition: [{ type: String }],
