@@ -65,16 +65,34 @@ const CakeSchema = new mongoose.Schema(
     nutrition: [{ type: String }],
     allergenIngredients: [{ type: String }],
 
-    isHalal: {
-      type: Boolean,
-      default: false,
-    },
+    // isHalal: {
+    //   type: Boolean,
+    //   default: false,
+    // },
 
     /* ================= TIME ================= */
-    timeSchedule: {
-      startTime: String,
-      endTime: String,
-    },
+/* ================= TIME ================= */
+timeSchedule: {
+  startTime: {
+    type: String, // e.g. "10:00"
+    required: true
+  },
+  startPeriod: {
+    type: String,
+    enum: ["AM", "PM"],
+    default: "AM"
+  },
+  endTime: {
+    type: String, // e.g. "06:00"
+    required: true
+  },
+  endPeriod: {
+    type: String,
+    enum: ["AM", "PM"],
+    default: "PM"
+  }
+},
+
 
     /* ================= PRICE ================= */
     priceInfo: {

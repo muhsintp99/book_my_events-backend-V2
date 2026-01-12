@@ -78,8 +78,8 @@ const sanitizeCakeData = (body) => {
     data.isActive !== undefined ? String(data.isActive) === "true" : true;
   data.isTopPick =
     data.isTopPick !== undefined ? String(data.isTopPick) === "true" : false;
-  data.isHalal =
-    data.isHalal !== undefined ? String(data.isHalal) === "true" : false;
+
+  // ❌ REMOVED isHalal handling
 
   if (data.module) data.module = parseObjectId(data.module);
   if (data.category) data.category = parseObjectId(data.category);
@@ -94,14 +94,25 @@ const sanitizeCakeData = (body) => {
   data.allergenIngredients = parseJSON(data.allergenIngredients, []);
   data.searchTags = parseJSON(data.searchTags, []);
   data.variations = parseJSON(data.variations, []);
-  data.timeSchedule = parseJSON(data.timeSchedule, {});
-  
-  // ✅ FIXED: Parse priceInfo first, then convert advanceBookingAmount
+data.timeSchedule = parseJSON(data.timeSchedule, {});
+
+if (data.timeSchedule) {
+  if (data.timeSchedule.startPeriod) {
+    data.timeSchedule.startPeriod =
+      data.timeSchedule.startPeriod === "PM" ? "PM" : "AM";
+  }
+
+  if (data.timeSchedule.endPeriod) {
+    data.timeSchedule.endPeriod =
+      data.timeSchedule.endPeriod === "PM" ? "PM" : "AM";
+  }
+}
   data.priceInfo = parseJSON(data.priceInfo, {});
-  
-  // ✅ Convert advanceBookingAmount to number if it exists
+
   if (data.priceInfo.advanceBookingAmount !== undefined) {
-    data.priceInfo.advanceBookingAmount = Number(data.priceInfo.advanceBookingAmount);
+    data.priceInfo.advanceBookingAmount = Number(
+      data.priceInfo.advanceBookingAmount
+    );
   }
 
   return data;
@@ -786,9 +797,9 @@ exports.searchCakes = async (req, res) => {
     }
 
     // Halal filter
-    if (isHalal !== undefined) {
-      query.isHalal = isHalal === "true";
-    }
+    // if (isHalal !== undefined) {
+    //   query.isHalal = isHalal === "true";
+    // }
 
     // Price filtering (using unitPrice from priceInfo)
     if (minPrice !== undefined) {
