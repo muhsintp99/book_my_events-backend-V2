@@ -72,26 +72,26 @@ const CakeSchema = new mongoose.Schema(
 
     /* ================= TIME ================= */
 /* ================= TIME ================= */
-timeSchedule: {
-  startTime: {
-    type: String, // e.g. "10:00"
-    required: true
-  },
-  startPeriod: {
-    type: String,
-    enum: ["AM", "PM"],
-    default: "AM"
-  },
-  endTime: {
-    type: String, // e.g. "06:00"
-    required: true
-  },
-  endPeriod: {
-    type: String,
-    enum: ["AM", "PM"],
-    default: "PM"
-  }
-},
+// timeSchedule: {
+//   startTime: {
+//     type: String, // e.g. "10:00"
+//     required: true
+//   },
+//   startPeriod: {
+//     type: String,
+//     enum: ["AM", "PM"],
+//     default: "AM"
+//   },
+//   endTime: {
+//     type: String, // e.g. "06:00"
+//     required: true
+//   },
+//   endPeriod: {
+//     type: String,
+//     enum: ["AM", "PM"],
+//     default: "PM"
+//   }
+// },
 
 
     /* ================= PRICE ================= */

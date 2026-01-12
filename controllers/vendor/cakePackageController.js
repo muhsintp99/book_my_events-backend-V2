@@ -79,8 +79,6 @@ const sanitizeCakeData = (body) => {
   data.isTopPick =
     data.isTopPick !== undefined ? String(data.isTopPick) === "true" : false;
 
-  // ❌ REMOVED isHalal handling
-
   if (data.module) data.module = parseObjectId(data.module);
   if (data.category) data.category = parseObjectId(data.category);
 
@@ -94,19 +92,8 @@ const sanitizeCakeData = (body) => {
   data.allergenIngredients = parseJSON(data.allergenIngredients, []);
   data.searchTags = parseJSON(data.searchTags, []);
   data.variations = parseJSON(data.variations, []);
-data.timeSchedule = parseJSON(data.timeSchedule, {});
 
-if (data.timeSchedule) {
-  if (data.timeSchedule.startPeriod) {
-    data.timeSchedule.startPeriod =
-      data.timeSchedule.startPeriod === "PM" ? "PM" : "AM";
-  }
 
-  if (data.timeSchedule.endPeriod) {
-    data.timeSchedule.endPeriod =
-      data.timeSchedule.endPeriod === "PM" ? "PM" : "AM";
-  }
-}
   data.priceInfo = parseJSON(data.priceInfo, {});
 
   if (data.priceInfo.advanceBookingAmount !== undefined) {
