@@ -357,6 +357,7 @@ const getEffectivePrice = (pricing) => {
 };
 
 // ================= CREATE =================
+// ================= CREATE =================
 exports.createVehicle = async (req, res) => {
   const body = sanitizeVehicleData(req.body);
 
