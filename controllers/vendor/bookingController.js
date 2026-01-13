@@ -42,8 +42,8 @@ function calculateTimeline(bookingDate) {
     message: isToday
       ? "This booking is scheduled for TODAY!"
       : isUpcoming
-      ? `This booking is ${daysDifference} day(s) away`
-      : `This booking was ${Math.abs(daysDifference)} day(s) ago`,
+        ? `This booking is ${daysDifference} day(s) away`
+        : `This booking was ${Math.abs(daysDifference)} day(s) ago`,
   };
 }
 
@@ -777,7 +777,7 @@ exports.createBooking = async (req, res) => {
           password: "123456",
         });
         token = resp?.data?.token || null;
-      } catch (_) {}
+      } catch (_) { }
 
       userDetails = { fullName, contactNumber, emailAddress, address };
     }
@@ -821,67 +821,67 @@ exports.createBooking = async (req, res) => {
 
     switch (moduleType) {
       case "Cake":
-  if (!cakeId) {
-    return res.status(400).json({
-      success: false,
-      message: "cakeId is required for Cake booking",
-    });
-  }
+        if (!cakeId) {
+          return res.status(400).json({
+            success: false,
+            message: "cakeId is required for Cake booking",
+          });
+        }
 
-  if (!Array.isArray(variations) || variations.length === 0) {
-    return res.status(400).json({
-      success: false,
-      message: "At least one cake variation must be selected",
-    });
-  }
+        if (!Array.isArray(variations) || variations.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: "At least one cake variation must be selected",
+          });
+        }
 
-  serviceProvider = await Cake.findById(cakeId).lean();
-  if (!serviceProvider) {
-    return res.status(404).json({
-      success: false,
-      message: "Cake not found",
-    });
-  }
+        serviceProvider = await Cake.findById(cakeId).lean();
+        if (!serviceProvider) {
+          return res.status(404).json({
+            success: false,
+            message: "Cake not found",
+          });
+        }
 
-  let basePrice = 0;
-  calculatedVariations = [];
+        let basePrice = 0;
+        calculatedVariations = [];
 
-  for (const selected of variations) {
-    if (!selected._id) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid variation payload",
-      });
-    }
+        for (const selected of variations) {
+          if (!selected._id) {
+            return res.status(400).json({
+              success: false,
+              message: "Invalid variation payload",
+            });
+          }
 
-    const cakeVar = serviceProvider.variations.find(
-      (v) => v._id.toString() === selected._id.toString()
-    );
+          const cakeVar = serviceProvider.variations.find(
+            (v) => v._id.toString() === selected._id.toString()
+          );
 
-    if (!cakeVar) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid cake variation selected: ${selected._id}`,
-      });
-    }
+          if (!cakeVar) {
+            return res.status(400).json({
+              success: false,
+              message: `Invalid cake variation selected: ${selected._id}`,
+            });
+          }
 
-    const qty = Number(selected.quantity) > 0 ? Number(selected.quantity) : 1;
-    const total = cakeVar.price * qty;
+          const qty = Number(selected.quantity) > 0 ? Number(selected.quantity) : 1;
+          const total = cakeVar.price * qty;
 
-    calculatedVariations.push({
-      variationId: cakeVar._id,
-      name: cakeVar.name,
-      price: cakeVar.price,
-      quantity: qty,
-      totalPrice: total,
-    });
+          calculatedVariations.push({
+            variationId: cakeVar._id,
+            name: cakeVar.name,
+            price: cakeVar.price,
+            quantity: qty,
+            totalPrice: total,
+          });
 
-    basePrice += total;
-  }
+          basePrice += total;
+        }
 
-  pricing.basePrice = basePrice;
-  pricing.discount = Number(serviceProvider.priceInfo?.discount) || 0;
-  break;
+        pricing.basePrice = basePrice;
+        pricing.discount = Number(serviceProvider.priceInfo?.discount) || 0;
+        break;
 
 
       case "Transport":
@@ -952,6 +952,12 @@ exports.createBooking = async (req, res) => {
         break;
 
       case "Catering":
+        if (!cateringId || !numberOfGuests) {
+          return res.status(400).json({
+            success: false,
+            message: "cateringId & numberOfGuests required",
+          });
+        }
         serviceProvider = await Catering.findById(cateringId).lean();
         if (!serviceProvider) throw new Error("Catering service not found");
 
@@ -1002,8 +1008,8 @@ exports.createBooking = async (req, res) => {
         moduleType === "Venues"
           ? serviceProvider.advanceDeposit
           : moduleType === "Cake"
-          ? serviceProvider.priceInfo?.advanceBookingAmount
-          : serviceProvider.advanceBookingAmount
+            ? serviceProvider.priceInfo?.advanceBookingAmount
+            : serviceProvider.advanceBookingAmount
       ) || 0;
 
     advanceAmount = Math.max(advanceAmount, 0);
@@ -1051,6 +1057,10 @@ exports.createBooking = async (req, res) => {
           : undefined,
       photographyId: moduleType === "Photography" ? photographyId : undefined,
       cateringId: moduleType === "Catering" ? cateringId : undefined,
+      numberOfGuests:
+        moduleType === "Venues" || moduleType === "Catering"
+          ? numberOfGuests
+          : undefined,
 
       // ================= PRICING =================
       perDayPrice: pricing.perDayPrice || 0,
@@ -1398,8 +1408,8 @@ exports.getBookingById = async (req, res) => {
           booking.paymentStatus === "Paid"
             ? booking.finalPrice
             : booking.paymentStatus === "Advance"
-            ? booking.advanceAmount || 0
-            : 0,
+              ? booking.advanceAmount || 0
+              : 0,
         amountDue: booking.paymentStatus === "Paid" ? 0 : booking.finalPrice,
       },
     };
@@ -1676,8 +1686,8 @@ exports.updatePaymentStatus = async (req, res) => {
             paymentStatus === "Paid"
               ? booking.finalPrice
               : paymentStatus === "Advance"
-              ? booking.advanceAmount || 0
-              : 0,
+                ? booking.advanceAmount || 0
+                : 0,
           amountDue: paymentStatus === "Paid" ? 0 : booking.finalPrice,
         },
       },
