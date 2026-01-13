@@ -190,176 +190,145 @@ const parseObjectId = (value) => {
 const sanitizeVehicleData = (body) => {
   const sanitized = { ...body };
 
-  // Parse brand as single ObjectId
+  /* ================= OBJECT IDs ================= */
+
   if (sanitized.brand) sanitized.brand = parseObjectId(sanitized.brand);
+  if (sanitized.category) sanitized.category = parseObjectId(sanitized.category);
 
-  // Parse fuelType and transmissionType as single strings with type safety
-  if (sanitized.fuelType) {
-    sanitized.fuelType =
-      typeof sanitized.fuelType === "string"
-        ? sanitized.fuelType.trim().toLowerCase()
-        : String(sanitized.fuelType).toLowerCase();
-  }
-  if (sanitized.transmissionType) {
-    sanitized.transmissionType =
-      typeof sanitized.transmissionType === "string"
-        ? sanitized.transmissionType.trim().toLowerCase()
-        : String(sanitized.transmissionType).toLowerCase();
+  if (sanitized.subCategories) {
+    sanitized.subCategories = parseObjectIdArray(sanitized.subCategories);
   }
 
-  // ✅ FIXED: Add type checking for seatType
-  if (sanitized.seatType) {
-    sanitized.seatType =
-      typeof sanitized.seatType === "string"
-        ? sanitized.seatType.trim().toLowerCase()
-        : String(sanitized.seatType).toLowerCase();
-  }
+  /* ================= STRINGS ================= */
 
-  // ✅ FIXED: Add type checking for camera
-  if (sanitized.camera) {
-    sanitized.camera =
-      typeof sanitized.camera === "string"
-        ? sanitized.camera.trim().toLowerCase()
-        : String(sanitized.camera).toLowerCase();
-  }
-
-  // ✅ FIXED: Add type checking for all string fields
-  if (sanitized.model) {
-    sanitized.model =
-      typeof sanitized.model === "string"
-        ? sanitized.model.trim()
-        : String(sanitized.model);
-  }
   if (sanitized.name) {
     sanitized.name =
       typeof sanitized.name === "string"
         ? sanitized.name.trim()
         : String(sanitized.name);
   }
+
   if (sanitized.description) {
     sanitized.description =
       typeof sanitized.description === "string"
         ? sanitized.description.trim()
         : String(sanitized.description);
   }
+
+  if (sanitized.model) {
+    sanitized.model =
+      typeof sanitized.model === "string"
+        ? sanitized.model.trim()
+        : String(sanitized.model);
+  }
+
   if (sanitized.vinNumber) {
     sanitized.vinNumber =
       typeof sanitized.vinNumber === "string"
         ? sanitized.vinNumber.trim()
         : String(sanitized.vinNumber);
   }
+
   if (sanitized.licensePlateNumber) {
     sanitized.licensePlateNumber =
       typeof sanitized.licensePlateNumber === "string"
         ? sanitized.licensePlateNumber.trim()
         : String(sanitized.licensePlateNumber);
   }
-  if (sanitized.audioSystem) {
-    sanitized.audioSystem =
-      typeof sanitized.audioSystem === "string"
-        ? sanitized.audioSystem.trim()
-        : String(sanitized.audioSystem);
-  }
 
-  // Parse string arrays
+  /* ================= ARRAYS ================= */
+
   if (sanitized.searchTags !== undefined) {
     sanitized.searchTags = parseStringArray(sanitized.searchTags);
   }
-  if (sanitized.connectivity !== undefined) {
-    sanitized.connectivity = parseStringArray(sanitized.connectivity);
-  }
-  if (sanitized.sensors !== undefined) {
-    sanitized.sensors = parseStringArray(sanitized.sensors);
-  }
-  if (sanitized.safety !== undefined) {
-    sanitized.safety = parseStringArray(sanitized.safety);
-  }
-  if (sanitized.insuranceIncluded !== undefined) {
-    sanitized.insuranceIncluded = parseStringArray(sanitized.insuranceIncluded);
-  }
-  if (sanitized.insuranceExcluded !== undefined) {
-    sanitized.insuranceExcluded = parseStringArray(sanitized.insuranceExcluded);
-  }
 
-  // Convert airCondition to boolean
+  /* ================= BOOLEANS ================= */
+
   if (sanitized.airCondition !== undefined) {
-    if (typeof sanitized.airCondition === "string") {
-      sanitized.airCondition =
-        sanitized.airCondition.trim().toLowerCase() === "true";
-    } else if (typeof sanitized.airCondition === "boolean") {
-      sanitized.airCondition = sanitized.airCondition;
-    } else {
-      sanitized.airCondition = !!sanitized.airCondition;
-    }
+    sanitized.airCondition =
+      sanitized.airCondition === true ||
+      sanitized.airCondition === "true";
   }
 
-  // Advance booking amount parsing
-  if (
-    sanitized.advanceBookingAmount !== undefined &&
-    sanitized.advanceBookingAmount !== ""
-  ) {
-    const parsed = Number(sanitized.advanceBookingAmount);
-    if (!isNaN(parsed)) {
-      sanitized.advanceBookingAmount = parsed;
-    }
-  } else if (sanitized.advanceBookingAmount === "") {
-    delete sanitized.advanceBookingAmount;
+  if (sanitized.isActive !== undefined) {
+    sanitized.isActive =
+      sanitized.isActive === true || sanitized.isActive === "true";
   }
 
-  // Parse numeric fields
-  if (sanitized.airbags !== undefined)
-    sanitized.airbags = Number(sanitized.airbags);
-  if (sanitized.bootSpace !== undefined)
-    sanitized.bootSpace = Number(sanitized.bootSpace);
-  if (sanitized.fuelTank !== undefined)
-    sanitized.fuelTank = Number(sanitized.fuelTank);
-  if (sanitized.engineCapacity !== undefined)
-    sanitized.engineCapacity = Number(sanitized.engineCapacity);
-  if (sanitized.enginePower !== undefined)
-    sanitized.enginePower = Number(sanitized.enginePower);
-  if (sanitized.seatingCapacity !== undefined)
+  if (sanitized.isAvailable !== undefined) {
+    sanitized.isAvailable =
+      sanitized.isAvailable === true || sanitized.isAvailable === "true";
+  }
+
+  /* ================= FEATURES (IMPORTANT) ================= */
+
+  if (sanitized.features) {
+    sanitized.features = {
+      driverIncluded:
+        sanitized.features.driverIncluded === true ||
+        sanitized.features.driverIncluded === "true",
+
+      sunroof:
+        sanitized.features.sunroof === true ||
+        sanitized.features.sunroof === "true",
+
+      decorationAvailable:
+        sanitized.features.decorationAvailable === true ||
+        sanitized.features.decorationAvailable === "true",
+    };
+  }
+
+  /* ================= NUMBERS ================= */
+
+  if (sanitized.seatingCapacity !== undefined) {
     sanitized.seatingCapacity = Number(sanitized.seatingCapacity);
-  if (sanitized.discount !== undefined)
-    sanitized.discount = Number(sanitized.discount);
-  if (sanitized.latitude !== undefined)
-    sanitized.latitude = Number(sanitized.latitude);
-  if (sanitized.longitude !== undefined)
-    sanitized.longitude = Number(sanitized.longitude);
+  }
 
-  // Parse pricing object
+  if (sanitized.discount !== undefined) {
+    sanitized.discount = Number(sanitized.discount);
+  }
+
+  if (sanitized.advanceBookingAmount !== undefined) {
+    const value = Number(sanitized.advanceBookingAmount);
+    if (!isNaN(value)) sanitized.advanceBookingAmount = value;
+  }
+
+  if (sanitized.latitude !== undefined) {
+    sanitized.latitude = Number(sanitized.latitude);
+  }
+
+  if (sanitized.longitude !== undefined) {
+    sanitized.longitude = Number(sanitized.longitude);
+  }
+
+  /* ================= PRICING ================= */
+
   if (sanitized.pricing) {
     if (typeof sanitized.pricing === "string") {
       try {
         sanitized.pricing = JSON.parse(sanitized.pricing);
-      } catch (e) {
-        console.error("Failed to parse pricing:", e);
+      } catch {
+        delete sanitized.pricing;
       }
     }
-    if (sanitized.pricing && typeof sanitized.pricing === "object") {
-      if (sanitized.pricing.hourly !== undefined) {
+
+    if (typeof sanitized.pricing === "object") {
+      if (sanitized.pricing.hourly !== undefined)
         sanitized.pricing.hourly = Number(sanitized.pricing.hourly);
-      }
-      if (sanitized.pricing.perDay !== undefined) {
+
+      if (sanitized.pricing.perDay !== undefined)
         sanitized.pricing.perDay = Number(sanitized.pricing.perDay);
-      }
-      if (sanitized.pricing.distanceWise !== undefined) {
-        sanitized.pricing.distanceWise = Number(sanitized.pricing.distanceWise);
-      }
+
+      if (sanitized.pricing.distanceWise !== undefined)
+        sanitized.pricing.distanceWise = Number(
+          sanitized.pricing.distanceWise
+        );
     }
-  }
-
-  // Parent category (SINGLE)
-  if (sanitized.category) {
-    sanitized.category = parseObjectId(sanitized.category);
-  }
-
-  // Sub categories (ARRAY)
-  if (sanitized.subCategories) {
-    sanitized.subCategories = parseObjectIdArray(sanitized.subCategories);
   }
 
   return sanitized;
 };
+
 // Helper function to calculate distance between two coordinates
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371;
@@ -545,32 +514,24 @@ exports.createVehicle = async (req, res) => {
 // ================= GET ALL VEHICLES =================
 exports.getVehicles = async (req, res) => {
   try {
-    const {
-      page = 1,
-      limit = 10,
-      brand,
-      category,
-      fuelType,
-      transmissionType,
-      seatType,
-      camera,
-      minPrice,
-      maxPrice,
-      search,
-      isActive,
-      zone,
-    } = req.query;
+   const {
+  page = 1,
+  limit = 10,
+  brand,
+  category,
+  minPrice,
+  maxPrice,
+  search,
+  isActive,
+  zone,
+} = req.query;
+;
 
     const query = {};
 
     // Build filters
     if (brand) query.brand = parseObjectIdArray(brand);
     if (category) query.category = { $in: parseObjectIdArray(category) };
-    if (fuelType) query.fuelType = { $in: parseStringArray(fuelType) };
-    if (transmissionType)
-      query.transmissionType = { $in: parseStringArray(transmissionType) };
-    if (seatType) query.seatType = seatType.toLowerCase();
-    if (camera) query.camera = camera.toLowerCase();
     if (isActive !== undefined) query.isActive = isActive === "true";
     if (zone) query.zone = zone;
 
@@ -600,13 +561,13 @@ exports.getVehicles = async (req, res) => {
     // Search functionality
     if (search) {
       const keywordRegex = new RegExp(search, "i");
-      query.$or = [
-        { name: keywordRegex },
-        { description: keywordRegex },
-        { model: keywordRegex },
-        { audioSystem: keywordRegex },
-        { searchTags: { $in: [keywordRegex] } },
-      ];
+    query.$or = [
+  { name: keywordRegex },
+  { description: keywordRegex },
+  { model: keywordRegex },
+  { searchTags: { $in: [keywordRegex] } },
+];
+
     }
 
     const skip = (Number(page) - 1) * Number(limit);
@@ -1208,39 +1169,24 @@ exports.reactivateVehicle = async (req, res) => {
 exports.filterVehicles = async (req, res) => {
   try {
     const {
-      // Location filters
-      latitude,
-      longitude,
-      radius = 10,
-
-      // Filters
-      brandId,
-      categoryId,
-      type,
-      fuelType,
-      transmissionType,
-      seatingCapacityRange,
-      minSeatingCapacity,
-      maxSeatingCapacity,
-      airCondition,
-      insuranceIncluded,
-
-      // Price range
-      minPrice,
-      maxPrice,
-
-      // Rating filter
-      minRating,
-      maxRating,
-
-      // Pagination
-      page = 1,
-      limit = 50,
-
-      // Sorting
-      sortBy = "createdAt",
-      sortOrder = "desc",
-    } = req.query;
+  latitude,
+  longitude,
+  radius = 10,
+  brandId,
+  categoryId,
+  seatingCapacityRange,
+  minSeatingCapacity,
+  maxSeatingCapacity,
+  airCondition,
+  minPrice,
+  maxPrice,
+  minRating,
+  maxRating,
+  page = 1,
+  limit = 50,
+  sortBy = "createdAt",
+  sortOrder = "desc",
+} = req.query;
 
     console.log("=== FILTER REQUEST ===");
     console.log("minPrice:", minPrice, typeof minPrice);
@@ -1282,6 +1228,19 @@ exports.filterVehicles = async (req, res) => {
 
     // Build base query
     const query = { isActive: true };
+// ===== FEATURE FILTERS =====
+if (req.query.driverIncluded !== undefined) {
+  query["features.driverIncluded"] = req.query.driverIncluded === "true";
+}
+
+if (req.query.sunroof !== undefined) {
+  query["features.sunroof"] = req.query.sunroof === "true";
+}
+
+if (req.query.decorationAvailable !== undefined) {
+  query["features.decorationAvailable"] =
+    req.query.decorationAvailable === "true";
+}
 
     // Apply capacity range filter
     if (capacityFilter) {
@@ -1329,37 +1288,10 @@ exports.filterVehicles = async (req, res) => {
       }
     }
 
-    // Type filter
-    if (type) {
-      query.type = { $in: parseStringArray(type).map((t) => t.toLowerCase()) };
-    }
+  
 
     // Fuel type filter
-    if (fuelType) {
-      query.fuelType = {
-        $in: parseStringArray(fuelType).map((f) => f.toLowerCase()),
-      };
-    }
-
-    // Transmission type filter
-    if (transmissionType) {
-      query.transmissionType = {
-        $in: parseStringArray(transmissionType).map((t) => t.toLowerCase()),
-      };
-    }
-
-    // Air condition filter
-    if (airCondition !== undefined) {
-      const hasAC = airCondition === "true" || airCondition === true;
-      query.airCondition = hasAC;
-    }
-
-    // Insurance included filter
-    if (insuranceIncluded !== undefined) {
-      const hasInsurance =
-        insuranceIncluded === "true" || insuranceIncluded === true;
-      query["insuranceIncluded.0"] = { $exists: hasInsurance };
-    }
+    
 
     // Rating filter
     if (minRating !== undefined) {
@@ -1580,9 +1512,7 @@ exports.filterVehicles = async (req, res) => {
         : null,
       brandId: brandId || null,
       categoryId: categoryId || null,
-      type: type || null,
-      fuelType: fuelType || null,
-      transmissionType: transmissionType || null,
+    
       seatingCapacityRange: seatingCapacityRange || null,
       capacity: {
         min: minSeatingCapacity || null,
@@ -1592,7 +1522,6 @@ exports.filterVehicles = async (req, res) => {
         airCondition !== undefined
           ? airCondition === "true" || airCondition === true
           : null,
-      insuranceIncluded: insuranceIncluded || null,
       price: {
         min: minPrice || null,
         max: maxPrice || null,
@@ -1654,7 +1583,6 @@ exports.searchVehicles = async (req, res) => {
         { description: keywordRegex },
         { model: keywordRegex },
         { searchTags: { $in: [keywordRegex] } },
-        { audioSystem: keywordRegex },
       ];
     }
 
