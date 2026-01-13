@@ -871,6 +871,31 @@ exports.getCategoriesByModule = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+/* -----------------------------------------------------
+   GET ALL SUBCATEGORIES BY MODULE
+----------------------------------------------------- */
+exports.getAllSubCategoriesByModule = async (req, res) => {
+  try {
+    const { moduleId } = req.params;
+
+    const subcategories = await Category.find({
+      module: moduleId,
+      parentCategory: { $ne: null },
+      isActive: true,
+    })
+      .populate("parentCategory", "title")
+      .select("_id title image parentCategory")
+      .lean();
+
+    res.json({
+      success: true,
+      data: subcategories,
+    });
+  } catch (err) {
+    console.error("Get Subcategories By Module Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
 
 /* -----------------------------------------------------
    GET SUBCATEGORIES UNDER A PARENT

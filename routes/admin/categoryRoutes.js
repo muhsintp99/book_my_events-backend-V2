@@ -148,7 +148,10 @@ router.get(
   '/parent/:parentId',
   categoryController.getSubCategories
 );
-
+router.get(
+  "/modules/:moduleId/subcategories",
+  categoryController.getAllSubCategoriesByModule
+);
 /**
  * ✅ EXISTING: Get subcategory with full parent tree
  * GET /api/categories/with-parent/:id
