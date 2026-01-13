@@ -361,6 +361,20 @@ const getEffectivePrice = (pricing) => {
 // ================= CREATE =================
 exports.createVehicle = async (req, res) => {
   const body = sanitizeVehicleData(req.body);
+// ✅ PREVENT FALSE DUPLICATES (ADD THIS)
+const duplicateVehicle = await Vehicle.findOne({
+  provider: body.provider,
+  licensePlateNumber: body.licensePlateNumber,
+});
+
+if (duplicateVehicle) {
+  return sendResponse(
+    res,
+    400,
+    false,
+    "A vehicle with this license plate already exists"
+  );
+}
 
   // Provider auto-fill
   if (!body.provider && req.user) {
@@ -497,16 +511,15 @@ exports.createVehicle = async (req, res) => {
     if (body.documents?.length) await deleteFiles(body.documents);
 
     if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)[0];
-      return sendResponse(
-        res,
-        400,
-        false,
-        `${
-          field === "vinNumber" ? "VIN number" : "License plate number"
-        } already exists`
-      );
-    }
+  console.error("❌ Duplicate key error:", error.keyValue);
+  return sendResponse(
+    res,
+    400,
+    false,
+    "A vehicle with this license plate already exists"
+  );
+}
+
     sendResponse(res, 400, false, error.message);
   }
 };
