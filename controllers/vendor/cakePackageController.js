@@ -119,13 +119,17 @@ const sanitizeCakeData = (body) => {
   // =========================
   // PRICE INFO
   // =========================
-data.priceInfo = parseJSON(data.priceInfo, null);
+data.priceInfo = parseJSON(data.priceInfo, {});
 
-  if (data.priceInfo.advanceBookingAmount !== undefined) {
-    data.priceInfo.advanceBookingAmount = Number(
-      data.priceInfo.advanceBookingAmount
-    );
-  }
+ if (
+  data.priceInfo &&
+  data.priceInfo.advanceBookingAmount !== undefined
+) {
+  data.priceInfo.advanceBookingAmount = Number(
+    data.priceInfo.advanceBookingAmount
+  );
+}
+
 
   return data;
 };
