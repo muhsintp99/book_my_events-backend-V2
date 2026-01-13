@@ -119,7 +119,7 @@ const sanitizeCakeData = (body) => {
   // =========================
   // PRICE INFO
   // =========================
-  data.priceInfo = parseJSON(data.priceInfo, {});
+data.priceInfo = parseJSON(data.priceInfo, null);
 
   if (data.priceInfo.advanceBookingAmount !== undefined) {
     data.priceInfo.advanceBookingAmount = Number(
@@ -899,8 +899,39 @@ exports.updateCake = async (req, res) => {
       body.images = req.files.images.map((f) => f.path);
     }
 
-    Object.assign(cake, body);
-    await cake.save();
+    // =========================
+// SAFE PRICE INFO MERGE
+// =========================
+if (body.priceInfo) {
+  cake.priceInfo = {
+    ...cake.priceInfo.toObject(), // keep existing fields
+    ...body.priceInfo            // overwrite only provided fields
+  };
+  delete body.priceInfo;
+}
+
+// =========================
+// ASSIGN OTHER FIELDS
+// =========================
+Object.assign(cake, body);
+
+// =========================
+// FINAL VALIDATION SAFETY
+// =========================
+if (
+  cake.priceInfo?.unitPrice === undefined ||
+  cake.priceInfo?.unitPrice === null
+) {
+  return sendResponse(
+    res,
+    400,
+    false,
+    "Unit price is required"
+  );
+}
+
+await cake.save();
+
 
     if (filesToDelete.length) await deleteFiles(filesToDelete);
 
