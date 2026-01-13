@@ -193,7 +193,8 @@ const sanitizeVehicleData = (body) => {
   /* ================= OBJECT IDs ================= */
 
   if (sanitized.brand) sanitized.brand = parseObjectId(sanitized.brand);
-  if (sanitized.category) sanitized.category = parseObjectId(sanitized.category);
+  if (sanitized.category)
+    sanitized.category = parseObjectId(sanitized.category);
 
   if (sanitized.subCategories) {
     sanitized.subCategories = parseObjectIdArray(sanitized.subCategories);
@@ -246,8 +247,7 @@ const sanitizeVehicleData = (body) => {
 
   if (sanitized.airCondition !== undefined) {
     sanitized.airCondition =
-      sanitized.airCondition === true ||
-      sanitized.airCondition === "true";
+      sanitized.airCondition === true || sanitized.airCondition === "true";
   }
 
   if (sanitized.isActive !== undefined) {
@@ -320,9 +320,7 @@ const sanitizeVehicleData = (body) => {
         sanitized.pricing.perDay = Number(sanitized.pricing.perDay);
 
       if (sanitized.pricing.distanceWise !== undefined)
-        sanitized.pricing.distanceWise = Number(
-          sanitized.pricing.distanceWise
-        );
+        sanitized.pricing.distanceWise = Number(sanitized.pricing.distanceWise);
     }
   }
 
@@ -361,20 +359,6 @@ const getEffectivePrice = (pricing) => {
 // ================= CREATE =================
 exports.createVehicle = async (req, res) => {
   const body = sanitizeVehicleData(req.body);
-// ✅ PREVENT FALSE DUPLICATES (ADD THIS)
-const duplicateVehicle = await Vehicle.findOne({
-  provider: body.provider,
-  licensePlateNumber: body.licensePlateNumber,
-});
-
-if (duplicateVehicle) {
-  return sendResponse(
-    res,
-    400,
-    false,
-    "A vehicle with this license plate already exists"
-  );
-}
 
   // Provider auto-fill
   if (!body.provider && req.user) {
@@ -385,6 +369,23 @@ if (duplicateVehicle) {
     body.provider.toString() !== req.user._id.toString()
   ) {
     return sendResponse(res, 403, false, "Unauthorized: Invalid provider");
+  }
+
+  // ✅ FIXED: Check for duplicate ONLY by license plate (not provider)
+  // This allows the same provider to have multiple vehicles with different plates
+  if (body.licensePlateNumber) {
+    const duplicateVehicle = await Vehicle.findOne({
+      licensePlateNumber: body.licensePlateNumber,
+    });
+
+    if (duplicateVehicle) {
+      return sendResponse(
+        res,
+        400,
+        false,
+        "A vehicle with this license plate already exists"
+      );
+    }
   }
 
   // Handle uploads
@@ -403,7 +404,7 @@ if (duplicateVehicle) {
       }
     }
 
-    // ✅ FIXED: Validate subcategories properly
+    // ✅ Validate subcategories properly
     if (body.subCategories?.length) {
       const parentCategory = await Category.findById(body.category).lean();
 
@@ -462,7 +463,6 @@ if (duplicateVehicle) {
     const vehicle = await Vehicle.create(body);
 
     // Populate after creation
-    // Populate after creation
     const populatedVehicle = await Vehicle.findById(vehicle._id)
       .populate("brand")
       .populate({
@@ -473,10 +473,10 @@ if (duplicateVehicle) {
       .populate(populateProvider)
       .populate("zone")
       .lean();
+    
     attachVehicleImageUrls(populatedVehicle);
 
-    // ✅ MANUAL subCategory population (THIS IS THE KEY)
-    // ✅ MANUAL subCategory population (CORRECT WAY)
+    // ✅ MANUAL subCategory population
     if (populatedVehicle.subCategories?.length) {
       const subCategoryIds = populatedVehicle.subCategories.map((id) =>
         id.toString()
@@ -511,35 +511,32 @@ if (duplicateVehicle) {
     if (body.documents?.length) await deleteFiles(body.documents);
 
     if (error.code === 11000) {
-  console.error("❌ Duplicate key error:", error.keyValue);
-  return sendResponse(
-    res,
-    400,
-    false,
-    "A vehicle with this license plate already exists"
-  );
-}
+      console.error("❌ Duplicate key error:", error.keyValue);
+      return sendResponse(
+        res,
+        400,
+        false,
+        "A vehicle with this license plate already exists"
+      );
+    }
 
     sendResponse(res, 400, false, error.message);
   }
 };
-
 // ================= GET ALL VEHICLES =================
 exports.getVehicles = async (req, res) => {
   try {
-   const {
-  page = 1,
-  limit = 10,
-  brand,
-  category,
-  minPrice,
-  maxPrice,
-  search,
-  isActive,
-  zone,
-} = req.query;
-;
-
+    const {
+      page = 1,
+      limit = 10,
+      brand,
+      category,
+      minPrice,
+      maxPrice,
+      search,
+      isActive,
+      zone,
+    } = req.query;
     const query = {};
 
     // Build filters
@@ -574,13 +571,12 @@ exports.getVehicles = async (req, res) => {
     // Search functionality
     if (search) {
       const keywordRegex = new RegExp(search, "i");
-    query.$or = [
-  { name: keywordRegex },
-  { description: keywordRegex },
-  { model: keywordRegex },
-  { searchTags: { $in: [keywordRegex] } },
-];
-
+      query.$or = [
+        { name: keywordRegex },
+        { description: keywordRegex },
+        { model: keywordRegex },
+        { searchTags: { $in: [keywordRegex] } },
+      ];
     }
 
     const skip = (Number(page) - 1) * Number(limit);
@@ -753,8 +749,6 @@ exports.getVehiclesByProvider = async (req, res) => {
   }
 };
 
-
-
 /* =====================================================
    GET VENDORS FOR VEHICLE MODULE (LIKE CAKES)
 ===================================================== */
@@ -788,7 +782,7 @@ exports.getVendorsForVehicleModule = async (req, res) => {
       });
     }
 
-    const vendorIds = vendorProfiles.map(v => v.user);
+    const vendorIds = vendorProfiles.map((v) => v.user);
 
     // Fetch user info
     const users = await User.find({ _id: { $in: vendorIds } })
@@ -806,12 +800,12 @@ exports.getVendorsForVehicleModule = async (req, res) => {
 
     const baseUrl = `${req.protocol}://${req.get("host")}`;
 
-    const final = users.map(user => {
+    const final = users.map((user) => {
       const vp = vendorProfiles.find(
-        v => v.user.toString() === user._id.toString()
+        (v) => v.user.toString() === user._id.toString()
       );
       const sub = subscriptions.find(
-        s => s.userId.toString() === user._id.toString()
+        (s) => s.userId.toString() === user._id.toString()
       );
 
       const now = new Date();
@@ -1182,24 +1176,24 @@ exports.reactivateVehicle = async (req, res) => {
 exports.filterVehicles = async (req, res) => {
   try {
     const {
-  latitude,
-  longitude,
-  radius = 10,
-  brandId,
-  categoryId,
-  seatingCapacityRange,
-  minSeatingCapacity,
-  maxSeatingCapacity,
-  airCondition,
-  minPrice,
-  maxPrice,
-  minRating,
-  maxRating,
-  page = 1,
-  limit = 50,
-  sortBy = "createdAt",
-  sortOrder = "desc",
-} = req.query;
+      latitude,
+      longitude,
+      radius = 10,
+      brandId,
+      categoryId,
+      seatingCapacityRange,
+      minSeatingCapacity,
+      maxSeatingCapacity,
+      airCondition,
+      minPrice,
+      maxPrice,
+      minRating,
+      maxRating,
+      page = 1,
+      limit = 50,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+    } = req.query;
 
     console.log("=== FILTER REQUEST ===");
     console.log("minPrice:", minPrice, typeof minPrice);
@@ -1241,19 +1235,19 @@ exports.filterVehicles = async (req, res) => {
 
     // Build base query
     const query = { isActive: true };
-// ===== FEATURE FILTERS =====
-if (req.query.driverIncluded !== undefined) {
-  query["features.driverIncluded"] = req.query.driverIncluded === "true";
-}
+    // ===== FEATURE FILTERS =====
+    if (req.query.driverIncluded !== undefined) {
+      query["features.driverIncluded"] = req.query.driverIncluded === "true";
+    }
 
-if (req.query.sunroof !== undefined) {
-  query["features.sunroof"] = req.query.sunroof === "true";
-}
+    if (req.query.sunroof !== undefined) {
+      query["features.sunroof"] = req.query.sunroof === "true";
+    }
 
-if (req.query.decorationAvailable !== undefined) {
-  query["features.decorationAvailable"] =
-    req.query.decorationAvailable === "true";
-}
+    if (req.query.decorationAvailable !== undefined) {
+      query["features.decorationAvailable"] =
+        req.query.decorationAvailable === "true";
+    }
 
     // Apply capacity range filter
     if (capacityFilter) {
@@ -1301,10 +1295,7 @@ if (req.query.decorationAvailable !== undefined) {
       }
     }
 
-  
-
     // Fuel type filter
-    
 
     // Rating filter
     if (minRating !== undefined) {
@@ -1525,7 +1516,7 @@ if (req.query.decorationAvailable !== undefined) {
         : null,
       brandId: brandId || null,
       categoryId: categoryId || null,
-    
+
       seatingCapacityRange: seatingCapacityRange || null,
       capacity: {
         min: minSeatingCapacity || null,
