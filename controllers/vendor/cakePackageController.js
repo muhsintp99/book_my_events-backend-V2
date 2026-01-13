@@ -70,15 +70,35 @@ const parseObjectId = (value) =>
 const sanitizeCakeData = (body) => {
   const data = { ...body };
 
+  // =========================
+  // BASIC STRINGS
+  // =========================
   if (data.name) data.name = data.name.trim();
   if (data.shortDescription)
     data.shortDescription = data.shortDescription.trim();
 
+  // =========================
+  // BOOLEAN FLAGS
+  // =========================
   data.isActive =
     data.isActive !== undefined ? String(data.isActive) === "true" : true;
+
   data.isTopPick =
     data.isTopPick !== undefined ? String(data.isTopPick) === "true" : false;
 
+  // =========================
+  // ITEM TYPE (Egg / Eggless)
+  // =========================
+  if (data.itemType) {
+    const normalized = String(data.itemType).toLowerCase();
+
+    if (normalized === "eggless") data.itemType = "Eggless";
+    else if (normalized === "egg") data.itemType = "Egg";
+  }
+
+  // =========================
+  // OBJECT IDS
+  // =========================
   if (data.module) data.module = parseObjectId(data.module);
   if (data.category) data.category = parseObjectId(data.category);
 
@@ -88,12 +108,17 @@ const sanitizeCakeData = (body) => {
     );
   }
 
+  // =========================
+  // ARRAYS / JSON FIELDS
+  // =========================
   data.nutrition = parseJSON(data.nutrition, []);
   data.allergenIngredients = parseJSON(data.allergenIngredients, []);
   data.searchTags = parseJSON(data.searchTags, []);
   data.variations = parseJSON(data.variations, []);
 
-
+  // =========================
+  // PRICE INFO
+  // =========================
   data.priceInfo = parseJSON(data.priceInfo, {});
 
   if (data.priceInfo.advanceBookingAmount !== undefined) {
@@ -104,6 +129,7 @@ const sanitizeCakeData = (body) => {
 
   return data;
 };
+
 /* =====================================================
    POPULATE CAKE HELPER
 ===================================================== */
