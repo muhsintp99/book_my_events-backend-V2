@@ -1,82 +1,3 @@
-// const express = require('express');
-// const router = express.Router();
-// const createUpload = require('../../middlewares/upload');
-// const vehicleController = require('../../controllers/vendor/vehicleController');
-// const { protect, authorizeRoles } = require('../../middlewares/authMiddleware');
-
-// const upload = createUpload('vehicles', { fileSizeMB: 20 });
-// const uploadFields = upload.fields([
-//   { name: 'images', maxCount: 10 },
-//   { name: 'thumbnail', maxCount: 1 },
-//   { name: 'documents', maxCount: 5 },
-// ]);
-
-// // Optional auth for GET routes
-// const optionalAuth = (req, res, next) => {
-//   if (req.headers.authorization) {
-//     return protect(req, res, next);
-//   }
-//   next();
-// };
-
-// // Public / optional authentication
-// router.get('/', optionalAuth, vehicleController.getVehicles);
-// router.get('/filter', optionalAuth, vehicleController.filterVehicles);
-// router.get('/search', optionalAuth, vehicleController.searchVehicles);
-// router.get('/sort', optionalAuth, vehicleController.sortVehicles);
-// router.get('/location', optionalAuth, vehicleController.getVehiclesByLocation);
-// router.get('/provider/:providerId', optionalAuth, vehicleController.getVehiclesByProvider);
-// router.get('/category/:categoryId', optionalAuth, vehicleController.getVehiclesByCategory);
-// router.get(
-//   "/vendors/:moduleId",
-//   optionalAuth,
-//   vehicleController.getVendorsForVehicleModule
-// );
-// router.get('/counts', protect, authorizeRoles('admin'), vehicleController.getVehicleCounts);
-// router.get('/:id', optionalAuth, vehicleController.getVehicle);
-
-// // Protected routes
-// router.post(
-//   '/',
-//   protect,
-//   authorizeRoles('vendor', 'admin'),
-//   uploadFields,
-//   vehicleController.createVehicle
-// );
-
-// router.put(
-//   '/:id',
-//   protect,
-//   authorizeRoles('vendor', 'admin'),
-//   uploadFields,
-//   vehicleController.updateVehicle
-// );
-
-
-
-// router.delete(
-//   '/:id',
-//   protect,
-//   authorizeRoles('vendor', 'admin'),
-//   vehicleController.deleteVehicle
-// );
-
-// router.put(
-//   '/:id/block',
-//   protect,
-//   authorizeRoles('vendor', 'admin'),
-//   vehicleController.blockVehicle
-// );
-
-// router.put(
-//   '/:id/reactivate',
-//   protect,
-//   authorizeRoles('vendor', 'admin'),
-//   vehicleController.reactivateVehicle
-// );
-
-// module.exports = router;
-
 const express = require('express');
 const router = express.Router();
 const createUpload = require('../../middlewares/upload');
@@ -98,7 +19,7 @@ const optionalAuth = (req, res, next) => {
   next();
 };
 
-// Public / optional authentication
+// ================= PUBLIC / OPTIONAL AUTH =================
 router.get('/', optionalAuth, vehicleController.getVehicles);
 router.get('/filter', optionalAuth, vehicleController.filterVehicles);
 router.get('/search', optionalAuth, vehicleController.searchVehicles);
@@ -106,10 +27,20 @@ router.get('/sort', optionalAuth, vehicleController.sortVehicles);
 router.get('/location', optionalAuth, vehicleController.getVehiclesByLocation);
 router.get('/provider/:providerId', optionalAuth, vehicleController.getVehiclesByProvider);
 router.get('/category/:categoryId', optionalAuth, vehicleController.getVehiclesByCategory);
+
+// ✅ MUST be before `/:id`
+router.get(
+  '/vendors/:moduleId',
+  optionalAuth,
+  vehicleController.getVendorsForVehicleModule
+);
+
 router.get('/counts', protect, authorizeRoles('admin'), vehicleController.getVehicleCounts);
+
+// ✅ SINGLE ID ROUTE (ONLY ONCE)
 router.get('/:id', optionalAuth, vehicleController.getVehicle);
 
-// Protected routes
+// ================= PROTECTED ROUTES =================
 router.post(
   '/',
   protect,
