@@ -121,14 +121,7 @@ const sanitizeCakeData = (body) => {
   // =========================
 data.priceInfo = parseJSON(data.priceInfo, {});
 
- if (
-  data.priceInfo &&
-  data.priceInfo.advanceBookingAmount !== undefined
-) {
-  data.priceInfo.advanceBookingAmount = Number(
-    data.priceInfo.advanceBookingAmount
-  );
-}
+ 
 
 
   return data;

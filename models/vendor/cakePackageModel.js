@@ -100,13 +100,7 @@ const CakeSchema = new mongoose.Schema(
     required: true,
   },
 
-  // ✅ MUST BE HERE
-  advanceBookingAmount: {
-    type: Number,
-    default: 0,
-    min: 0
-  },
-
+ 
   discountType: {
     type: String,
     enum: ["Percent", "Amount"],
