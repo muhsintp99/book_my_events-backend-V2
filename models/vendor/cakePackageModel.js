@@ -93,29 +93,7 @@ const CakeSchema = new mongoose.Schema(
 // },
 
 
-    /* ================= PRICE ================= */
-    priceInfo: {
-  unitPrice: {
-    type: Number,
-    required: true,
-  },
-
- 
-  discountType: {
-    type: String,
-    enum: ["Percent", "Amount"],
-    default: "Percent",
-  },
-
-  discount: {
-    type: Number,
-    default: 0,
-  },
-
-  maxPurchaseQty: Number,
-},
-
-    /* ================= VARIATIONS ================= */
+      /* ================= VARIATIONS ================= */
     variations: [
       {
         name: String,

@@ -116,11 +116,7 @@ const sanitizeCakeData = (body) => {
   data.searchTags = parseJSON(data.searchTags, []);
   data.variations = parseJSON(data.variations, []);
 
-  // =========================
-  // PRICE INFO
-  // =========================
-data.priceInfo = parseJSON(data.priceInfo, {});
-
+  
  
 
 
@@ -381,10 +377,10 @@ exports.getCakesByModule = async (req, res) => {
     const query = { module: moduleId, isActive: true };
 
     const validSortFields = {
-      price: "priceInfo.unitPrice",
-      createdAt: "createdAt",
-      name: "name",
-    };
+  createdAt: "createdAt",
+  name: "name",
+};
+
 
     const sortField = validSortFields[sortBy] || "createdAt";
     const order = sortOrder === "asc" ? 1 : -1;
@@ -441,10 +437,10 @@ exports.getCakesByCategory = async (req, res) => {
     const query = { category: categoryId, isActive: true };
 
     const validSortFields = {
-      price: "priceInfo.unitPrice",
-      createdAt: "createdAt",
-      name: "name",
-    };
+  createdAt: "createdAt",
+  name: "name",
+};
+
 
     const sortField = validSortFields[sortBy] || "createdAt";
     const order = sortOrder === "asc" ? 1 : -1;
@@ -811,26 +807,13 @@ exports.searchCakes = async (req, res) => {
     //   query.isHalal = isHalal === "true";
     // }
 
-    // Price filtering (using unitPrice from priceInfo)
-    if (minPrice !== undefined) {
-      query["priceInfo.unitPrice"] = {
-        ...query["priceInfo.unitPrice"],
-        $gte: Number(minPrice),
-      };
-    }
-    if (maxPrice !== undefined) {
-      query["priceInfo.unitPrice"] = {
-        ...query["priceInfo.unitPrice"],
-        $lte: Number(maxPrice),
-      };
-    }
+   
 
-    // Sorting field
-    const validSortFields = {
-      price: "priceInfo.unitPrice",
-      createdAt: "createdAt",
-      name: "name",
-    };
+   const validSortFields = {
+  createdAt: "createdAt",
+  name: "name",
+};
+
 
     const sortField = validSortFields[sortBy] || "createdAt";
     const order = sortOrder === "asc" ? 1 : -1;
@@ -899,33 +882,11 @@ exports.updateCake = async (req, res) => {
     // =========================
 // SAFE PRICE INFO MERGE
 // =========================
-if (body.priceInfo) {
-  cake.priceInfo = {
-    ...cake.priceInfo.toObject(), // keep existing fields
-    ...body.priceInfo            // overwrite only provided fields
-  };
-  delete body.priceInfo;
-}
 
-// =========================
-// ASSIGN OTHER FIELDS
-// =========================
 Object.assign(cake, body);
 
-// =========================
-// FINAL VALIDATION SAFETY
-// =========================
-if (
-  cake.priceInfo?.unitPrice === undefined ||
-  cake.priceInfo?.unitPrice === null
-) {
-  return sendResponse(
-    res,
-    400,
-    false,
-    "Unit price is required"
-  );
-}
+
+
 
 await cake.save();
 
