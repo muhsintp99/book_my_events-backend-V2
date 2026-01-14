@@ -137,7 +137,6 @@
 //       bookingId,
 //       advanceAmount: amount,
 
-
 //         // sdk_payload: session.sdk_payload,
 
 //       payment_links: session.payment_links,
@@ -176,7 +175,6 @@
 //     return res.sendStatus(200);
 //   }
 // };
-
 
 // /**
 //  * HANDLE PAYMENT RESPONSE (S2S Order Status Check)
@@ -342,9 +340,6 @@
 //   getLatestPayment: exports.getLatestPayment,
 // };
 
-
-
-
 const { Juspay, APIError } = require("expresscheckout-nodejs");
 const Booking = require("../models/vendor/Booking");
 const config = require("../config/smartgateway_config.json");
@@ -411,45 +406,53 @@ exports.createSmartGatewayPayment = async (req, res) => {
       .populate("cateringId");
 
     if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
+      });
     }
 
     /* ================= AMOUNT LOGIC ================= */
-let amountToPay = 0;
+    let amountToPay = 0;
 
-/* ================= CAKE MODULE ================= */
-if (booking.moduleType === "Cake") {
-  amountToPay = Number(booking.finalPrice);
-}
+    // 🎂 CAKE → FULL PAYMENT
+    if (booking.moduleType === "Cake") {
+      amountToPay = Number(booking.finalPrice);
+    }
 
-/* ================= OTHER MODULES ================= */
-else {
-  amountToPay = Number(booking.advanceAmount) || 0;
+    // 🧾 OTHER MODULES → ADVANCE PAYMENT
+    else {
+      amountToPay = Number(booking.advanceAmount) || 0;
 
-  if (amountToPay <= 0) {
-    if (booking.moduleType === "Makeup Artist")
-      amountToPay = Number(booking.makeupId?.advanceBookingAmount) || 0;
-    if (booking.moduleType === "Photography")
-      amountToPay = Number(booking.photographyId?.advanceBookingAmount) || 0;
-    if (booking.moduleType === "Catering")
-      amountToPay = Number(booking.cateringId?.advanceBookingAmount) || 0;
-  }
-}
+      if (amountToPay <= 0) {
+        if (booking.moduleType === "Makeup Artist") {
+          amountToPay =
+            Number(booking.makeupId?.advanceBookingAmount) || 0;
+        }
 
-if (amountToPay <= 0) {
-  return res.status(400).json({
-    success: false,
-    message: "Payment amount not configured",
-  });
-}
+        if (booking.moduleType === "Photography") {
+          amountToPay =
+            Number(booking.photographyId?.advanceBookingAmount) || 0;
+        }
 
+        if (booking.moduleType === "Catering") {
+          amountToPay =
+            Number(booking.cateringId?.advanceBookingAmount) || 0;
+        }
+      }
+    }
 
+    if (amountToPay <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment amount not configured",
+      });
+    }
 
-    const amount = advanceAmount.toFixed(2);
+    const amount = amountToPay.toFixed(2); // ✅ FIXED
     const orderId = `order_${bookingId}_${Date.now()}`;
 
     /* ================= RETURN URL ================= */
-    // ⚠️ MUST be static — HDFC may strip params
     const returnUrl = "https://bookmyevent.ae/payment-success/index.html";
 
     /* ================= CREATE ORDER ================= */
@@ -460,10 +463,12 @@ if (amountToPay <= 0) {
       customer_id: booking.userId._id.toString(),
       customer_email: booking.userId.email,
       customer_phone: booking.userId.mobile || "9999999999",
-      description: `Advance Payment ₹${amount}`,
+      description:
+        booking.moduleType === "Cake"
+          ? `Cake Payment ₹${amount}`
+          : `Advance Payment ₹${amount}`,
       return_url: returnUrl,
 
-      // ✅ HDFC UDF FIELDS (VISIBLE IN DASHBOARD + ORDER STATUS API)
       udf1: bookingId,
       udf2: booking.moduleType,
       udf3: booking.userId._id.toString(),
@@ -485,33 +490,30 @@ if (amountToPay <= 0) {
     });
 
     /* ================= SAVE BOOKING ================= */
-    // booking.paymentOrderId = orderId;
-    // booking.paymentStatus = "initiated";
-    // booking.paidAmount = advanceAmount;
-    // await booking.save();
-booking.paidAmount = 0;
-booking.remainingAmount = booking.finalPrice;
-booking.paymentStatus = "initiated";
-booking.paymentOrderId = orderId;
+    booking.paymentStatus = "initiated";
+    booking.paymentOrderId = orderId;
 
-await booking.save();
+    // Cake → full payment later
+    booking.paidAmount = 0;
+    booking.remainingAmount = booking.finalPrice;
+
+    await booking.save();
 
     return res.json({
       success: true,
       order_id: orderId,
       bookingId,
-      advanceAmount: amount,
-
-
-        // sdk_payload: session.sdk_payload,
-
+      payableAmount: amount, // ✅ FIXED
       payment_links: session.payment_links,
       return_url: returnUrl,
     });
 
   } catch (err) {
-    console.error("❌ Payment Error:", err.message);
-    return res.status(500).json({ success: false, message: err.message });
+    console.error("❌ Payment Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 
@@ -541,7 +543,6 @@ exports.juspayWebhook = async (req, res) => {
     return res.sendStatus(200);
   }
 };
-
 
 /**
  * HANDLE PAYMENT RESPONSE (S2S Order Status Check)
@@ -611,7 +612,7 @@ exports.verifyBookingPayment = async (req, res) => {
     // 2️⃣ FINAL SAFETY NET (HDFC STRIPS EVERYTHING)
     if (!orderId) {
       const latest = await Booking.findOne({
-        paymentStatus: { $in: ["initiated", "pending"] }
+        paymentStatus: { $in: ["initiated", "pending"] },
       }).sort({ createdAt: -1 });
 
       orderId = latest?.paymentOrderId;
@@ -622,7 +623,7 @@ exports.verifyBookingPayment = async (req, res) => {
     if (!orderId) {
       return res.json({
         status: "failed",
-        message: "Payment reference not found"
+        message: "Payment reference not found",
       });
     }
 
@@ -633,7 +634,7 @@ exports.verifyBookingPayment = async (req, res) => {
     const order = await juspay.order.status(orderId);
 
     const booking = await Booking.findOne({
-      paymentOrderId: orderId
+      paymentOrderId: orderId,
     });
 
     if (order.status === "CHARGED") {
@@ -651,7 +652,9 @@ exports.verifyBookingPayment = async (req, res) => {
       });
     }
 
-    if (["PENDING", "AUTHORIZING", "NEW", "PENDING_VBV"].includes(order.status)) {
+    if (
+      ["PENDING", "AUTHORIZING", "NEW", "PENDING_VBV"].includes(order.status)
+    ) {
       return res.json({ status: "pending" });
     }
 
@@ -661,12 +664,11 @@ exports.verifyBookingPayment = async (req, res) => {
     }
 
     return res.json({ status: "failed" });
-
   } catch (err) {
     console.error("❌ verifyBookingPayment error:", err);
     return res.json({
       status: "failed",
-      message: "Verification error"
+      message: "Verification error",
     });
   }
 };
@@ -677,7 +679,7 @@ exports.verifyBookingPayment = async (req, res) => {
 exports.getLatestPayment = async (req, res) => {
   try {
     const booking = await Booking.findOne({
-      paymentStatus: "initiated"
+      paymentStatus: "initiated",
     }).sort({ createdAt: -1 });
 
     if (!booking || !booking.paymentOrderId) {
@@ -687,9 +689,8 @@ exports.getLatestPayment = async (req, res) => {
     return res.json({
       success: true,
       orderId: booking.paymentOrderId,
-      bookingId: booking._id
+      bookingId: booking._id,
     });
-
   } catch (err) {
     console.error("❌ getLatestPayment:", err);
     res.json({ success: false });
