@@ -40,6 +40,18 @@ const VehicleSchema = new mongoose.Schema(
     latitude: { type: Number },
     longitude: { type: Number },
     model: { type: String, trim: true },
+transmissionType: {
+  type: String,
+  enum: ["manual", "automatic", "semi-automatic"],
+  required: false,
+  lowercase: true,
+  trim: true,
+},
+
+enginePower: {
+  type: Number, // hp
+  min: [0, "Engine power cannot be negative"],
+},
 
     seatingCapacity: {
       type: Number,
@@ -93,6 +105,7 @@ features: {
         message: "VIN must be 17 characters if provided",
       },
     },
+    
     licensePlateNumber: {
       type: String,
       trim: true,

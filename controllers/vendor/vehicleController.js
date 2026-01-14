@@ -200,7 +200,17 @@ const sanitizeVehicleData = (body) => {
     sanitized.subCategories = parseObjectIdArray(sanitized.subCategories);
   }
 
+
   /* ================= STRINGS ================= */
+
+if (sanitized.transmissionType) {
+  sanitized.transmissionType = String(
+    sanitized.transmissionType
+  )
+    .trim()
+    .toLowerCase();
+}
+
 
   if (sanitized.name) {
     sanitized.name =
@@ -278,7 +288,14 @@ const sanitizeVehicleData = (body) => {
     };
   }
 
+
   /* ================= NUMBERS ================= */
+
+if (sanitized.enginePower !== undefined) {
+  const value = Number(sanitized.enginePower);
+  if (!isNaN(value)) sanitized.enginePower = value;
+}
+
 
   if (sanitized.seatingCapacity !== undefined) {
     sanitized.seatingCapacity = Number(sanitized.seatingCapacity);
