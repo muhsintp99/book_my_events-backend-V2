@@ -3,25 +3,26 @@ const Module = require("../../models/admin/module");
 const mongoose = require("mongoose");
 
 /**
- * CHECK AVAILABILITY (PACKAGE BASED - ALL MODULES)
+ * UNIVERSAL AVAILABILITY CHECK
+ * DATE-BASED (NO TIME SLOT)
+ * WORKS FOR ALL MODULES
  */
 exports.checkAvailability = async (req, res) => {
   try {
     const {
-      bookingId,     // ⭐ OPTIONAL (for edit / reschedule)
+      bookingId,     // optional (edit / reschedule)
       moduleId,
-      packageId,     // ⭐ COMMON FOR ALL MODULES
-      bookingDate,
-      timeSlot
+      packageId,
+      bookingDate
     } = req.body;
 
     /* =========================
        BASIC VALIDATION
     ========================= */
-    if (!moduleId || !packageId || !bookingDate || !timeSlot) {
+    if (!moduleId || !packageId || !bookingDate) {
       return res.status(400).json({
         success: false,
-        message: "moduleId, packageId, bookingDate, and timeSlot are required"
+        message: "moduleId, packageId, and bookingDate are required"
       });
     }
 
@@ -49,46 +50,59 @@ exports.checkAvailability = async (req, res) => {
     /* =========================
        CHECK MODULE EXISTS
     ========================= */
-    const module = await Module.findById(moduleId).lean();
-    if (!module) {
+    const moduleExists = await Module.findById(moduleId)
+      .select("_id title isActive")
+      .lean();
+
+    if (!moduleExists) {
       return res.status(404).json({
         success: false,
         message: "Module not found"
       });
     }
 
+    if (!moduleExists.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: "Module is inactive"
+      });
+    }
+
     /* =========================
-       BUILD AVAILABILITY QUERY
+       NORMALIZE DATE (IMPORTANT)
+       Ensures date-only comparison
     ========================= */
-    const query = {
+    const normalizedDate = new Date(bookingDate);
+    normalizedDate.setHours(0, 0, 0, 0);
+
+    /* =========================
+       BUILD CONFLICT QUERY
+    ========================= */
+    const conflictQuery = {
       moduleId,
       packageId,
-      bookingDate: new Date(bookingDate),
-      timeSlot,
+      bookingDate: normalizedDate,
       status: { $in: ["Pending", "Accepted"] }
     };
 
-    // ⭐ EXCLUDE CURRENT BOOKING (EDIT CASE)
+    // Exclude current booking (edit case)
     if (bookingId) {
-      query._id = { $ne: bookingId };
+      conflictQuery._id = { $ne: bookingId };
     }
 
     /* =========================
        CHECK EXISTING BOOKINGS
     ========================= */
-    const conflict = await Booking.findOne(query).lean();
+    const conflict = await Booking.findOne(conflictQuery)
+      .select("_id bookingDate status")
+      .lean();
 
     if (conflict) {
       return res.json({
         success: true,
         available: false,
-        message: "Not available for the selected date and time",
-        conflict: {
-          bookingId: conflict._id,
-          status: conflict.status,
-          bookingDate: conflict.bookingDate,
-          timeSlot: conflict.timeSlot
-        }
+        message: "Not available for the selected date",
+        conflict
       });
     }
 
