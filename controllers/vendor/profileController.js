@@ -18,7 +18,7 @@ exports.getAllVendors = async (req, res) => {
       })
       .populate({
         path: "zone",
-        select: "name city country"
+        select: "name description coordinates city country isActive isTopZone icon"
       });
 
     return res.status(200).json({
@@ -41,7 +41,7 @@ exports.getSingleVendor = async (req, res) => {
     const vendor = await VendorProfile.findOne({ user: providerId })
       .populate("user", "firstName lastName email phone role profilePhoto")
       .populate("module", "title moduleId icon")
-      .populate("zone", "name city country");
+      .populate("zone", "name description coordinates city country isActive isTopZone icon");
 
     if (!vendor) {
       return res.status(404).json({
@@ -424,7 +424,7 @@ exports.getProfileByProviderId = async (req, res) => {
 // ✅ FIXED: Update profile - handles BOTH Profile ID and User ID
 exports.updateProfile = async (req, res) => {
   try {
-    const { role, vendorName, firstName, lastName, businessAddress, mobileNumber, socialLinks, bankDetails } = req.body;
+    const { role, vendorName, firstName, lastName, businessAddress, mobileNumber, socialLinks, bankDetails, latitude, longitude, storeAddress } = req.body;
     const id = req.params.id; // Could be Profile ID or User ID
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -463,6 +463,15 @@ exports.updateProfile = async (req, res) => {
       if (vendorName) updatedData.vendorName = vendorName;
       if (businessAddress) updatedData.businessAddress = businessAddress;
       if (mobileNumber) updatedData.mobileNumber = mobileNumber;
+      if (latitude) updatedData.latitude = latitude;
+      if (longitude) updatedData.longitude = longitude;
+      if (storeAddress) {
+        try {
+          updatedData.storeAddress = typeof storeAddress === 'string' ? JSON.parse(storeAddress) : storeAddress;
+        } catch (err) {
+          console.error("Invalid storeAddress JSON", err);
+        }
+      }
 
       let profile;
 

@@ -1880,7 +1880,8 @@ exports.login = async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ email });
+    const cleanEmail = email?.toString().trim();
+    const user = await User.findOne({ email: cleanEmail });
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -1914,7 +1915,7 @@ exports.login = async (req, res) => {
         },
         {
           path: "zone",
-          select: "name description city country isActive",
+          select: "name description coordinates city country isActive isTopZone icon",
         },
       ]);
     }
@@ -2032,6 +2033,9 @@ exports.register = async (req, res) => {
       ifscCode,
       branchName,
       upiId,
+      latitude,
+      longitude,
+      accountType,
     } = req.body;
 
     const finalRole = req.body.role === "vendor" ? "vendor" : "user";
@@ -2068,13 +2072,14 @@ exports.register = async (req, res) => {
     const bankDetails =
       finalRole === "vendor"
         ? {
-            accountHolderName: accountHolderName || "",
-            bankName: bankName || "",
-            accountNumber: accountNumber || "",
-            ifscCode: ifscCode || "",
-            branchName: branchName || "",
-            upiId: upiId || "",
-          }
+          accountHolderName: (accountHolderName || "").toString().trim(),
+          bankName: (bankName || "").toString().trim(),
+          accountNumber: (accountNumber || "").toString().trim(),
+          ifscCode: (ifscCode || "").toString().trim(),
+          branchName: (branchName || "").toString().trim(),
+          upiId: (upiId || "").toString().trim(),
+          accountType: (accountType || "savings").toString().trim(),
+        }
         : undefined;
 
     // Basic validation
@@ -2097,7 +2102,8 @@ exports.register = async (req, res) => {
       });
     }
 
-    const existing = await User.findOne({ email }).session(session);
+    const cleanEmail = email?.toString().trim();
+    const existing = await User.findOne({ email: cleanEmail }).session(session);
     if (existing) {
       await session.abortTransaction();
       session.endSession();
@@ -2137,11 +2143,11 @@ exports.register = async (req, res) => {
       [
         {
           userId,
-          firstName,
-          lastName,
-          email,
+          firstName: firstName?.toString().trim(),
+          lastName: lastName?.toString().trim(),
+          email: email?.toString().trim(),
           password: userPassword,
-          phone,
+          phone: phone?.toString().trim(),
           role: finalRole,
           refreshToken,
         },
@@ -2163,10 +2169,10 @@ exports.register = async (req, res) => {
 
       const bioSection = isBioModule
         ? {
-            title: req.body.bioTitle || "",
-            subtitle: req.body.bioSubtitle || "",
-            description: req.body.bioDescription || "",
-          }
+          title: req.body.bioTitle || "",
+          subtitle: req.body.bioSubtitle || "",
+          description: req.body.bioDescription || "",
+        }
         : undefined;
 
       const vendorTypeValue = isVendorTypeModule
@@ -2176,8 +2182,10 @@ exports.register = async (req, res) => {
       vendorProfile = await VendorProfile.create(
         [
           {
-            storeName: storeName || "",
+            storeName: (storeName || "").toString().trim(),
             storeAddress,
+            latitude: (latitude || "").toString().trim(),
+            longitude: (longitude || "").toString().trim(),
             logo: req.files?.logo
               ? `/uploads/vendors/${req.files.logo[0].filename}`
               : "",
@@ -2187,11 +2195,11 @@ exports.register = async (req, res) => {
             tinCertificate: req.files?.tinCertificate
               ? `/uploads/vendors/${req.files.tinCertificate[0].filename}`
               : "",
-            ownerFirstName: firstName,
-            ownerLastName: lastName,
-            ownerPhone: phone || "",
-            ownerEmail: email,
-            businessTIN: businessTIN || "",
+            ownerFirstName: firstName?.toString().trim(),
+            ownerLastName: lastName?.toString().trim(),
+            ownerPhone: (phone || "").toString().trim(),
+            ownerEmail: email?.toString().trim(),
+            businessTIN: (businessTIN || "").toString().trim(),
             tinExpireDate: tinExpireDate || null,
             bankDetails,
             bio: bioSection,
@@ -2203,17 +2211,17 @@ exports.register = async (req, res) => {
             lastPaymentDate: null,
             estimatedDeliveryTime: isCakeModule
               ? {
-                  minDays: req.body.minDeliveryDays || null,
-                  maxDays: req.body.maxDeliveryDays || null,
-                  unit: req.body.deliveryUnit || "days",
-                }
+                minDays: req.body.minDeliveryDays || null,
+                maxDays: req.body.maxDeliveryDays || null,
+                unit: req.body.deliveryUnit || "days",
+              }
               : undefined,
 
-            module: mongoose.Types.ObjectId.isValid(module)
-              ? new mongoose.Types.ObjectId(module)
+            module: mongoose.Types.ObjectId.isValid(module?.toString().trim())
+              ? new mongoose.Types.ObjectId(module.toString().trim())
               : null,
-            zone: mongoose.Types.ObjectId.isValid(zone)
-              ? new mongoose.Types.ObjectId(zone)
+            zone: mongoose.Types.ObjectId.isValid(zone?.toString().trim())
+              ? new mongoose.Types.ObjectId(zone.toString().trim())
               : null,
             user: user[0]._id,
             status: "pending",
@@ -2250,7 +2258,7 @@ exports.register = async (req, res) => {
     if (vendorProfile) {
       vendorProfile = await VendorProfile.findById(vendorProfile[0]._id)
         .populate("module", "title")
-        .populate("zone", "name");
+        .populate("zone", "name description coordinates city country isActive isTopZone icon");
     }
 
     const responseData = {
@@ -2278,9 +2286,17 @@ exports.register = async (req, res) => {
           : null,
         isFreeTrial: vendorProfile ? vendorProfile.isFreeTrial : false,
         subscriptionPlan: vendorProfile ? vendorProfile.subscriptionPlan : null,
+        latitude: vendorProfile?.latitude || "",
+        longitude: vendorProfile?.longitude || "",
         bio: vendorProfile?.bio || null,
         vendorType: vendorProfile?.vendorType || null,
         bankDetails: vendorProfile?.bankDetails || null,
+        storeAddress: vendorProfile?.storeAddress || null,
+        street: vendorProfile?.storeAddress?.street || "",
+        city: vendorProfile?.storeAddress?.city || "",
+        state: vendorProfile?.storeAddress?.state || "",
+        zipCode: vendorProfile?.storeAddress?.zipCode || "",
+        fullAddress: vendorProfile?.storeAddress?.fullAddress || "",
       },
     };
 

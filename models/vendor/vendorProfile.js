@@ -618,7 +618,7 @@
 //   this.trialStartDate = null;
 //   this.trialEndDate = null;
 //   this.lastPaymentDate = new Date();
-  
+
 //   return await this.save();
 // };
 
@@ -656,7 +656,7 @@
 // vendorProfileSchema.statics.findExpiringTrials = function (daysThreshold = 3) {
 //   const thresholdDate = new Date();
 //   thresholdDate.setDate(thresholdDate.getDate() + daysThreshold);
-  
+
 //   return this.find({
 //     isFreeTrial: true,
 //     subscriptionStatus: "trial",
@@ -671,7 +671,7 @@
 // vendorProfileSchema.statics.findExpiringSubscriptions = function (daysThreshold = 7) {
 //   const thresholdDate = new Date();
 //   thresholdDate.setDate(thresholdDate.getDate() + daysThreshold);
-  
+
 //   return this.find({
 //     subscriptionStatus: "active",
 //     subscriptionEndDate: {
@@ -728,7 +728,7 @@
 // // ----------------------- JSON TRANSFORMATION -----------------------
 // vendorProfileSchema.methods.toJSON = function () {
 //   const obj = this.toObject();
-  
+
 //   // Add computed fields
 //   obj.isTrialExpired = this.isTrialExpired;
 //   obj.isSubscriptionExpired = this.isSubscriptionExpired;
@@ -792,6 +792,8 @@ const vendorProfileSchema = new mongoose.Schema(
         default: ""
       }
     },
+    latitude: { type: String, default: "" },
+    longitude: { type: String, default: "" },
 
     logo: { type: String, trim: true, default: "" },
     coverImage: { type: String, trim: true, default: "" },
@@ -883,7 +885,7 @@ const vendorProfileSchema = new mongoose.Schema(
 
     subscriptionStatus: {
       type: String,
-      enum: ["none", "trial","pending", "pending_payment", "active", "expired", "cancelled", "suspended"],
+      enum: ["none", "trial", "pending", "pending_payment", "active", "expired", "cancelled", "suspended"],
       default: "none",
       index: true
     },
@@ -916,22 +918,22 @@ const vendorProfileSchema = new mongoose.Schema(
       paymentMethod: String,
       transactionId: String
     }],
-// ----------------------- CAKE MODULE FIELDS -----------------------
-estimatedDeliveryTime: {
-  minDays: {
-    type: Number,
-    default: null
-  },
-  maxDays: {
-    type: Number,
-    default: null
-  },
-  unit: {
-    type: String,
-    enum: ["hours", "days"],
-    default: "days"
-  }
-},
+    // ----------------------- CAKE MODULE FIELDS -----------------------
+    estimatedDeliveryTime: {
+      minDays: {
+        type: Number,
+        default: null
+      },
+      maxDays: {
+        type: Number,
+        default: null
+      },
+      unit: {
+        type: String,
+        enum: ["hours", "days"],
+        default: "days"
+      }
+    },
 
     bio: {
       title: { type: String, default: "" },
@@ -993,7 +995,7 @@ estimatedDeliveryTime: {
       canUseAdvancedFeatures: { type: Boolean, default: false }
     }
   },
-  { 
+  {
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
@@ -1049,7 +1051,7 @@ vendorProfileSchema.methods.activateSubscription = async function (planId, start
   this.subscriptionEndDate = endDate;
   this.isFreeTrial = false;
   this.lastPaymentDate = new Date();
-  
+
   return await this.save();
 };
 
@@ -1087,7 +1089,7 @@ vendorProfileSchema.methods.addPayment = async function (paymentData) {
 vendorProfileSchema.statics.findExpiringSubscriptions = function (daysThreshold = 7) {
   const thresholdDate = new Date();
   thresholdDate.setDate(thresholdDate.getDate() + daysThreshold);
-  
+
   return this.find({
     subscriptionStatus: "active",
     subscriptionEndDate: {
@@ -1125,12 +1127,12 @@ vendorProfileSchema.pre("save", function (next) {
 // ----------------------- JSON TRANSFORMATION -----------------------
 vendorProfileSchema.methods.toJSON = function () {
   const obj = this.toObject();
-  
+
   // Remove fields that should not be in response
   delete obj.trialStartDate;
   delete obj.trialEndDate;
   delete obj.nextBillingDate;
-  
+
   // Add computed fields
   obj.isTrialExpired = this.isTrialExpired;
   obj.isSubscriptionExpired = this.isSubscriptionExpired;
