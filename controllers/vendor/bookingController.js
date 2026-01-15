@@ -42,8 +42,8 @@ function calculateTimeline(bookingDate) {
     message: isToday
       ? "This booking is scheduled for TODAY!"
       : isUpcoming
-        ? `This booking is ${daysDifference} day(s) away`
-        : `This booking was ${Math.abs(daysDifference)} day(s) ago`,
+      ? `This booking is ${daysDifference} day(s) away`
+      : `This booking was ${Math.abs(daysDifference)} day(s) ago`,
   };
 }
 
@@ -778,7 +778,7 @@ exports.createBooking = async (req, res) => {
           password: "123456",
         });
         token = resp?.data?.token || null;
-      } catch (_) { }
+      } catch (_) {}
 
       userDetails = { fullName, contactNumber, emailAddress, address };
     }
@@ -885,50 +885,57 @@ exports.createBooking = async (req, res) => {
         pricing.discount = Number(serviceProvider.priceInfo?.discount) || 0;
         break;
 
-      case "Transport":
-        if (!vehicleId || !tripType) {
-          return res.status(400).json({
-            success: false,
-            message: "vehicleId and tripType required for Transport",
-          });
-        }
+     case "Transport": {
+  if (!vehicleId || !tripType) {
+    return res.status(400).json({
+      success: false,
+      message: "vehicleId and tripType required for Transport",
+    });
+  }
 
-        serviceProvider = await Vehicle.findById(vehicleId).lean();
-        if (!serviceProvider) throw new Error("Vehicle not found");
+  serviceProvider = await Vehicle.findById(vehicleId).lean();
+  if (!serviceProvider) throw new Error("Vehicle not found");
 
-        const pricingMap = serviceProvider.pricing || {
-          hourly: 0,
-          perDay: 0,
-          distanceWise: 0,
-        };
+  const pricingMap = serviceProvider.pricing || {};
+  let transportPrice = 0;
 
-        let transportPrice = 0;
+  // 🚗 TRIP TYPE PRICING
+  if (tripType === "hourly") {
+    if (!hours) throw new Error("hours required");
+    transportPrice = (pricingMap.hourly || 0) * hours;
+    pricing.perHourCharge = pricingMap.hourly || 0;
+  }
 
-        if (tripType === "hourly") {
-          if (!hours) throw new Error("hours required");
-          transportPrice = pricingMap.hourly * hours;
-          pricing.perHourCharge = pricingMap.hourly;
-        } else if (tripType === "perDay") {
-          if (!days) throw new Error("days required");
-          transportPrice = pricingMap.perDay * days;
-          pricing.perDayPrice = pricingMap.perDay;
-        } else if (tripType === "distanceWise") {
-          if (!distanceKm) throw new Error("distanceKm required");
-          transportPrice = pricingMap.distanceWise * distanceKm;
-        }
+else if (tripType === "perDay") {
+  const totalDays = Number(days) > 0 ? Number(days) : 1; // ✅ DEFAULT 1 DAY
 
-        pricing.basePrice = transportPrice;
-        pricing.discount = serviceProvider.discount || 0;
+  transportPrice = (pricingMap.perDay || 0) * totalDays;
+  pricing.perDayPrice = pricingMap.perDay || 0;
+}
 
-        // ✅ AUTO-INCLUDE DECORATION PRICE WHEN AVAILABLE
-        let decorationCost = 0;
-        if (serviceProvider.features?.decorationAvailable && serviceProvider.features?.decorationPrice) {
-          decorationCost = Number(serviceProvider.features.decorationPrice) || 0;
-          pricing.basePrice += decorationCost;
-          console.log(`🌸 Decoration auto-included. Cost: ${decorationCost}`);
-        }
-        break;
 
+  else if (tripType === "distanceWise") {
+    if (!distanceKm) throw new Error("distanceKm required");
+    transportPrice = (pricingMap.distanceWise || 0) * distanceKm;
+  }
+
+  // 🎯 BASE PRICE (ONLY ONCE)
+  pricing.basePrice = transportPrice;
+
+  // 🌸 ADD DECORATION ONLY IF USER SELECTED IT
+  let decorationPrice = 0;
+  if (
+    decorationIncluded === true &&
+    serviceProvider.features?.decorationAvailable
+  ) {
+    decorationPrice = Number(serviceProvider.features.decorationPrice) || 0;
+    pricing.basePrice += decorationPrice;
+  }
+
+  pricing.discount = serviceProvider.discount || 0;
+
+  break;
+}
 
       case "Venues":
         if (!venueId || !numberOfGuests) {
@@ -1025,8 +1032,8 @@ exports.createBooking = async (req, res) => {
         moduleType === "Venues"
           ? serviceProvider.advanceDeposit
           : moduleType === "Cake"
-            ? serviceProvider.priceInfo?.advanceBookingAmount
-            : serviceProvider.advanceBookingAmount
+          ? serviceProvider.priceInfo?.advanceBookingAmount
+          : serviceProvider.advanceBookingAmount
       ) || 0;
 
     advanceAmount = Math.max(advanceAmount, 0);
@@ -1061,11 +1068,15 @@ exports.createBooking = async (req, res) => {
         transportDetails: {
           tripType,
           hours: hours || null,
-          days: days || null,
+days: Number(days) > 0 ? Number(days) : 1,
           distanceKm: distanceKm || null,
-          decorationIncluded: !!(serviceProvider.features?.decorationAvailable && serviceProvider.features?.decorationPrice),
+          decorationIncluded: !!(
+            serviceProvider.features?.decorationAvailable &&
+            serviceProvider.features?.decorationPrice
+          ),
           decorationPrice:
-            serviceProvider.features?.decorationAvailable && serviceProvider.features?.decorationPrice
+            serviceProvider.features?.decorationAvailable &&
+            serviceProvider.features?.decorationPrice
               ? Number(serviceProvider.features.decorationPrice) || 0
               : 0,
         },
@@ -1437,8 +1448,8 @@ exports.getBookingById = async (req, res) => {
           booking.paymentStatus === "Paid"
             ? booking.finalPrice
             : booking.paymentStatus === "Advance"
-              ? booking.advanceAmount || 0
-              : 0,
+            ? booking.advanceAmount || 0
+            : 0,
         amountDue: booking.paymentStatus === "Paid" ? 0 : booking.finalPrice,
       },
     };
@@ -1715,8 +1726,8 @@ exports.updatePaymentStatus = async (req, res) => {
             paymentStatus === "Paid"
               ? booking.finalPrice
               : paymentStatus === "Advance"
-                ? booking.advanceAmount || 0
-                : 0,
+              ? booking.advanceAmount || 0
+              : 0,
           amountDue: paymentStatus === "Paid" ? 0 : booking.finalPrice,
         },
       },
