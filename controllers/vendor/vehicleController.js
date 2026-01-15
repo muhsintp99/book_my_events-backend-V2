@@ -281,8 +281,18 @@ const sanitizeVehicleData = (body) => {
       decorationAvailable:
         sanitized.features.decorationAvailable === true ||
         sanitized.features.decorationAvailable === "true",
+
+      decorationPrice:
+        sanitized.decorationPrice !== undefined
+          ? Number(sanitized.decorationPrice) || 0
+          : sanitized.features.decorationPrice !== undefined
+            ? Number(sanitized.features.decorationPrice) || 0
+            : 0,
     };
   }
+
+  // Remove root level decorationPrice to avoid confusion/pollution
+  delete sanitized.decorationPrice;
 
   /* ================= NUMBERS ================= */
 
@@ -337,35 +347,35 @@ const sanitizeVehicleData = (body) => {
 
   /* ================= TERMS & CONDITIONS ================= */
 
-if (sanitized.termsAndConditions) {
-  let parsed = sanitized.termsAndConditions;
+  if (sanitized.termsAndConditions) {
+    let parsed = sanitized.termsAndConditions;
 
-  if (typeof parsed === "string") {
-    try {
-      parsed = JSON.parse(parsed);
-    } catch (e) {
-      parsed = [];
+    if (typeof parsed === "string") {
+      try {
+        parsed = JSON.parse(parsed);
+      } catch (e) {
+        parsed = [];
+      }
+    }
+
+    if (Array.isArray(parsed)) {
+      sanitized.termsAndConditions = parsed
+        .filter(
+          (section) =>
+            section?.heading &&
+            Array.isArray(section.points) &&
+            section.points.length > 0
+        )
+        .map((section) => ({
+          heading: String(section.heading).trim(),
+          points: section.points
+            .map((p) => String(p).trim())
+            .filter((p) => p),
+        }));
+    } else {
+      sanitized.termsAndConditions = [];
     }
   }
-
-  if (Array.isArray(parsed)) {
-    sanitized.termsAndConditions = parsed
-      .filter(
-        (section) =>
-          section?.heading &&
-          Array.isArray(section.points) &&
-          section.points.length > 0
-      )
-      .map((section) => ({
-        heading: String(section.heading).trim(),
-        points: section.points
-          .map((p) => String(p).trim())
-          .filter((p) => p),
-      }));
-  } else {
-    sanitized.termsAndConditions = [];
-  }
-}
 
   return sanitized;
 };
@@ -378,9 +388,9 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
@@ -873,33 +883,33 @@ exports.getVendorsForVehicleModule = async (req, res) => {
         hasVendorProfile: true,
         subscription: sub
           ? {
-              isSubscribed: sub.status === "active",
-              status: sub.status,
-              plan: sub.planId,
-              module: sub.moduleId,
-              billing: {
-                startDate: sub.startDate,
-                endDate: sub.endDate,
-                autoRenew: sub.autoRenew,
-              },
-              access: {
-                canAccess: sub.status === "active" && !isExpired,
-                isExpired,
-                daysLeft,
-              },
-            }
-          : {
-              isSubscribed: false,
-              status: "none",
-              plan: null,
-              module: null,
-              billing: null,
-              access: {
-                canAccess: false,
-                isExpired: true,
-                daysLeft: 0,
-              },
+            isSubscribed: sub.status === "active",
+            status: sub.status,
+            plan: sub.planId,
+            module: sub.moduleId,
+            billing: {
+              startDate: sub.startDate,
+              endDate: sub.endDate,
+              autoRenew: sub.autoRenew,
             },
+            access: {
+              canAccess: sub.status === "active" && !isExpired,
+              isExpired,
+              daysLeft,
+            },
+          }
+          : {
+            isSubscribed: false,
+            status: "none",
+            plan: null,
+            module: null,
+            billing: null,
+            access: {
+              canAccess: false,
+              isExpired: true,
+              daysLeft: 0,
+            },
+          },
       };
     });
 
@@ -990,8 +1000,8 @@ exports.updateVehicle = async (req, res) => {
       if (parentCategory) {
         const validSubIds = Array.isArray(parentCategory.subCategories)
           ? parentCategory.subCategories
-              .filter((sub) => sub.isActive)
-              .map((s) => s._id.toString())
+            .filter((sub) => sub.isActive)
+            .map((s) => s._id.toString())
           : [];
 
         body.subCategories = body.subCategories.filter((id) =>
@@ -1052,8 +1062,7 @@ exports.updateVehicle = async (req, res) => {
         res,
         400,
         false,
-        `${
-          field === "vinNumber" ? "VIN number" : "License plate number"
+        `${field === "vinNumber" ? "VIN number" : "License plate number"
         } already exists`
       );
     }
@@ -1552,11 +1561,11 @@ exports.filterVehicles = async (req, res) => {
     const appliedFilters = {
       location: useLocationFilter
         ? {
-            latitude: userLat,
-            longitude: userLon,
-            radius: searchRadius,
-            unit: "km",
-          }
+          latitude: userLat,
+          longitude: userLon,
+          radius: searchRadius,
+          unit: "km",
+        }
         : null,
       brandId: brandId || null,
       categoryId: categoryId || null,
@@ -2027,11 +2036,11 @@ exports.sortVehicles = async (req, res) => {
         sortBy: sortBy,
         searchParams: useLocationFilter
           ? {
-              latitude: userLat,
-              longitude: userLon,
-              radius: searchRadius,
-              unit: "km",
-            }
+            latitude: userLat,
+            longitude: userLon,
+            radius: searchRadius,
+            unit: "km",
+          }
           : null,
       }
     );

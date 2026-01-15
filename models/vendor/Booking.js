@@ -305,12 +305,12 @@ const bookingSchema = new mongoose.Schema(
     location: {
       type: String,
     },
-// 🔥 TRANSPORT PRICING SNAPSHOT
-transportPricing: {
-  hourly: { type: Number, default: 0 },
-  perDay: { type: Number, default: 0 },
-  distanceWise: { type: Number, default: 0 },
-},
+    // 🔥 TRANSPORT PRICING SNAPSHOT
+    transportPricing: {
+      hourly: { type: Number, default: 0 },
+      perDay: { type: Number, default: 0 },
+      distanceWise: { type: Number, default: 0 },
+    },
 
     numberOfGuests: {
       type: Number,
@@ -336,37 +336,39 @@ transportPricing: {
       hours: Number,
       days: Number,
       distanceKm: Number,
+      decorationIncluded: { type: Boolean, default: false },
+      decorationPrice: { type: Number, default: 0 },
     },
 
 
     // ===============================
-// CAKE VARIATIONS (MULTI SELECT)
-// ===============================
-cakeVariations: [
-  {
-    variationId: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: true,
-    },
-    name: {
-      type: String,
-      required: true,
-    },
-    price: {
-      type: Number,
-      required: true,
-    },
-    quantity: {
-      type: Number,
-      default: 1,
-      min: 1,
-    },
-    totalPrice: {
-      type: Number,
-      required: true,
-    },
-  },
-],
+    // CAKE VARIATIONS (MULTI SELECT)
+    // ===============================
+    cakeVariations: [
+      {
+        variationId: {
+          type: mongoose.Schema.Types.ObjectId,
+          required: true,
+        },
+        name: {
+          type: String,
+          required: true,
+        },
+        price: {
+          type: Number,
+          required: true,
+        },
+        quantity: {
+          type: Number,
+          default: 1,
+          min: 1,
+        },
+        totalPrice: {
+          type: Number,
+          required: true,
+        },
+      },
+    ],
 
     // ===============================
     // STATUS
@@ -390,13 +392,13 @@ cakeVariations: [
       enum: ["pending", "initiated", "failed", "completed", "ongoing"],
       default: "pending",
     },
-deliveryType: {
-  type: String,
-  enum: ["Takeaway", "Home Delivery"],
-  required: function () {
-    return this.moduleType === "Cake";
-  },
-},
+    deliveryType: {
+      type: String,
+      enum: ["Takeaway", "Home Delivery"],
+      required: function () {
+        return this.moduleType === "Cake";
+      },
+    },
 
 
     customerMessage: {

@@ -42,8 +42,8 @@ function calculateTimeline(bookingDate) {
     message: isToday
       ? "This booking is scheduled for TODAY!"
       : isUpcoming
-      ? `This booking is ${daysDifference} day(s) away`
-      : `This booking was ${Math.abs(daysDifference)} day(s) ago`,
+        ? `This booking is ${daysDifference} day(s) away`
+        : `This booking was ${Math.abs(daysDifference)} day(s) ago`,
   };
 }
 
@@ -576,6 +576,7 @@ exports.createBooking = async (req, res) => {
       deliveryType,
       customerMessage,
       variations,
+      decorationIncluded,
     } = req.body;
 
     console.log("=".repeat(60));
@@ -777,7 +778,7 @@ exports.createBooking = async (req, res) => {
           password: "123456",
         });
         token = resp?.data?.token || null;
-      } catch (_) {}
+      } catch (_) { }
 
       userDetails = { fullName, contactNumber, emailAddress, address };
     }
@@ -919,6 +920,12 @@ exports.createBooking = async (req, res) => {
         pricing.basePrice = transportPrice;
         pricing.discount = serviceProvider.discount || 0;
 
+        // ✅ HANDLE DECORATION PRICE
+        if (decorationIncluded && serviceProvider.features?.decorationAvailable) {
+          const decorationCost = Number(serviceProvider.features.decorationPrice) || 0;
+          pricing.basePrice += decorationCost;
+          console.log(`🌸 Decoration added. Cost: ${decorationCost}`);
+        }
         break;
 
       case "Venues":
@@ -1016,8 +1023,8 @@ exports.createBooking = async (req, res) => {
         moduleType === "Venues"
           ? serviceProvider.advanceDeposit
           : moduleType === "Cake"
-          ? serviceProvider.priceInfo?.advanceBookingAmount
-          : serviceProvider.advanceBookingAmount
+            ? serviceProvider.priceInfo?.advanceBookingAmount
+            : serviceProvider.advanceBookingAmount
       ) || 0;
 
     advanceAmount = Math.max(advanceAmount, 0);
@@ -1054,6 +1061,11 @@ exports.createBooking = async (req, res) => {
           hours: hours || null,
           days: days || null,
           distanceKm: distanceKm || null,
+          decorationIncluded: !!decorationIncluded,
+          decorationPrice:
+            decorationIncluded && serviceProvider.features?.decorationAvailable
+              ? Number(serviceProvider.features.decorationPrice) || 0
+              : 0,
         },
 
         // 🔥 STORE VEHICLE PRICING SNAPSHOT
@@ -1423,8 +1435,8 @@ exports.getBookingById = async (req, res) => {
           booking.paymentStatus === "Paid"
             ? booking.finalPrice
             : booking.paymentStatus === "Advance"
-            ? booking.advanceAmount || 0
-            : 0,
+              ? booking.advanceAmount || 0
+              : 0,
         amountDue: booking.paymentStatus === "Paid" ? 0 : booking.finalPrice,
       },
     };
@@ -1701,8 +1713,8 @@ exports.updatePaymentStatus = async (req, res) => {
             paymentStatus === "Paid"
               ? booking.finalPrice
               : paymentStatus === "Advance"
-              ? booking.advanceAmount || 0
-              : 0,
+                ? booking.advanceAmount || 0
+                : 0,
           amountDue: paymentStatus === "Paid" ? 0 : booking.finalPrice,
         },
       },

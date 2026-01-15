@@ -74,7 +74,13 @@ const VehicleSchema = new mongoose.Schema(
         type: Boolean,
         default: false,
       },
+      decorationPrice: {
+        type: Number,
+        default: 0,
+        min: [0, "Decoration price cannot be negative"],
+      },
     },
+
 
     termsAndConditions: [
       {
@@ -173,9 +179,9 @@ VehicleSchema.methods.calculateDistance = function (latitude, longitude) {
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((latitude * Math.PI) / 180) *
-      Math.cos((this.latitude * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos((this.latitude * Math.PI) / 180) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = R * c;

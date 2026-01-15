@@ -627,7 +627,21 @@ exports.deleteProfile = async (req, res) => {
 // Save KYC details
 exports.saveKyc = async (req, res) => {
   try {
-    const { userId, personalInfo, documentInfo, bankDetails } = req.body;
+    let { userId, personalInfo, documentInfo, bankDetails, data } = req.body;
+
+    // ✅ SUPPORT FOR SINGLE JSON PAYLOAD (Frontend/Postman Convenience)
+    // Allows sending { data: JSON_STRING, frontImage: FILE, backImage: FILE }
+    if (data) {
+      try {
+        const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+        userId = parsedData.userId || userId;
+        personalInfo = parsedData.personalInfo || personalInfo;
+        documentInfo = parsedData.documentInfo || documentInfo;
+        bankDetails = parsedData.bankDetails || bankDetails;
+      } catch (err) {
+        return res.status(400).json({ success: false, message: "Invalid JSON format in 'data' field" });
+      }
+    }
 
     if (!userId) {
       return res.status(400).json({ success: false, message: "User ID is required" });
