@@ -39,6 +39,26 @@ const CakeSchema = new mongoose.Schema(
   required: true,
   index: true,
 },
+/* ================= ADD ONS ================= */
+addons: [
+  {
+    name: {
+      type: String,
+      required: true, // e.g. "Birthday Candles"
+    },
+    description: {
+      type: String, // optional
+    },
+    price: {
+      type: Number,
+      required: true,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+  },
+],
 
 
     category: {

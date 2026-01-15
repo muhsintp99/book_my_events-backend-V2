@@ -117,7 +117,8 @@ const sanitizeCakeData = (body) => {
   data.variations = parseJSON(data.variations, []);
 
   
- 
+ data.addons = parseJSON(data.addons, []);
+
 
 
   return data;
