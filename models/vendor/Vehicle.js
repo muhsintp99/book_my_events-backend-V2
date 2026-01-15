@@ -40,18 +40,18 @@ const VehicleSchema = new mongoose.Schema(
     latitude: { type: Number },
     longitude: { type: Number },
     model: { type: String, trim: true },
-transmissionType: {
-  type: String,
-  enum: ["manual", "automatic", "semi-automatic"],
-  required: false,
-  lowercase: true,
-  trim: true,
-},
+    transmissionType: {
+      type: String,
+      enum: ["manual", "automatic", "semi-automatic"],
+      required: false,
+      lowercase: true,
+      trim: true,
+    },
 
-enginePower: {
-  type: Number, // hp
-  min: [0, "Engine power cannot be negative"],
-},
+    enginePower: {
+      type: Number, // hp
+      min: [0, "Engine power cannot be negative"],
+    },
 
     seatingCapacity: {
       type: Number,
@@ -61,20 +61,38 @@ enginePower: {
       type: Boolean,
       default: false,
     },
-features: {
-  driverIncluded: {
-    type: Boolean,
-    default: false,
-  },
-  sunroof: {
-    type: Boolean,
-    default: false,
-  },
-  decorationAvailable: {
-    type: Boolean,
-    default: false,
-  },
-},
+    features: {
+      driverIncluded: {
+        type: Boolean,
+        default: false,
+      },
+      sunroof: {
+        type: Boolean,
+        default: false,
+      },
+      decorationAvailable: {
+        type: Boolean,
+        default: false,
+      },
+    },
+
+    termsAndConditions: [
+      {
+        heading: {
+          type: String,
+          trim: true,
+          required: true,
+          maxlength: 100,
+        },
+        points: {
+          type: [String],
+          validate: {
+            validator: (arr) => Array.isArray(arr) && arr.length > 0,
+            message: "Each terms section must have at least one point",
+          },
+        },
+      },
+    ],
 
     pricing: {
       hourly: { type: Number, default: 0, min: 0 },
@@ -105,7 +123,7 @@ features: {
         message: "VIN must be 17 characters if provided",
       },
     },
-    
+
     licensePlateNumber: {
       type: String,
       trim: true,
@@ -221,9 +239,6 @@ VehicleSchema.statics.advancedSearch = async function (filters) {
   }
 
   // ❌ REMOVED: type filter completely removed
-
-  
-
 
   if (filters.airCondition !== undefined) {
     query.airCondition = filters.airCondition;
@@ -354,6 +369,5 @@ VehicleSchema.index({
   model: "text",
   searchTags: "text",
 });
-
 
 module.exports = mongoose.model("Vehicle", VehicleSchema);

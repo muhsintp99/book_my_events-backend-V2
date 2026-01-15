@@ -200,17 +200,13 @@ const sanitizeVehicleData = (body) => {
     sanitized.subCategories = parseObjectIdArray(sanitized.subCategories);
   }
 
-
   /* ================= STRINGS ================= */
 
-if (sanitized.transmissionType) {
-  sanitized.transmissionType = String(
-    sanitized.transmissionType
-  )
-    .trim()
-    .toLowerCase();
-}
-
+  if (sanitized.transmissionType) {
+    sanitized.transmissionType = String(sanitized.transmissionType)
+      .trim()
+      .toLowerCase();
+  }
 
   if (sanitized.name) {
     sanitized.name =
@@ -288,14 +284,12 @@ if (sanitized.transmissionType) {
     };
   }
 
-
   /* ================= NUMBERS ================= */
 
-if (sanitized.enginePower !== undefined) {
-  const value = Number(sanitized.enginePower);
-  if (!isNaN(value)) sanitized.enginePower = value;
-}
-
+  if (sanitized.enginePower !== undefined) {
+    const value = Number(sanitized.enginePower);
+    if (!isNaN(value)) sanitized.enginePower = value;
+  }
 
   if (sanitized.seatingCapacity !== undefined) {
     sanitized.seatingCapacity = Number(sanitized.seatingCapacity);
@@ -340,6 +334,38 @@ if (sanitized.enginePower !== undefined) {
         sanitized.pricing.distanceWise = Number(sanitized.pricing.distanceWise);
     }
   }
+
+  /* ================= TERMS & CONDITIONS ================= */
+
+if (sanitized.termsAndConditions) {
+  let parsed = sanitized.termsAndConditions;
+
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch (e) {
+      parsed = [];
+    }
+  }
+
+  if (Array.isArray(parsed)) {
+    sanitized.termsAndConditions = parsed
+      .filter(
+        (section) =>
+          section?.heading &&
+          Array.isArray(section.points) &&
+          section.points.length > 0
+      )
+      .map((section) => ({
+        heading: String(section.heading).trim(),
+        points: section.points
+          .map((p) => String(p).trim())
+          .filter((p) => p),
+      }));
+  } else {
+    sanitized.termsAndConditions = [];
+  }
+}
 
   return sanitized;
 };
@@ -491,7 +517,7 @@ exports.createVehicle = async (req, res) => {
       .populate(populateProvider)
       .populate("zone")
       .lean();
-    
+
     attachVehicleImageUrls(populatedVehicle);
 
     // ✅ MANUAL subCategory population
