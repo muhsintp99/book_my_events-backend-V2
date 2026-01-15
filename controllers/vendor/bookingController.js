@@ -920,13 +920,15 @@ exports.createBooking = async (req, res) => {
         pricing.basePrice = transportPrice;
         pricing.discount = serviceProvider.discount || 0;
 
-        // ✅ HANDLE DECORATION PRICE
-        if (decorationIncluded && serviceProvider.features?.decorationAvailable) {
-          const decorationCost = Number(serviceProvider.features.decorationPrice) || 0;
+        // ✅ AUTO-INCLUDE DECORATION PRICE WHEN AVAILABLE
+        let decorationCost = 0;
+        if (serviceProvider.features?.decorationAvailable && serviceProvider.features?.decorationPrice) {
+          decorationCost = Number(serviceProvider.features.decorationPrice) || 0;
           pricing.basePrice += decorationCost;
-          console.log(`🌸 Decoration added. Cost: ${decorationCost}`);
+          console.log(`🌸 Decoration auto-included. Cost: ${decorationCost}`);
         }
         break;
+
 
       case "Venues":
         if (!venueId || !numberOfGuests) {
@@ -1061,9 +1063,9 @@ exports.createBooking = async (req, res) => {
           hours: hours || null,
           days: days || null,
           distanceKm: distanceKm || null,
-          decorationIncluded: !!decorationIncluded,
+          decorationIncluded: !!(serviceProvider.features?.decorationAvailable && serviceProvider.features?.decorationPrice),
           decorationPrice:
-            decorationIncluded && serviceProvider.features?.decorationAvailable
+            serviceProvider.features?.decorationAvailable && serviceProvider.features?.decorationPrice
               ? Number(serviceProvider.features.decorationPrice) || 0
               : 0,
         },
