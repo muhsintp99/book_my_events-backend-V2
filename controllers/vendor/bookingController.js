@@ -885,33 +885,43 @@ exports.createBooking = async (req, res) => {
 
 
       case "Transport":
-        if (!vehicleId || !tripType) {
-          return res.status(400).json({
-            success: false,
-            message: "vehicleId and tripType required for Transport",
-          });
-        }
+  if (!vehicleId || !tripType) {
+    return res.status(400).json({
+      success: false,
+      message: "vehicleId and tripType required for Transport",
+    });
+  }
 
-        serviceProvider = await Vehicle.findById(vehicleId).lean();
-        if (!serviceProvider) throw new Error("Vehicle not found");
+  serviceProvider = await Vehicle.findById(vehicleId).lean();
+  if (!serviceProvider) throw new Error("Vehicle not found");
 
-        const pricingMap = serviceProvider.pricing || {};
-        let transportPrice = 0;
+  const pricingMap = serviceProvider.pricing || {
+    hourly: 0,
+    perDay: 0,
+    distanceWise: 0,
+  };
 
-        if (tripType === "hourly") {
-          if (!hours) throw new Error("hours required");
-          transportPrice = pricingMap.hourly * hours;
-        } else if (tripType === "perDay") {
-          if (!days) throw new Error("days required");
-          transportPrice = pricingMap.perDay * days;
-        } else if (tripType === "distanceWise") {
-          if (!distanceKm) throw new Error("distanceKm required");
-          transportPrice = pricingMap.distanceWise * distanceKm;
-        }
+  let transportPrice = 0;
 
-        pricing.basePrice = transportPrice;
-        pricing.discount = serviceProvider.discount || 0;
-        break;
+  if (tripType === "hourly") {
+    if (!hours) throw new Error("hours required");
+    transportPrice = pricingMap.hourly * hours;
+    pricing.perHourCharge = pricingMap.hourly;
+  } 
+  else if (tripType === "perDay") {
+    if (!days) throw new Error("days required");
+    transportPrice = pricingMap.perDay * days;
+    pricing.perDayPrice = pricingMap.perDay;
+  } 
+  else if (tripType === "distanceWise") {
+    if (!distanceKm) throw new Error("distanceKm required");
+    transportPrice = pricingMap.distanceWise * distanceKm;
+  }
+
+  pricing.basePrice = transportPrice;
+  pricing.discount = serviceProvider.discount || 0;
+
+  break;
 
       case "Venues":
         if (!venueId || !numberOfGuests) {
@@ -1040,14 +1050,22 @@ exports.createBooking = async (req, res) => {
 
       // ================= TRANSPORT =================
       ...(moduleType === "Transport" && {
-        vehicleId,
-        transportDetails: {
-          tripType,
-          hours: hours || null,
-          days: days || null,
-          distanceKm: distanceKm || null,
-        },
-      }),
+  vehicleId,
+  transportDetails: {
+    tripType,
+    hours: hours || null,
+    days: days || null,
+    distanceKm: distanceKm || null,
+  },
+
+  // 🔥 STORE VEHICLE PRICING SNAPSHOT
+  transportPricing: {
+    hourly: serviceProvider.pricing?.hourly || 0,
+    perDay: serviceProvider.pricing?.perDay || 0,
+    distanceWise: serviceProvider.pricing?.distanceWise || 0,
+  },
+}),
+
 
       // ================= OTHER MODULES =================
       venueId: moduleType === "Venues" ? venueId : undefined,

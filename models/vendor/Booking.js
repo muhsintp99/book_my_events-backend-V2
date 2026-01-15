@@ -305,6 +305,12 @@ const bookingSchema = new mongoose.Schema(
     location: {
       type: String,
     },
+// 🔥 TRANSPORT PRICING SNAPSHOT
+transportPricing: {
+  hourly: { type: Number, default: 0 },
+  perDay: { type: Number, default: 0 },
+  distanceWise: { type: Number, default: 0 },
+},
 
     numberOfGuests: {
       type: Number,
