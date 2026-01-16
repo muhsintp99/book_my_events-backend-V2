@@ -10,9 +10,22 @@ const upload = createUpload("profiles", {
 
 /*
 ========================================
-        PROFILE ROUTES (FIXED)
+        PROFILE ROUTES (FINAL FIX)
 ========================================
 */
+
+/* ---------- VENDOR ROUTES (TOP PRIORITY) ---------- */
+
+// Get ALL Vendors
+router.get("/vendors/all", profileController.getAllVendors);
+
+// Get Single Vendor
+router.get("/vendor/:providerId", profileController.getSingleVendor);
+
+// ✅ DELETE VENDOR ONLY (FIXED)
+router.delete("/vendor/:vendorId", profileController.deleteVendorOnly);
+
+/* ---------- PROFILE ROUTES ---------- */
 
 // Create Profile
 router.post("/", upload.single("profilePhoto"), profileController.createProfile);
@@ -20,29 +33,26 @@ router.post("/", upload.single("profilePhoto"), profileController.createProfile)
 // Get All Profiles
 router.get("/", profileController.getProfiles);
 
-// Get ALL Vendors (NEW)
-router.get("/vendors/all", profileController.getAllVendors);
-
-router.get("/vendor/:providerId", profileController.getSingleVendor);
-
-// Get Profile by Provider ID (userId) — MUST COME BEFORE /:id
+// Get Profile by Provider ID
 router.get("/provider/:providerId", profileController.getProfileByProviderId);
-
-// Get Single Profile by Profile ID
-router.get("/:id", profileController.getProfileById);
 
 // Update Profile
 router.put("/:id", upload.single("profilePhoto"), profileController.updateProfile);
 
-// KYC Routes
-router.post("/kyc", upload.fields([
-  { name: 'frontImage', maxCount: 1 },
-  { name: 'backImage', maxCount: 1 }
-]), profileController.saveKyc);
-
-router.get("/kyc/:userId", profileController.getKyc);
-
 // Delete Profile
 router.delete("/:id", profileController.deleteProfile);
+
+/* ---------- KYC ROUTES ---------- */
+
+router.post(
+  "/kyc",
+  upload.fields([
+    { name: "frontImage", maxCount: 1 },
+    { name: "backImage", maxCount: 1 }
+  ]),
+  profileController.saveKyc
+);
+
+router.get("/kyc/:userId", profileController.getKyc);
 
 module.exports = router;

@@ -32,6 +32,44 @@ exports.getAllVendors = async (req, res) => {
   }
 };
 
+// DELETE ONLY VENDOR (VendorProfile only)
+exports.deleteVendorOnly = async (req, res) => {
+  try {
+    const { vendorId } = req.params; // USER ID
+
+    if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid vendor ID format"
+      });
+    }
+
+    // Check VendorProfile
+    const vendor = await VendorProfile.findOne({ user: vendorId });
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: "Vendor not found"
+      });
+    }
+
+    // Delete ONLY VendorProfile
+    await VendorProfile.findOneAndDelete({ user: vendorId });
+
+    return res.status(200).json({
+      success: true,
+      message: "Vendor deleted successfully (User & Profile retained)"
+    });
+
+  } catch (error) {
+    console.error("Delete Vendor Only Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
 
 
 exports.getSingleVendor = async (req, res) => {
