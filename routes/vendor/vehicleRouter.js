@@ -6,9 +6,8 @@ const { protect, authorizeRoles } = require('../../middlewares/authMiddleware');
 
 const upload = createUpload('vehicles', { fileSizeMB: 20 });
 const uploadFields = upload.fields([
-  { name: 'images', maxCount: 10 },
-  { name: 'thumbnail', maxCount: 1 },
-  { name: 'documents', maxCount: 5 },
+  { name: 'featuredImage', maxCount: 1 },
+  { name: 'galleryImages', maxCount: 10 },
 ]);
 
 // Optional auth for GET routes

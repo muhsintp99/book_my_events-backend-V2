@@ -2,378 +2,456 @@ const mongoose = require("mongoose");
 
 const VehicleSchema = new mongoose.Schema(
   {
+    // Basic fields (KEEP - not replaced)
     name: {
       type: String,
-      required: [true, "Please add a vehicle name"],
+      required: [true, "Vehicle name is required"],
       trim: true,
-      maxlength: [100, "Name cannot be more than 100 characters"],
-      validate: {
-        validator: (v) => /^[a-zA-Z0-9\s\-\(\)]+$/.test(v),
-        message:
-          "Name can only contain letters, numbers, spaces, hyphens, and parentheses",
-      },
+      maxlength: [100, "Name cannot exceed 100 characters"],
     },
+
     description: {
       type: String,
       trim: true,
-      maxlength: [500, "Description cannot be more than 500 characters"],
+      maxlength: [500, "Description cannot exceed 500 characters"],
     },
+
+    // General Information (additional info)
+    generalInformation: {
+      type: String,
+      trim: true,
+      maxlength: [500, "General information cannot exceed 500 characters"],
+    },
+
+    // Featured Image
+    featuredImage: {
+      type: String,
+    },
+
+    // Category
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+      required: [true, "Category is required"],
+    },
+
+    // Subcategory - References Category model (admin can add dynamically)
+    // For Car: SUV, Sedan, Jeep, etc.
+    // For Bus: Mini Bus, Standard Bus, Luxury Bus, etc.
+    subCategory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+    },
+
+    // Gallery
+    galleryImages: [{
+      type: String,
+    }],
+
+    // Basic Info (Brand/Model)
+    basicInfo: {
+      type: String,
+      trim: true,
+    },
+
+    yearOfManufacture: {
+      type: Number,
+    },
+
     brand: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Brand",
     },
-    category: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Category",
-      required: true,
+
+    model: {
+      type: String,
+      trim: true,
     },
-    subCategories: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Category",
+
+    // Capacity & Comfort
+    capacityAndComfort: {
+      seatingCapacity: { type: Number, min: 0 },
+      legroomType: { type: String, trim: true }, // Standard, Extra, etc.
+      pushbackSeats: { type: Boolean, default: false },
+      reclinerSeats: { type: Boolean, default: false },
+      numberOfSeats: {
+        value: { type: Number, min: 0, default: 0 },
+        available: { type: Boolean, default: false },
       },
-    ],
+      numberOfDoors: {
+        value: { type: Number, min: 0, default: 0 },
+        available: { type: Boolean, default: false },
+      },
+    },
+
+    // Engine & Drive
+    engineCharacteristics: {
+      transmissionType: {
+        value: {
+          type: String,
+          enum: ["manual", "automatic", "semi-automatic"],
+          lowercase: true,
+        },
+        available: { type: Boolean, default: false },
+      },
+      engineCapacityCC: { type: Number, min: 0 },
+      powerBHP: { type: Number, min: 0 },
+      torque: { type: String, trim: true },
+      mileage: { type: String, trim: true },
+      driveControl: {
+        type: String,
+        enum: ["FWD", "RWD", "AWD", "4WD"],
+        uppercase: true,
+      },
+      fuelType: {
+        type: String,
+        enum: ["petrol", "diesel", "cng", "lpg", "electric", "hybrid"],
+        lowercase: true,
+      },
+      coolingSystem: { type: String, trim: true },
+      brakeType: { type: String, trim: true },
+      airConditioning: { type: Boolean, default: false },
+    },
+
+    // Location
+    location: {
+      address: { type: String, trim: true },
+      latitude: { type: Number },
+      longitude: { type: Number },
+    },
+
     zone: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Zone",
     },
-    latitude: { type: Number },
-    longitude: { type: Number },
-    model: { type: String, trim: true },
-    transmissionType: {
-      type: String,
-      enum: ["manual", "automatic", "semi-automatic"],
-      required: false,
-      lowercase: true,
-      trim: true,
+
+    // Availability (Bus/Van specific)
+    availability: {
+      driverIncluded: { type: Boolean, default: false },
+      sunroof: { type: Boolean, default: false },
+      acAvailable: { type: Boolean, default: false },
     },
 
-    enginePower: {
-      type: Number, // hp
-      min: [0, "Engine power cannot be negative"],
-    },
-
-    seatingCapacity: {
-      type: Number,
-      min: [1, "Seating capacity must be at least 1"],
-    },
-    airCondition: {
-      type: Boolean,
-      default: false,
-    },
+    // Features - Category-specific (flexible structure)
+    // For Car: heatingAndAC, gpsSystem, entertainmentAndConnectivity, etc.
+    // For Bus: heatingAndAC, gpsSystem, safetyCompliance, cameras, etc.
+    // For Bike: Different set of features
     features: {
-      driverIncluded: {
-        type: Boolean,
-        default: false,
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+
+    // Extra Addons (NO PRICING - just checkboxes)
+    extraAddons: {
+      wifi: { type: Boolean, default: false },
+      chargingPorts: { type: Boolean, default: false },
+      interiorLighting: { type: Boolean, default: false },
+      powerLuggage: { type: Boolean, default: false },
+      electricRecliner: { type: Boolean, default: false },
+    },
+
+
+
+    // Pricing Structure
+    pricing: {
+      // Basic Package
+      basicPackage: {
+        price: {
+          type: Number,
+          default: 0,
+          min: [0, "Basic package price cannot be negative"],
+        },
+        includedKilometers: {
+          type: Number,
+          default: 0,
+          min: [0, "Included kilometers cannot be negative"],
+        },
+        includedHours: {
+          type: Number,
+          default: 0,
+          min: [0, "Included hours cannot be negative"],
+        },
       },
-      sunroof: {
-        type: Boolean,
-        default: false,
+
+      // Additional Pricing
+      extraKmPrice: {
+        km: { type: Number, min: 0, default: 0 },
+        price: { type: Number, min: 0, default: 0 },
       },
-      decorationAvailable: {
-        type: Boolean,
-        default: false,
+      extraHourPrice: {
+        type: Number,
+        min: 0,
+        default: 0,
       },
-      decorationPrice: {
+      discount: {
+        type: {
+          type: String,
+          enum: ["percentage", "flat_rate"],
+          lowercase: true,
+        },
+        value: { type: Number, default: 0, min: 0 },
+      },
+      decoration: {
+        available: { type: Boolean, default: false },
+        price: { type: Number, default: 0, min: 0 },
+      },
+      grandTotal: {
         type: Number,
         default: 0,
-        min: [0, "Decoration price cannot be negative"],
+        min: [0, "Grand total cannot be negative"],
       },
     },
 
-
-    termsAndConditions: [
-      {
-        heading: {
-          type: String,
-          trim: true,
-          required: true,
-          maxlength: 100,
-        },
-        points: {
-          type: [String],
-          validate: {
-            validator: (arr) => Array.isArray(arr) && arr.length > 0,
-            message: "Each terms section must have at least one point",
-          },
-        },
-      },
-    ],
-
-    pricing: {
-      hourly: { type: Number, default: 0, min: 0 },
-      perDay: { type: Number, default: 0, min: 0 },
-      distanceWise: { type: Number, default: 0, min: 0 },
-    },
+    // Advance Booking Amount 
     advanceBookingAmount: {
       type: Number,
       default: 0,
       min: [0, "Advance booking amount cannot be negative"],
     },
-    discount: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 100,
-    },
-    images: [{ type: String }],
-    thumbnail: { type: String },
-    searchTags: [{ type: String }],
-    vinNumber: {
+
+
+
+    // Car-specific fields
+    vehicleType: {
       type: String,
-      trim: true,
-      unique: true,
-      sparse: true,
-      validate: {
-        validator: (v) => !v || v.length === 17,
-        message: "VIN must be 17 characters if provided",
-      },
+      enum: ["electric", "luxury", "vintage"],
+      lowercase: true,
     },
 
+    // Bike-specific fields
+    bikeType: {
+      type: String,
+      enum: ["sports", "cruiser", "standard", "touring", "off-road"],
+      lowercase: true,
+    },
+    engineCapacity: {
+      type: Number,
+      min: [0, "Engine capacity cannot be negative"],
+    },
+    numberOfGears: {
+      type: Number,
+      min: [1, "Number of gears must be at least 1"],
+    },
+
+    // Vehicle Identity (KEEP - license plate number)
     licensePlateNumber: {
       type: String,
       trim: true,
       unique: true,
       sparse: true,
-      validate: {
-        validator: (v) => !v || /^[A-Z0-9-]{1,10}$/.test(v),
-        message: "Invalid license plate number",
-      },
     },
-    documents: [{ type: String }],
+
+
+
+    // Terms & Conditions
+    termsAndConditions: {
+      type: String,
+      trim: true,
+    },
+
+    generalConditions: {
+      type: String,
+      trim: true,
+    },
+
+    // System fields (KEEP - not in creation form but needed)
+    provider: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
     isActive: {
       type: Boolean,
       default: true,
     },
+
     isAvailable: {
       type: Boolean,
       default: true,
     },
+
     totalTrips: {
       type: Number,
       default: 0,
       min: 0,
     },
+
     rating: {
       type: Number,
       default: 0,
       min: 0,
       max: 5,
     },
-    provider: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
   },
   { timestamps: true }
 );
 
-// Instance method to calculate distance from given coordinates
-VehicleSchema.methods.calculateDistance = function (latitude, longitude) {
-  if (!this.latitude || !this.longitude) return null;
-
-  const R = 6371;
-  const dLat = ((this.latitude - latitude) * Math.PI) / 180;
-  const dLon = ((this.longitude - longitude) * Math.PI) / 180;
-
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((latitude * Math.PI) / 180) *
-    Math.cos((this.latitude * Math.PI) / 180) *
-    Math.sin(dLon / 2) *
-    Math.sin(dLon / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c;
-
-  return parseFloat(distance.toFixed(2));
-};
-
-// Static method to find vehicles within radius
-VehicleSchema.statics.findWithinRadius = async function (
-  latitude,
-  longitude,
-  radiusKm = 10
-) {
-  const vehicles = await this.find({
-    latitude: { $exists: true, $ne: null },
-    longitude: { $exists: true, $ne: null },
-    isActive: true,
-  }).lean();
-
-  return vehicles
-    .filter((vehicle) => {
-      const distance = this.prototype.calculateDistance.call(
-        vehicle,
-        latitude,
-        longitude
-      );
-      return distance !== null && distance <= radiusKm;
-    })
-    .map((vehicle) => ({
-      ...vehicle,
-      distance: this.prototype.calculateDistance.call(
-        vehicle,
-        latitude,
-        longitude
-      ),
-      distanceUnit: "km",
-    }))
-    .sort((a, b) => a.distance - b.distance);
-};
-
-// Static method for advanced search
-VehicleSchema.statics.advancedSearch = async function (filters) {
-  const query = { isActive: true };
-
-  if (filters.keyword) {
-    const keywordRegex = new RegExp(filters.keyword, "i");
-    query.$or = [
-      { name: keywordRegex },
-      { description: keywordRegex },
-      { model: keywordRegex },
-      { searchTags: { $in: [keywordRegex] } },
-    ];
-  }
-
-  if (filters.brandId) {
-    query.brand = { $in: filters.brandId };
-  }
-
-  if (filters.categoryId) {
-    query.category = { $in: filters.categoryId };
-  }
-
-  // ❌ REMOVED: type filter completely removed
-
-  if (filters.airCondition !== undefined) {
-    query.airCondition = filters.airCondition;
-  }
-
-  if (filters.minCapacity) {
-    query.seatingCapacity = { $gte: filters.minCapacity };
-  }
-
-  if (filters.latitude && filters.longitude) {
-    query.latitude = { $exists: true, $ne: null };
-    query.longitude = { $exists: true, $ne: null };
-  }
-
-  return this.find(query)
-    .populate("brand")
-    .populate({
-      path: "category",
-      model: "Category",
-      select: "title image isActive subCategories",
-    })
-    .populate("provider")
-    .populate("zone")
-    .lean();
-};
-
-// Pre-save middleware to update searchTags
-VehicleSchema.pre("save", function (next) {
-  if (!this.searchTags) {
-    this.searchTags = [];
-  }
-
-  if (this.isModified("searchTags") && this.searchTags.length > 0) {
-    const parsedTags = [];
-    this.searchTags.forEach((tag) => {
-      if (typeof tag === "string") {
-        try {
-          const parsed = JSON.parse(tag);
-          if (Array.isArray(parsed)) {
-            parsedTags.push(...parsed.map((t) => t.trim().toLowerCase()));
-          } else {
-            parsedTags.push(tag.trim().toLowerCase());
-          }
-        } catch {
-          parsedTags.push(tag.trim().toLowerCase());
-        }
-      }
-    });
-    this.searchTags = [...new Set(parsedTags.filter((tag) => tag))];
-  }
-
-  if (this.name && !this.searchTags.includes(this.name.toLowerCase())) {
-    this.searchTags.push(this.name.toLowerCase());
-  }
-
-  if (this.model) {
-    const modelParts = this.model
-      .split(" ")
-      .map((part) => part.trim().toLowerCase());
-    modelParts.forEach((part) => {
-      if (part && !this.searchTags.includes(part)) {
-        this.searchTags.push(part);
-      }
-    });
-  }
-
-  next();
-});
-
-// Pre-update middleware
-VehicleSchema.pre("findOneAndUpdate", function (next) {
-  this.options.runValidators = true;
-  this.options.new = true;
-
-  const update = this.getUpdate();
-  if (update.searchTags) {
-    let parsedTags = [];
-    if (typeof update.searchTags === "string") {
-      try {
-        parsedTags = JSON.parse(update.searchTags);
-        if (!Array.isArray(parsedTags)) {
-          parsedTags = [update.searchTags];
-        }
-      } catch {
-        parsedTags = update.searchTags.split(",").map((tag) => tag.trim());
-      }
-    } else if (Array.isArray(update.searchTags)) {
-      parsedTags = update.searchTags;
-    }
-    update.searchTags = [
-      ...new Set(
-        parsedTags
-          .flat()
-          .map((tag) => tag.trim().toLowerCase())
-          .filter((tag) => tag)
-      ),
-    ];
-  }
-
-  next();
-});
-
-// Post-save middleware for logging
-VehicleSchema.post("save", function (doc) {
-  console.log(`Vehicle ${doc.name} has been saved with ID: ${doc._id}`);
-});
-
-// Error handling middleware
-VehicleSchema.post("save", function (error, doc, next) {
-  if (error.name === "MongoServerError" && error.code === 11000) {
-    next(new Error("A vehicle with this information already exists"));
-  } else {
-    next(error);
-  }
-});
-
+// Indexes for performance
 VehicleSchema.index({ provider: 1, isActive: 1 });
 VehicleSchema.index({ brand: 1, category: 1 });
 VehicleSchema.index({ zone: 1 });
-VehicleSchema.index({ latitude: 1, longitude: 1 });
-VehicleSchema.index({ airCondition: 1, isActive: 1 });
+VehicleSchema.index({ "location.latitude": 1, "location.longitude": 1 });
+VehicleSchema.index({ isActive: 1 });
 VehicleSchema.index({ rating: -1, isActive: 1 });
 VehicleSchema.index({ totalTrips: -1, isActive: 1 });
-VehicleSchema.index({ seatingCapacity: 1, isActive: 1 });
-VehicleSchema.index({
-  name: "text",
-  description: "text",
-  model: "text",
-  searchTags: "text",
-});
+
+// ================= STATIC METHODS =================
+
+/**
+ * Calculate distance between two coordinates using Haversine formula
+ * @param {Number} lat1 - Latitude of first point
+ * @param {Number} lon1 - Longitude of first point
+ * @param {Number} lat2 - Latitude of second point
+ * @param {Number} lon2 - Longitude of second point
+ * @returns {Number} Distance in kilometers
+ */
+VehicleSchema.statics.calculateDistance = function (lat1, lon1, lat2, lon2) {
+  const R = 6371; // Radius of Earth in kilometers
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+/**
+ * Find vehicles within a specific radius
+ * @param {Number} latitude - Center latitude
+ * @param {Number} longitude - Center longitude
+ * @param {Number} radiusInKm - Search radius in kilometers
+ * @param {Object} filters - Additional filters
+ * @returns {Promise<Array>} Array of vehicles within radius
+ */
+VehicleSchema.statics.findWithinRadius = async function (
+  latitude,
+  longitude,
+  radiusInKm,
+  filters = {}
+) {
+  const vehicles = await this.find({
+    isActive: true,
+    isAvailable: true,
+    ...filters,
+  }).lean();
+
+  return vehicles
+    .map((vehicle) => {
+      if (vehicle.location?.latitude && vehicle.location?.longitude) {
+        const distance = this.calculateDistance(
+          latitude,
+          longitude,
+          vehicle.location.latitude,
+          vehicle.location.longitude
+        );
+        return { ...vehicle, distance };
+      }
+      return null;
+    })
+    .filter((v) => v && v.distance <= radiusInKm)
+    .sort((a, b) => a.distance - b.distance);
+};
+
+/**
+ * Advanced search with multiple filters
+ * @param {Object} searchParams - Search parameters
+ * @returns {Promise<Object>} Search results with pagination
+ */
+VehicleSchema.statics.advancedSearch = async function (searchParams) {
+  const {
+    category,
+    brand,
+    zone,
+    minPrice,
+    maxPrice,
+    latitude,
+    longitude,
+    radius,
+    search,
+    page = 1,
+    limit = 10,
+  } = searchParams;
+
+  const query = { isActive: true };
+
+  if (category) query.category = category;
+  if (brand) query.brand = brand;
+  if (zone) query.zone = zone;
+
+  // Text search
+  if (search) {
+    query.$or = [
+      { name: { $regex: search, $options: "i" } },
+      { description: { $regex: search, $options: "i" } },
+      { model: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  let vehicles = await this.find(query)
+    .populate("brand")
+    .populate("category")
+    .populate("zone")
+    .lean();
+
+  // Distance filtering
+  if (latitude && longitude && radius) {
+    vehicles = vehicles
+      .map((vehicle) => {
+        if (vehicle.location?.latitude && vehicle.location?.longitude) {
+          const distance = this.calculateDistance(
+            latitude,
+            longitude,
+            vehicle.location.latitude,
+            vehicle.location.longitude
+          );
+          return { ...vehicle, distance };
+        }
+        return null;
+      })
+      .filter((v) => v && v.distance <= radius)
+      .sort((a, b) => a.distance - b.distance);
+  }
+
+  // Pagination
+  const total = vehicles.length;
+  const startIndex = (page - 1) * limit;
+  const endIndex = page * limit;
+  const paginatedVehicles = vehicles.slice(startIndex, endIndex);
+
+  return {
+    vehicles: paginatedVehicles,
+    pagination: {
+      total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      pages: Math.ceil(total / limit),
+    },
+  };
+};
+
+// ================= INSTANCE METHODS =================
+
+/**
+ * Calculate distance from this vehicle to a given point
+ * @param {Number} lat - Target latitude
+ * @param {Number} lon - Target longitude
+ * @returns {Number} Distance in kilometers
+ */
+VehicleSchema.methods.distanceTo = function (lat, lon) {
+  if (!this.location?.latitude || !this.location?.longitude) {
+    return null;
+  }
+  return this.constructor.calculateDistance(
+    this.location.latitude,
+    this.location.longitude,
+    lat,
+    lon
+  );
+};
 
 module.exports = mongoose.model("Vehicle", VehicleSchema);

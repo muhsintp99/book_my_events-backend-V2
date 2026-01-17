@@ -53,16 +53,12 @@ const normalizeVehiclePath = (value) => {
 const attachVehicleImageUrls = (vehicle) => {
   if (!vehicle) return vehicle;
 
-  if (vehicle.thumbnail) {
-    vehicle.thumbnail = normalizeVehiclePath(vehicle.thumbnail);
+  if (vehicle.featuredImage) {
+    vehicle.featuredImage = normalizeVehiclePath(vehicle.featuredImage);
   }
 
-  if (Array.isArray(vehicle.images)) {
-    vehicle.images = vehicle.images.map(normalizeVehiclePath);
-  }
-
-  if (Array.isArray(vehicle.documents)) {
-    vehicle.documents = vehicle.documents.map(normalizeVehiclePath);
+  if (Array.isArray(vehicle.galleryImages)) {
+    vehicle.galleryImages = vehicle.galleryImages.map(normalizeVehiclePath);
   }
 
   return vehicle;
@@ -185,196 +181,324 @@ const parseObjectId = (value) => {
   return null;
 };
 
-// Sanitize and parse request body
-// Sanitize and parse request body - FIXED VERSION
+// Sanitize and parse request body - NEW STRUCTURE
 const sanitizeVehicleData = (body) => {
-  const sanitized = { ...body };
+  const sanitized = {};
+
+  /* ================= BASIC FIELDS ================= */
+
+  if (body.name) {
+    sanitized.name = String(body.name).trim();
+  }
+
+  if (body.description) {
+    sanitized.description = String(body.description).trim();
+  }
+
+  if (body.model) {
+    sanitized.model = String(body.model).trim();
+  }
+
+  if (body.generalInformation) {
+    sanitized.generalInformation = String(body.generalInformation).trim();
+  }
+
+  if (body.basicInfo) {
+    sanitized.basicInfo = String(body.basicInfo).trim();
+  }
+
+  if (body.yearOfManufacture) {
+    sanitized.yearOfManufacture = Number(body.yearOfManufacture);
+  }
 
   /* ================= OBJECT IDs ================= */
 
-  if (sanitized.brand) sanitized.brand = parseObjectId(sanitized.brand);
-  if (sanitized.category)
-    sanitized.category = parseObjectId(sanitized.category);
-
-  if (sanitized.subCategories) {
-    sanitized.subCategories = parseObjectIdArray(sanitized.subCategories);
+  if (body.category) {
+    sanitized.category = parseObjectId(body.category);
   }
 
-  /* ================= STRINGS ================= */
-
-  if (sanitized.transmissionType) {
-    sanitized.transmissionType = String(sanitized.transmissionType)
-      .trim()
-      .toLowerCase();
+  if (body.brand) {
+    sanitized.brand = parseObjectId(body.brand);
   }
 
-  if (sanitized.name) {
-    sanitized.name =
-      typeof sanitized.name === "string"
-        ? sanitized.name.trim()
-        : String(sanitized.name);
+  if (body.zone) {
+    sanitized.zone = parseObjectId(body.zone);
   }
 
-  if (sanitized.description) {
-    sanitized.description =
-      typeof sanitized.description === "string"
-        ? sanitized.description.trim()
-        : String(sanitized.description);
+  /* ================= SUBCATEGORY (ObjectId Reference) ================= */
+
+  if (body.subCategory) {
+    sanitized.subCategory = parseObjectId(body.subCategory);
   }
 
-  if (sanitized.model) {
-    sanitized.model =
-      typeof sanitized.model === "string"
-        ? sanitized.model.trim()
-        : String(sanitized.model);
+  /* ================= VEHICLE IDENTITY ================= */
+
+  if (body.licensePlateNumber) {
+    sanitized.licensePlateNumber = String(body.licensePlateNumber).trim();
   }
 
-  if (sanitized.vinNumber) {
-    sanitized.vinNumber =
-      typeof sanitized.vinNumber === "string"
-        ? sanitized.vinNumber.trim()
-        : String(sanitized.vinNumber);
-  }
 
-  if (sanitized.licensePlateNumber) {
-    sanitized.licensePlateNumber =
-      typeof sanitized.licensePlateNumber === "string"
-        ? sanitized.licensePlateNumber.trim()
-        : String(sanitized.licensePlateNumber);
-  }
 
-  /* ================= ARRAYS ================= */
+  /* ================= CAPACITY & COMFORT ================= */
 
-  if (sanitized.searchTags !== undefined) {
-    sanitized.searchTags = parseStringArray(sanitized.searchTags);
-  }
-
-  /* ================= BOOLEANS ================= */
-
-  if (sanitized.airCondition !== undefined) {
-    sanitized.airCondition =
-      sanitized.airCondition === true || sanitized.airCondition === "true";
-  }
-
-  if (sanitized.isActive !== undefined) {
-    sanitized.isActive =
-      sanitized.isActive === true || sanitized.isActive === "true";
-  }
-
-  if (sanitized.isAvailable !== undefined) {
-    sanitized.isAvailable =
-      sanitized.isAvailable === true || sanitized.isAvailable === "true";
-  }
-
-  /* ================= FEATURES (IMPORTANT) ================= */
-
-  if (sanitized.features) {
-    sanitized.features = {
-      driverIncluded:
-        sanitized.features.driverIncluded === true ||
-        sanitized.features.driverIncluded === "true",
-
-      sunroof:
-        sanitized.features.sunroof === true ||
-        sanitized.features.sunroof === "true",
-
-      decorationAvailable:
-        sanitized.features.decorationAvailable === true ||
-        sanitized.features.decorationAvailable === "true",
-
-      decorationPrice:
-        sanitized.decorationPrice !== undefined
-          ? Number(sanitized.decorationPrice) || 0
-          : sanitized.features.decorationPrice !== undefined
-            ? Number(sanitized.features.decorationPrice) || 0
-            : 0,
-    };
-  }
-
-  // Remove root level decorationPrice to avoid confusion/pollution
-  delete sanitized.decorationPrice;
-
-  /* ================= NUMBERS ================= */
-
-  if (sanitized.enginePower !== undefined) {
-    const value = Number(sanitized.enginePower);
-    if (!isNaN(value)) sanitized.enginePower = value;
-  }
-
-  if (sanitized.seatingCapacity !== undefined) {
-    sanitized.seatingCapacity = Number(sanitized.seatingCapacity);
-  }
-
-  if (sanitized.discount !== undefined) {
-    sanitized.discount = Number(sanitized.discount);
-  }
-
-  if (sanitized.advanceBookingAmount !== undefined) {
-    const value = Number(sanitized.advanceBookingAmount);
-    if (!isNaN(value)) sanitized.advanceBookingAmount = value;
-  }
-
-  if (sanitized.latitude !== undefined) {
-    sanitized.latitude = Number(sanitized.latitude);
-  }
-
-  if (sanitized.longitude !== undefined) {
-    sanitized.longitude = Number(sanitized.longitude);
-  }
-
-  /* ================= PRICING ================= */
-
-  if (sanitized.pricing) {
-    if (typeof sanitized.pricing === "string") {
+  if (body.capacityAndComfort) {
+    let capacity = body.capacityAndComfort;
+    if (typeof capacity === "string") {
       try {
-        sanitized.pricing = JSON.parse(sanitized.pricing);
+        capacity = JSON.parse(capacity);
       } catch {
-        delete sanitized.pricing;
+        capacity = {};
       }
     }
 
-    if (typeof sanitized.pricing === "object") {
-      if (sanitized.pricing.hourly !== undefined)
-        sanitized.pricing.hourly = Number(sanitized.pricing.hourly);
+    sanitized.capacityAndComfort = {
+      seatingCapacity: Number(capacity.seatingCapacity) || 0,
+      legroomType: capacity.legroomType ? String(capacity.legroomType).trim() : "",
+      pushbackSeats: capacity.pushbackSeats === true || capacity.pushbackSeats === "true",
+      reclinerSeats: capacity.reclinerSeats === true || capacity.reclinerSeats === "true",
+      numberOfSeats: {
+        value: Number(capacity.numberOfSeats?.value) || 0,
+        available:
+          capacity.numberOfSeats?.available === true ||
+          capacity.numberOfSeats?.available === "true",
+      },
+      numberOfDoors: {
+        value: Number(capacity.numberOfDoors?.value) || 0,
+        available:
+          capacity.numberOfDoors?.available === true ||
+          capacity.numberOfDoors?.available === "true",
+      },
+    };
+  }
 
-      if (sanitized.pricing.perDay !== undefined)
-        sanitized.pricing.perDay = Number(sanitized.pricing.perDay);
+  /* ================= ENGINE CHARACTERISTICS ================= */
 
-      if (sanitized.pricing.distanceWise !== undefined)
-        sanitized.pricing.distanceWise = Number(sanitized.pricing.distanceWise);
+  if (body.engineCharacteristics) {
+    let engine = body.engineCharacteristics;
+    if (typeof engine === "string") {
+      try {
+        engine = JSON.parse(engine);
+      } catch {
+        engine = {};
+      }
     }
+
+    sanitized.engineCharacteristics = {
+      transmissionType: {
+        value: engine.transmissionType?.value
+          ? String(engine.transmissionType.value).trim().toLowerCase()
+          : undefined,
+        available:
+          engine.transmissionType?.available === true ||
+          engine.transmissionType?.available === "true",
+      },
+      engineCapacityCC: Number(engine.engineCapacityCC) || 0,
+      powerBHP: Number(engine.powerBHP) || 0,
+      torque: engine.torque ? String(engine.torque).trim() : "",
+      mileage: engine.mileage ? String(engine.mileage).trim() : "",
+      fuelType: engine.fuelType ? String(engine.fuelType).trim().toLowerCase() : undefined,
+      driveControl: engine.driveControl
+        ? String(engine.driveControl).trim().toUpperCase()
+        : undefined,
+      coolingSystem: engine.coolingSystem ? String(engine.coolingSystem).trim() : "",
+      brakeType: engine.brakeType ? String(engine.brakeType).trim() : "",
+      airConditioning: engine.airConditioning === true || engine.airConditioning === "true",
+    };
+  }
+
+  /* ================= LOCATION ================= */
+
+  if (body.location) {
+    let loc = body.location;
+    if (typeof loc === "string") {
+      try {
+        loc = JSON.parse(loc);
+      } catch {
+        loc = {};
+      }
+    }
+
+    sanitized.location = {
+      address: loc.address ? String(loc.address).trim() : "",
+      latitude: Number(loc.latitude) || 0,
+      longitude: Number(loc.longitude) || 0,
+    };
+  }
+
+  /* ================= AVAILABILITY ================= */
+
+  if (body.availability) {
+    let avail = body.availability;
+    if (typeof avail === "string") {
+      try {
+        avail = JSON.parse(avail);
+      } catch {
+        avail = {};
+      }
+    }
+
+    sanitized.availability = {
+      driverIncluded:
+        avail.driverIncluded === true || avail.driverIncluded === "true",
+      sunroof: avail.sunroof === true || avail.sunroof === "true",
+      acAvailable: avail.acAvailable === true || avail.acAvailable === "true",
+    };
+  }
+
+  /* ================= FEATURES (Category-Specific - Mixed Type) ================= */
+
+  if (body.features) {
+    let feat = body.features;
+    if (typeof feat === "string") {
+      try {
+        feat = JSON.parse(feat);
+      } catch {
+        feat = {};
+      }
+    }
+
+    // Features is now Mixed type - store whatever is sent
+    // Frontend will send different features based on category
+    // Car: heatingAndAC, gpsSystem, entertainmentAndConnectivity, etc.
+    // Bus: heatingAndAC, gpsSystem, safetyCompliance, cameras, etc.
+    // Bike: Different set of features
+    if (typeof feat === "object") {
+      sanitized.features = {};
+      for (const key in feat) {
+        if (feat.hasOwnProperty(key)) {
+          // Convert to boolean if it's a boolean-like value
+          if (feat[key] === true || feat[key] === "true") {
+            sanitized.features[key] = true;
+          } else if (feat[key] === false || feat[key] === "false") {
+            sanitized.features[key] = false;
+          } else {
+            // Keep other types as-is (for future extensibility)
+            sanitized.features[key] = feat[key];
+          }
+        }
+      }
+    }
+  }
+
+  /* ================= EXTRA ADDONS (NO PRICING) ================= */
+
+  if (body.extraAddons) {
+    let addons = body.extraAddons;
+    if (typeof addons === "string") {
+      try {
+        addons = JSON.parse(addons);
+      } catch {
+        addons = {};
+      }
+    }
+
+    sanitized.extraAddons = {
+      wifi: addons.wifi === true || addons.wifi === "true",
+      chargingPorts:
+        addons.chargingPorts === true || addons.chargingPorts === "true",
+      interiorLighting: addons.interiorLighting === true || addons.interiorLighting === "true",
+      powerLuggage:
+        addons.powerLuggage === true || addons.powerLuggage === "true",
+      electricRecliner:
+        addons.electricRecliner === true || addons.electricRecliner === "true",
+    };
+  }
+
+
+
+  /* ================= PRICING ================= */
+
+  if (body.pricing) {
+    let pricing = body.pricing;
+    if (typeof pricing === "string") {
+      try {
+        pricing = JSON.parse(pricing);
+      } catch {
+        pricing = {};
+      }
+    }
+
+    sanitized.pricing = {
+      basicPackage: {
+        price: Number(pricing.basicPackage?.price) || 0,
+        includedKilometers:
+          Number(pricing.basicPackage?.includedKilometers) || 0,
+        includedHours: Number(pricing.basicPackage?.includedHours) || 0,
+      },
+      extraKmPrice: {
+        km: Number(pricing.extraKmPrice?.km) || 0,
+        price: Number(pricing.extraKmPrice?.price) || 0,
+      },
+      extraHourPrice: Number(pricing.extraHourPrice) || 0,
+      discount: {
+        type: pricing.discount?.type
+          ? String(pricing.discount.type).trim().toLowerCase()
+          : undefined,
+        value: Number(pricing.discount?.value) || 0,
+      },
+      decoration: {
+        available:
+          pricing.decoration?.available === true ||
+          pricing.decoration?.available === "true",
+        price: Number(pricing.decoration?.price) || 0,
+      },
+      grandTotal: Number(pricing.grandTotal) || 0,
+    };
+  }
+
+  /* ================= ADVANCE BOOKING AMOUNT ================= */
+
+  if (body.advanceBookingAmount !== undefined) {
+    sanitized.advanceBookingAmount = Number(body.advanceBookingAmount) || 0;
+  }
+
+
+
+  /* ================= CAR-SPECIFIC FIELDS ================= */
+
+  if (body.vehicleType) {
+    sanitized.vehicleType = String(body.vehicleType).trim().toLowerCase();
+  }
+
+  /* ================= BIKE-SPECIFIC FIELDS ================= */
+
+  if (body.bikeType) {
+    sanitized.bikeType = String(body.bikeType).trim().toLowerCase();
+  }
+
+  if (body.engineCapacity !== undefined) {
+    sanitized.engineCapacity = Number(body.engineCapacity) || 0;
+  }
+
+  if (body.numberOfGears !== undefined) {
+    sanitized.numberOfGears = Number(body.numberOfGears) || 0;
   }
 
   /* ================= TERMS & CONDITIONS ================= */
 
-  if (sanitized.termsAndConditions) {
-    let parsed = sanitized.termsAndConditions;
+  if (body.termsAndConditions) {
+    sanitized.termsAndConditions = String(body.termsAndConditions).trim();
+  }
 
-    if (typeof parsed === "string") {
-      try {
-        parsed = JSON.parse(parsed);
-      } catch (e) {
-        parsed = [];
-      }
-    }
+  if (body.generalConditions) {
+    sanitized.generalConditions = String(body.generalConditions).trim();
+  }
 
-    if (Array.isArray(parsed)) {
-      sanitized.termsAndConditions = parsed
-        .filter(
-          (section) =>
-            section?.heading &&
-            Array.isArray(section.points) &&
-            section.points.length > 0
-        )
-        .map((section) => ({
-          heading: String(section.heading).trim(),
-          points: section.points
-            .map((p) => String(p).trim())
-            .filter((p) => p),
-        }));
-    } else {
-      sanitized.termsAndConditions = [];
-    }
+  /* ================= PROVIDER ================= */
+
+  if (body.provider) {
+    sanitized.provider = parseObjectId(body.provider);
+  }
+
+  /* ================= SYSTEM FIELDS ================= */
+
+  if (body.isActive !== undefined) {
+    sanitized.isActive = body.isActive === true || body.isActive === "true";
+  }
+
+  if (body.isAvailable !== undefined) {
+    sanitized.isAvailable =
+      body.isAvailable === true || body.isAvailable === "true";
   }
 
   return sanitized;
@@ -442,12 +566,13 @@ exports.createVehicle = async (req, res) => {
     }
   }
 
-  // Handle uploads
-  if (req.files?.images) body.images = req.files.images.map((f) => f.filename);
-  if (req.files?.thumbnail?.[0])
-    body.thumbnail = req.files.thumbnail[0].filename;
-  if (req.files?.documents)
-    body.documents = req.files.documents.map((f) => f.filename);
+  // Handle uploads - NEW STRUCTURE
+  if (req.files?.featuredImage?.[0]) {
+    body.featuredImage = req.files.featuredImage[0].filename;
+  }
+  if (req.files?.galleryImages) {
+    body.galleryImages = req.files.galleryImages.map((f) => f.filename);
+  }
 
   try {
     // Validate parent category
@@ -455,41 +580,6 @@ exports.createVehicle = async (req, res) => {
       const parentExists = await Category.findById(body.category).select("_id");
       if (!parentExists) {
         return sendResponse(res, 400, false, "Invalid parent category");
-      }
-    }
-
-    // ✅ Validate subcategories properly
-    if (body.subCategories?.length) {
-      const parentCategory = await Category.findById(body.category).lean();
-
-      console.log("📦 Parent category fetched:", parentCategory?.title);
-      console.log("📦 Parent subCategories:", parentCategory?.subCategories);
-      console.log("📦 Requested subCategories:", body.subCategories);
-
-      if (!parentCategory) {
-        return sendResponse(res, 400, false, "Invalid parent category");
-      }
-
-      // Extract valid subcategory IDs from parent's embedded subdocuments
-      const validSubIds = Array.isArray(parentCategory.subCategories)
-        ? parentCategory.subCategories.map((id) => id.toString())
-        : [];
-
-      console.log("✅ Valid subcategory IDs:", validSubIds);
-
-      // Filter requested subcategories to only include valid ones
-      const validRequestedSubs = body.subCategories.filter((id) =>
-        validSubIds.includes(id.toString())
-      );
-
-      console.log("✅ Final valid subCategories:", validRequestedSubs);
-
-      // Only set subcategories if there are valid ones
-      if (validRequestedSubs.length > 0) {
-        body.subCategories = validRequestedSubs;
-      } else {
-        console.warn("⚠️ No valid subcategories found, setting to empty array");
-        body.subCategories = [];
       }
     }
 
@@ -522,33 +612,13 @@ exports.createVehicle = async (req, res) => {
       .populate({
         path: "category",
         model: "Category",
-        select: "title image isActive subCategories",
+        select: "title image isActive",
       })
       .populate(populateProvider)
       .populate("zone")
       .lean();
 
     attachVehicleImageUrls(populatedVehicle);
-
-    // ✅ MANUAL subCategory population
-    if (populatedVehicle.subCategories?.length) {
-      const subCategoryIds = populatedVehicle.subCategories.map((id) =>
-        id.toString()
-      );
-
-      const subCategoryDocs = await Category.find({
-        _id: { $in: subCategoryIds },
-        parentCategory: populatedVehicle.category._id,
-        isActive: true,
-      }).select("title image isActive");
-
-      populatedVehicle.subCategories = subCategoryDocs;
-    }
-
-    // Remove nested subCategories from category (clean response)
-    if (populatedVehicle.category) {
-      delete populatedVehicle.category.subCategories;
-    }
 
     sendResponse(
       res,
@@ -560,9 +630,8 @@ exports.createVehicle = async (req, res) => {
   } catch (error) {
     console.error("Error creating vehicle:", error);
     // Cleanup uploaded files if vehicle creation fails
-    if (body.images?.length) await deleteFiles(body.images);
-    if (body.thumbnail) await deleteFiles([body.thumbnail]);
-    if (body.documents?.length) await deleteFiles(body.documents);
+    if (body.featuredImage) await deleteFiles([body.featuredImage]);
+    if (body.galleryImages?.length) await deleteFiles(body.galleryImages);
 
     if (error.code === 11000) {
       console.error("❌ Duplicate key error:", error.keyValue);
