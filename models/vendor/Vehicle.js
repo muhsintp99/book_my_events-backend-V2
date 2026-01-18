@@ -214,9 +214,14 @@ const VehicleSchema = new mongoose.Schema(
     // Car-specific fields
     vehicleType: {
       type: String,
-      enum: ["electric", "luxury", "vintage"],
+      enum: ["standard", "electric", "luxury", "vintage"],
       lowercase: true,
     },
+
+    // Vehicle Documents
+    vehicleDocuments: [{
+      type: String,
+    }],
 
     // Bike-specific fields
     bikeType: {

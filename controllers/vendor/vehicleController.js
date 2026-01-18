@@ -61,6 +61,10 @@ const attachVehicleImageUrls = (vehicle) => {
     vehicle.galleryImages = vehicle.galleryImages.map(normalizeVehiclePath);
   }
 
+  if (Array.isArray(vehicle.vehicleDocuments)) {
+    vehicle.vehicleDocuments = vehicle.vehicleDocuments.map(normalizeVehiclePath);
+  }
+
   return vehicle;
 };
 
@@ -442,8 +446,23 @@ const sanitizeVehicleData = (body) => {
           pricing.decoration?.available === "true",
         price: Number(pricing.decoration?.price) || 0,
       },
-      grandTotal: Number(pricing.grandTotal) || 0,
     };
+
+    // ✅ Automatically calculate grandTotal
+    const basePrice = sanitized.pricing.basicPackage.price;
+    const decorationPrice = sanitized.pricing.decoration.available
+      ? sanitized.pricing.decoration.price
+      : 0;
+    const discountValue = sanitized.pricing.discount.value;
+    let discountAmount = 0;
+
+    if (sanitized.pricing.discount.type === "percentage") {
+      discountAmount = (basePrice * discountValue) / 100;
+    } else if (["flat", "flat_rate"].includes(sanitized.pricing.discount.type)) {
+      discountAmount = discountValue;
+    }
+
+    sanitized.pricing.grandTotal = Math.max(basePrice + decorationPrice - discountAmount, 0);
   }
 
   /* ================= ADVANCE BOOKING AMOUNT ================= */
@@ -573,6 +592,9 @@ exports.createVehicle = async (req, res) => {
   if (req.files?.galleryImages) {
     body.galleryImages = req.files.galleryImages.map((f) => f.filename);
   }
+  if (req.files?.vehicleDocuments) {
+    body.vehicleDocuments = req.files.vehicleDocuments.map((f) => f.filename);
+  }
 
   try {
     // Validate parent category
@@ -632,6 +654,7 @@ exports.createVehicle = async (req, res) => {
     // Cleanup uploaded files if vehicle creation fails
     if (body.featuredImage) await deleteFiles([body.featuredImage]);
     if (body.galleryImages?.length) await deleteFiles(body.galleryImages);
+    if (body.vehicleDocuments?.length) await deleteFiles(body.vehicleDocuments);
 
     if (error.code === 11000) {
       console.error("❌ Duplicate key error:", error.keyValue);
@@ -1043,9 +1066,9 @@ exports.updateVehicle = async (req, res) => {
       if (vehicle.thumbnail) filesToDelete.push(vehicle.thumbnail);
       body.thumbnail = req.files.thumbnail[0].filename;
     }
-    if (req.files?.documents) {
-      if (vehicle.documents?.length) filesToDelete.push(...vehicle.documents);
-      body.documents = req.files.documents.map((f) => f.filename);
+    if (req.files?.vehicleDocuments) {
+      if (vehicle.vehicleDocuments?.length) filesToDelete.push(...vehicle.vehicleDocuments);
+      body.vehicleDocuments = req.files.vehicleDocuments.map((f) => f.filename);
     }
 
     // Verify brand if changed

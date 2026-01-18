@@ -8,6 +8,7 @@ const upload = createUpload('vehicles', { fileSizeMB: 20 });
 const uploadFields = upload.fields([
   { name: 'featuredImage', maxCount: 1 },
   { name: 'galleryImages', maxCount: 10 },
+  { name: 'vehicleDocuments', maxCount: 10 },
 ]);
 
 // Optional auth for GET routes
