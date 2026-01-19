@@ -494,9 +494,16 @@ const sanitizeVehicleData = (body) => {
   }
 
   /* ================= TERMS & CONDITIONS ================= */
-
   if (body.termsAndConditions) {
-    sanitized.termsAndConditions = String(body.termsAndConditions).trim();
+    let terms = body.termsAndConditions;
+    if (typeof terms === "string") {
+      try {
+        terms = JSON.parse(terms);
+      } catch {
+        terms = [];
+      }
+    }
+    sanitized.termsAndConditions = Array.isArray(terms) ? terms : [];
   }
 
   if (body.generalConditions) {

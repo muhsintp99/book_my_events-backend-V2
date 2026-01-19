@@ -249,10 +249,10 @@ const VehicleSchema = new mongoose.Schema(
 
 
     // Terms & Conditions
-    termsAndConditions: {
-      type: String,
-      trim: true,
-    },
+    termsAndConditions: [{
+      heading: { type: String, trim: true },
+      points: [{ type: String, trim: true }]
+    }],
 
     generalConditions: {
       type: String,
