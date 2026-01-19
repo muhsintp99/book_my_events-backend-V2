@@ -307,9 +307,24 @@ const bookingSchema = new mongoose.Schema(
     },
     // 🔥 TRANSPORT PRICING SNAPSHOT
     transportPricing: {
-      hourly: { type: Number, default: 0 },
-      perDay: { type: Number, default: 0 },
-      distanceWise: { type: Number, default: 0 },
+      basicPackage: {
+        price: { type: Number, default: 0 },
+        includedKilometers: { type: Number, default: 0 },
+        includedHours: { type: Number, default: 0 },
+      },
+      extraKmPrice: {
+        km: { type: Number, default: 0 },
+        price: { type: Number, default: 0 },
+      },
+      extraHourPrice: { type: Number, default: 0 },
+      discount: {
+        type: { type: String },
+        value: { type: Number, default: 0 },
+      },
+      decoration: {
+        available: { type: Boolean, default: false },
+        price: { type: Number, default: 0 },
+      },
     },
 
     numberOfGuests: {
