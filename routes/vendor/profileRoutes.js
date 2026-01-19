@@ -18,6 +18,12 @@ const upload = createUpload("profiles", {
 
 // Get ALL Vendors
 router.get("/vendors/all", profileController.getAllVendors);
+// ✅ UPDATE VENDOR BIO
+router.put(
+  "/vendor/:vendorId/bio",
+  profileController.updateVendorBio
+);
+
 
 // Get Single Vendor
 router.get("/vendor/:providerId", profileController.getSingleVendor);

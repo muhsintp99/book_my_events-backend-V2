@@ -137,6 +137,12 @@ const profileSchema = new mongoose.Schema(
       },
       upiId: { type: String, default: '' }
     },
+    bio: {
+  title: { type: String, default: '' },
+  subtitle: { type: String, default: '' },
+  description: { type: String, default: '' }
+}
+,
     kycDetails: {
       personalInfo: {
         fullName: { type: String, default: '' },

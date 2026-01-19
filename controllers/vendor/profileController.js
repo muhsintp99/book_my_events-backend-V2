@@ -460,6 +460,54 @@ exports.getProfileByProviderId = async (req, res) => {
 //   }
 // };
 // ✅ FIXED: Update profile - handles BOTH Profile ID and User ID
+
+// ✅ UPDATE VENDOR BIO (FIX)
+exports.updateVendorBio = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const { bio } = req.body;
+
+    if (!bio) {
+      return res.status(400).json({
+        success: false,
+        message: "Bio data is required"
+      });
+    }
+
+    const vendor = await VendorProfile.findOneAndUpdate(
+      { user: vendorId },
+      {
+        $set: {
+          "bio.title": bio.title || "",
+          "bio.subtitle": bio.subtitle || "",
+          "bio.description": bio.description || ""
+        }
+      },
+      { new: true }
+    );
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: "Vendor not found"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Vendor bio updated successfully",
+      data: vendor.bio
+    });
+
+  } catch (error) {
+    console.error("Update Vendor Bio Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 exports.updateProfile = async (req, res) => {
   try {
     const { role, vendorName, firstName, lastName, businessAddress, mobileNumber, socialLinks, bankDetails, latitude, longitude, storeAddress } = req.body;
