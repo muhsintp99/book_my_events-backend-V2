@@ -312,10 +312,7 @@ const bookingSchema = new mongoose.Schema(
         includedKilometers: { type: Number, default: 0 },
         includedHours: { type: Number, default: 0 },
       },
-      extraKmPrice: {
-        km: { type: Number, default: 0 },
-        price: { type: Number, default: 0 },
-      },
+      extraKmPrice: { type: Number, default: 0 },
       extraHourPrice: { type: Number, default: 0 },
       discount: {
         type: { type: String },

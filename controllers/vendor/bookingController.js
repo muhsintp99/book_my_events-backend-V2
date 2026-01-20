@@ -917,8 +917,8 @@ exports.createBooking = async (req, res) => {
         // Extra Kilometers
         if (distanceKm && distanceKm > (basicPkg.includedKilometers || 0)) {
           const extraKm = distanceKm - (basicPkg.includedKilometers || 0);
-          const kmCharge = extraKm * (pricingMap.extraKmPrice?.price || 0);
-          console.log(`🛣️ Extra KM: ${extraKm}, Charge: ${kmCharge}`);
+          const kmCharge = extraKm * (pricingMap.extraKmPrice || 0);
+          console.log(`\u{1F6E3}\u{FE0F} Extra KM: ${extraKm}, Charge: ${kmCharge}`);
           extraCharges += kmCharge;
         }
 
@@ -1106,10 +1106,7 @@ exports.createBooking = async (req, res) => {
             includedKilometers: 0,
             includedHours: 0,
           },
-          extraKmPrice: serviceProvider.pricing?.extraKmPrice || {
-            km: 0,
-            price: 0,
-          },
+          extraKmPrice: serviceProvider.pricing?.extraKmPrice || 0,
           extraHourPrice: serviceProvider.pricing?.extraHourPrice || 0,
           discount: serviceProvider.pricing?.discount || {
             type: "none",

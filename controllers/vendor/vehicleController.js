@@ -429,10 +429,7 @@ const sanitizeVehicleData = (body) => {
           Number(pricing.basicPackage?.includedKilometers) || 0,
         includedHours: Number(pricing.basicPackage?.includedHours) || 0,
       },
-      extraKmPrice: {
-        km: Number(pricing.extraKmPrice?.km) || 0,
-        price: Number(pricing.extraKmPrice?.price) || 0,
-      },
+      extraKmPrice: Number(pricing.extraKmPrice) || 0,
       extraHourPrice: Number(pricing.extraHourPrice) || 0,
       discount: {
         type: pricing.discount?.type

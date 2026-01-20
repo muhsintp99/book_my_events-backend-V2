@@ -175,8 +175,9 @@ const VehicleSchema = new mongoose.Schema(
 
       // Additional Pricing
       extraKmPrice: {
-        km: { type: Number, min: 0, default: 0 },
-        price: { type: Number, min: 0, default: 0 },
+        type: Number,
+        min: 0,
+        default: 0,
       },
       extraHourPrice: {
         type: Number,
