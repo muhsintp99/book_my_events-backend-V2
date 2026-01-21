@@ -34,32 +34,11 @@ const CakeSchema = new mongoose.Schema(
 
     /* ================= MODULE & CATEGORY ================= */
     module: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "Module",
-  required: true,
-  index: true,
-},
-/* ================= ADD ONS ================= */
-addons: [
-  {
-    name: {
-      type: String,
-      required: true, // e.g. "Birthday Candles"
-    },
-    description: {
-      type: String, // optional
-    },
-    price: {
-      type: Number,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Module",
       required: true,
+      index: true,
     },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-  },
-],
-
 
     category: {
       type: mongoose.Schema.Types.ObjectId,
@@ -75,51 +54,90 @@ addons: [
     ],
 
     /* ================= CAKE TYPE ================= */
-   itemType: {
-  type: String,
-  enum: ["Eggless", "Egg"],
-  default: "Eggless"
-},
+    itemType: {
+      type: String,
+      enum: ["Eggless", "Egg"],
+      default: "Eggless",
+    },
 
-    /* ================= NUTRITION ================= */
-    nutrition: [{ type: String }],
-    allergenIngredients: [{ type: String }],
+    uom: {
+      type: String,
+      enum: ["Kg", "Gm", "Piece", "Litre"],
+      default: "Kg",
+    },
 
-    // isHalal: {
-    //   type: Boolean,
-    //   default: false,
-    // },
+    weight: {
+      type: Number,
+    },
 
-/* ================= TIME ================= */
-// timeSchedule: {
-//   startTime: {
-//     type: String, // e.g. "10:00"
-//     required: true
-//   },
-//   startPeriod: {
-//     type: String,
-//     enum: ["AM", "PM"],
-//     default: "AM"
-//   },
-//   endTime: {
-//     type: String, // e.g. "06:00"
-//     required: true
-//   },
-//   endPeriod: {
-//     type: String,
-//     enum: ["AM", "PM"],
-//     default: "PM"
-//   }
-// },
+    occasions: [{ type: String }],
 
+    prepTime: {
+      type: String,
+    },
 
-      /* ================= VARIATIONS ================= */
+    /* ================= IMAGES ================= */
+    thumbnail: {
+      type: String,
+      required: true,
+    },
+
+    cakeId: {
+      type: String,
+      default: null,
+    },
+
+    images: [
+      {
+        type: String,
+      },
+    ],
+
+    /* ================= VARIATIONS ================= */
     variations: [
       {
         name: String,
         price: Number,
+        image: String,
       },
     ],
+
+    /* ================= ADD ONS ================= */
+    addons: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "CakeAddon",
+      },
+    ],
+
+    /* ================= SHIPPING ================= */
+    shipping: {
+      free: { type: Boolean, default: false },
+      flatRate: { type: Boolean, default: false },
+      price: { type: Number, default: 0 },
+    },
+
+    /* ================= RELATED ITEMS ================= */
+    relatedItems: {
+      linkBy: {
+        type: String,
+        enum: ["product", "category"],
+      },
+      items: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          refPath: "relatedItems.linkByRef",
+        },
+      ],
+      linkByRef: {
+        type: String,
+        enum: ["Cake", "Category"],
+      },
+    },
+
+    /* ================= NUTRITION ================= */
+    nutrition: [{ type: String }],
+    allergenIngredients: [{ type: String }],
 
     /* ================= TAGS ================= */
     searchTags: [{ type: String }],
@@ -147,6 +165,7 @@ addons: [
   },
   { timestamps: true }
 );
+
 
 /* ================= INDEXES ================= */
 

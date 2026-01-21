@@ -266,14 +266,9 @@ const sanitizeVehicleData = (body) => {
           capacity.numberOfSeats?.available === true ||
           capacity.numberOfSeats?.available === "true",
       },
-      numberOfDoors: {
-        value: Number(capacity.numberOfDoors?.value) || 0,
-        available:
-          capacity.numberOfDoors?.available === true ||
-          capacity.numberOfDoors?.available === "true",
-      },
     };
   }
+
 
   /* ================= ENGINE CHARACTERISTICS ================= */
 

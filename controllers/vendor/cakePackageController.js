@@ -91,16 +91,23 @@ const sanitizeCakeData = (body) => {
   // =========================
   if (data.itemType) {
     const normalized = String(data.itemType).toLowerCase();
-
     if (normalized === "eggless") data.itemType = "Eggless";
     else if (normalized === "egg") data.itemType = "Egg";
   }
+
+  // =========================
+  // NEW FIELDS (UOM, Weight, PrepTime)
+  // =========================
+  if (data.uom) data.uom = data.uom.trim();
+  if (data.weight) data.weight = Number(data.weight);
+  if (data.prepTime) data.prepTime = data.prepTime.trim();
 
   // =========================
   // OBJECT IDS
   // =========================
   if (data.module) data.module = parseObjectId(data.module);
   if (data.category) data.category = parseObjectId(data.category);
+  if (data.provider) data.provider = parseObjectId(data.provider);
 
   if (data.subCategories) {
     data.subCategories = parseJSON(data.subCategories, []).filter((id) =>
@@ -115,14 +122,35 @@ const sanitizeCakeData = (body) => {
   data.allergenIngredients = parseJSON(data.allergenIngredients, []);
   data.searchTags = parseJSON(data.searchTags, []);
   data.variations = parseJSON(data.variations, []);
+  data.occasions = parseJSON(data.occasions, []);
 
-  
- data.addons = parseJSON(data.addons, []);
+  // Use new Addon system (IDs instead of objects)
+  data.addons = parseJSON(data.addons, []).filter((id) =>
+    mongoose.Types.ObjectId.isValid(id)
+  );
 
+  // Shipping
+  data.shipping = parseJSON(data.shipping, {
+    free: false,
+    flatRate: false,
+    price: 0,
+  });
 
+  // Related Items
+  data.relatedItems = parseJSON(data.relatedItems, {
+    linkBy: "category",
+    items: [],
+  });
+
+  if (data.relatedItems.linkBy === "product") {
+    data.relatedItems.linkByRef = "Cake";
+  } else {
+    data.relatedItems.linkByRef = "Category";
+  }
 
   return data;
 };
+
 
 /* =====================================================
    POPULATE CAKE HELPER
@@ -138,7 +166,12 @@ const populateCake = async (id, req = null) => {
     .populate("category", "title image description")
     .populate("subCategories", "title image")
     .populate("provider", "firstName lastName email phone profilePhoto")
+    .populate({
+      path: "addons",
+      select: "title description icon priceList isActive",
+    })
     .lean();
+
 
   if (!cake) return null;
 
@@ -187,9 +220,8 @@ const populateCake = async (id, req = null) => {
       : null;
     cake.provider.hasVendorProfile = true;
   } else {
-    cake.provider.storeName = `${cake.provider.firstName || ""} ${
-      cake.provider.lastName || ""
-    }`.trim();
+    cake.provider.storeName = `${cake.provider.firstName || ""} ${cake.provider.lastName || ""
+      }`.trim();
     cake.provider.logo = cake.provider.profilePhoto
       ? cake.provider.profilePhoto.startsWith("http")
         ? cake.provider.profilePhoto
@@ -378,9 +410,9 @@ exports.getCakesByModule = async (req, res) => {
     const query = { module: moduleId, isActive: true };
 
     const validSortFields = {
-  createdAt: "createdAt",
-  name: "name",
-};
+      createdAt: "createdAt",
+      name: "name",
+    };
 
 
     const sortField = validSortFields[sortBy] || "createdAt";
@@ -438,9 +470,9 @@ exports.getCakesByCategory = async (req, res) => {
     const query = { category: categoryId, isActive: true };
 
     const validSortFields = {
-  createdAt: "createdAt",
-  name: "name",
-};
+      createdAt: "createdAt",
+      name: "name",
+    };
 
 
     const sortField = validSortFields[sortBy] || "createdAt";
@@ -552,34 +584,34 @@ exports.getVendorsForCakeModule = async (req, res) => {
         hasVendorProfile: true,
         subscription: sub
           ? {
-              isSubscribed: sub.status === "active",
-              status: sub.status,
-              plan: sub.planId,
-              module: sub.moduleId,
-              billing: {
-                startDate: sub.startDate,
-                endDate: sub.endDate,
-                paymentId: sub.paymentId,
-                autoRenew: sub.autoRenew,
-              },
-              access: {
-                canAccess: sub.status === "active" && !isExpired,
-                isExpired,
-                daysLeft,
-              },
-            }
-          : {
-              isSubscribed: false,
-              status: "none",
-              plan: null,
-              module: null,
-              billing: null,
-              access: {
-                canAccess: false,
-                isExpired: true,
-                daysLeft: 0,
-              },
+            isSubscribed: sub.status === "active",
+            status: sub.status,
+            plan: sub.planId,
+            module: sub.moduleId,
+            billing: {
+              startDate: sub.startDate,
+              endDate: sub.endDate,
+              paymentId: sub.paymentId,
+              autoRenew: sub.autoRenew,
             },
+            access: {
+              canAccess: sub.status === "active" && !isExpired,
+              isExpired,
+              daysLeft,
+            },
+          }
+          : {
+            isSubscribed: false,
+            status: "none",
+            plan: null,
+            module: null,
+            billing: null,
+            access: {
+              canAccess: false,
+              isExpired: true,
+              daysLeft: 0,
+            },
+          },
       };
     });
 
@@ -808,12 +840,12 @@ exports.searchCakes = async (req, res) => {
     //   query.isHalal = isHalal === "true";
     // }
 
-   
 
-   const validSortFields = {
-  createdAt: "createdAt",
-  name: "name",
-};
+
+    const validSortFields = {
+      createdAt: "createdAt",
+      name: "name",
+    };
 
 
     const sortField = validSortFields[sortBy] || "createdAt";
@@ -881,15 +913,15 @@ exports.updateCake = async (req, res) => {
     }
 
     // =========================
-// SAFE PRICE INFO MERGE
-// =========================
+    // SAFE PRICE INFO MERGE
+    // =========================
 
-Object.assign(cake, body);
-
-
+    Object.assign(cake, body);
 
 
-await cake.save();
+
+
+    await cake.save();
 
 
     if (filesToDelete.length) await deleteFiles(filesToDelete);

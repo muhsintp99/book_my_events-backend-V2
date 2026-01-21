@@ -78,11 +78,8 @@ const VehicleSchema = new mongoose.Schema(
         value: { type: Number, min: 0, default: 0 },
         available: { type: Boolean, default: false },
       },
-      numberOfDoors: {
-        value: { type: Number, min: 0, default: 0 },
-        available: { type: Boolean, default: false },
-      },
     },
+
 
     // Engine & Drive
     engineCharacteristics: {

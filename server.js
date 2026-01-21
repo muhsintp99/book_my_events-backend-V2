@@ -561,6 +561,8 @@ app.use("/api/photography-packages", require("./routes/vendor/photographyPackage
 app.use("/api/enquiries", require("./routes/vendor/enquiryRoutes"));
 app.use("/api/availability", require("./routes/vendor/availabilityRoutes"));
 app.use("/api/cakes", require("./routes/vendor/cakePackageRoutes"));
+app.use("/api/cake-addons", require("./routes/vendor/cakeAddonRoutes"));
+
 
 app.use(
   "/api/razorpay/subscription",
