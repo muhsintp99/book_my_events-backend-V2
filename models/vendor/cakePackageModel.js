@@ -76,6 +76,29 @@ const CakeSchema = new mongoose.Schema(
       type: String,
     },
 
+    /* ================= PRICING ================= */
+    basePrice: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+
+    discountType: {
+      type: String,
+      enum: ["flat", "percentage", "none"],
+      default: "none",
+    },
+
+    discountValue: {
+      type: Number,
+      default: 0,
+    },
+
+    finalPrice: {
+      type: Number,
+      default: 0,
+    },
+
     /* ================= IMAGES ================= */
     thumbnail: {
       type: String,
@@ -94,13 +117,22 @@ const CakeSchema = new mongoose.Schema(
     ],
 
     /* ================= VARIATIONS ================= */
-    variations: [
+    attributes: [
       {
-        name: String,
-        price: Number,
-        image: String,
+        name: String, // e.g. "Weight"
+        values: [String], // e.g. ["0.5Kg", "1Kg", "2Kg"]
       },
     ],
+
+    variations: [
+      {
+        name: String, // e.g. "0.5 Kg - Egg"
+        price: Number,
+        image: String,
+        attributeValues: [String], // e.g. ["0.5Kg", "Egg"]
+      },
+    ],
+
 
     /* ================= ADD ONS ================= */
     addons: [

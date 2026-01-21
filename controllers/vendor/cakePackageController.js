@@ -103,6 +103,23 @@ const sanitizeCakeData = (body) => {
   if (data.prepTime) data.prepTime = data.prepTime.trim();
 
   // =========================
+  // PRICING & DISCOUNTS
+  // =========================
+  data.basePrice = Number(data.basePrice || 0);
+  data.discountValue = Number(data.discountValue || 0);
+  data.discountType = data.discountType || "none";
+
+  // Calculate Final Price
+  let final = data.basePrice;
+  if (data.discountType === "flat") {
+    final = Math.max(0, data.basePrice - data.discountValue);
+  } else if (data.discountType === "percentage") {
+    const discount = (data.basePrice * data.discountValue) / 100;
+    final = Math.max(0, data.basePrice - discount);
+  }
+  data.finalPrice = final;
+
+  // =========================
   // OBJECT IDS
   // =========================
   if (data.module) data.module = parseObjectId(data.module);
@@ -123,6 +140,7 @@ const sanitizeCakeData = (body) => {
   data.searchTags = parseJSON(data.searchTags, []);
   data.variations = parseJSON(data.variations, []);
   data.occasions = parseJSON(data.occasions, []);
+  data.attributes = parseJSON(data.attributes, []);
 
   // Use new Addon system (Item selection support)
   data.addons = parseJSON(data.addons, []).map((item) => {
@@ -258,6 +276,17 @@ const populateCake = async (id, req = null) => {
     cake.images = cake.images.map((img) =>
       img.startsWith("http") ? img : `${baseUrl}${normalizeUploadPath(img)}`
     );
+  }
+
+  if (cake.variations && cake.variations.length > 0) {
+    cake.variations = cake.variations.map((v) => {
+      if (v.image) {
+        v.image = v.image.startsWith("http")
+          ? v.image
+          : `${baseUrl}${v.image.startsWith("/uploads") ? v.image : "/uploads/cake-packages/" + v.image}`;
+      }
+      return v;
+    });
   }
 
   // Protect when provider is missing
