@@ -124,10 +124,27 @@ const sanitizeCakeData = (body) => {
   data.variations = parseJSON(data.variations, []);
   data.occasions = parseJSON(data.occasions, []);
 
-  // Use new Addon system (IDs instead of objects)
-  data.addons = parseJSON(data.addons, []).filter((id) =>
-    mongoose.Types.ObjectId.isValid(id)
-  );
+  // Use new Addon system (Item selection support)
+  data.addons = parseJSON(data.addons, []).map((item) => {
+    if (typeof item === "string" && mongoose.Types.ObjectId.isValid(item)) {
+      return { addonId: new mongoose.Types.ObjectId(item), selectedItems: [] };
+    }
+    if (typeof item === "object" && item.addonId) {
+      return {
+        addonId: new mongoose.Types.ObjectId(item.addonId),
+        selectedItems: Array.isArray(item.selectedItems)
+          ? item.selectedItems
+            .filter((id) => mongoose.Types.ObjectId.isValid(id))
+            .map((id) => new mongoose.Types.ObjectId(id))
+          : [],
+      };
+    }
+    return null;
+  }).filter(Boolean);
+
+  if (data.addonTemplate && mongoose.Types.ObjectId.isValid(data.addonTemplate)) {
+    data.addonTemplate = new mongoose.Types.ObjectId(data.addonTemplate);
+  }
 
   // Shipping
   data.shipping = parseJSON(data.shipping, {
@@ -167,13 +184,68 @@ const populateCake = async (id, req = null) => {
     .populate("subCategories", "title image")
     .populate("provider", "firstName lastName email phone profilePhoto")
     .populate({
-      path: "addons",
+      path: "addons.addonId",
       select: "title description icon priceList isActive",
+    })
+    .populate({
+      path: "addonTemplate",
+      populate: {
+        path: "addonGroups",
+        select: "title description icon priceList isActive",
+      },
     })
     .lean();
 
+  // Logic for Dynamic Templates in Cake Packages
+  if (cake.addonTemplate?.isDynamic && cake.provider) {
+    const CakeAddon = mongoose.model("CakeAddon");
+    const allAddons = await CakeAddon.find({
+      provider: cake.provider._id || cake.provider,
+      isActive: true,
+    }).select("title description icon priceList isActive");
+
+    // Manually formatting paths for dynamic addons
+    cake.addonTemplate.addonGroups = allAddons.map((addon) => {
+      const a = addon.toObject ? addon.toObject() : addon;
+      if (a.icon) {
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
+        a.icon = a.icon.startsWith("http")
+          ? a.icon
+          : `${baseUrl}${a.icon.startsWith("/uploads") ? a.icon : "/uploads/cake-addons/" + a.icon}`;
+      }
+      return a;
+    });
+  }
+
 
   if (!cake) return null;
+
+  // Process manual addons to only show selected items
+  if (cake.addons && cake.addons.length > 0) {
+    cake.addons = cake.addons.map((addon) => {
+      const group = addon.addonId;
+      if (!group) return null;
+
+      // If selectedItems is provided, filter the group's priceList
+      if (addon.selectedItems && addon.selectedItems.length > 0) {
+        const itemIds = addon.selectedItems.map((id) => id.toString());
+        group.priceList = group.priceList.filter((item) =>
+          itemIds.includes(item._id.toString())
+        );
+      }
+
+      // Format icon path if needed
+      if (group.icon && !group.icon.startsWith("http")) {
+        group.icon = `${baseUrl}${normalizeUploadPath(group.icon)}`;
+      }
+
+      // Simplify structure: Move group data up
+      return {
+        ...group,
+        addonId: group._id, // Keep ID for reference
+      };
+    }).filter(Boolean);
+  }
 
   // Normalize image paths for cake
   if (cake.thumbnail) {

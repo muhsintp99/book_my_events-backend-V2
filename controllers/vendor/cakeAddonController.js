@@ -1,7 +1,95 @@
 const CakeAddon = require("../../models/vendor/cakeAddonModel");
+const CakeAddonTemplate = require("../../models/vendor/cakeAddonTemplateModel");
 const mongoose = require("mongoose");
 const fs = require("fs").promises;
 const path = require("path");
+
+// ========================
+
+// ========================
+// TEMPLATE CONTROLLERS
+// ========================
+
+exports.createTemplate = async (req, res) => {
+    try {
+        const { title, addonGroups, provider } = req.body;
+        const vendorId = provider || req.user?._id;
+
+        if (!vendorId) {
+            return sendResponse(res, 400, false, "Provider is required");
+        }
+
+        const templateData = {
+            title,
+            addonGroups: Array.isArray(addonGroups) ? addonGroups : JSON.parse(addonGroups || "[]"),
+            provider: vendorId,
+            isDynamic: req.body.isDynamic === true || req.body.isDynamic === "true",
+        };
+
+        const template = await CakeAddonTemplate.create(templateData);
+        sendResponse(res, 201, true, "Template created successfully", template);
+    } catch (error) {
+        console.error("CREATE TEMPLATE ERROR:", error);
+        sendResponse(res, 500, false, error.message);
+    }
+};
+
+exports.getTemplatesByProvider = async (req, res) => {
+    try {
+        const { providerId } = req.params;
+        const templates = await CakeAddonTemplate.find({ provider: providerId })
+            .populate("addonGroups")
+            .sort({ createdAt: -1 });
+
+        // Logic for dynamic templates: automatically include ALL addons from the provider
+        const formattedTemplates = await Promise.all(templates.map(async (temp) => {
+            const t = temp.toObject();
+            if (t.isDynamic) {
+                const allAddons = await CakeAddon.find({ provider: providerId, isActive: true });
+                t.addonGroups = allAddons.map(a => populateAddon(a, req));
+            } else if (t.addonGroups) {
+                t.addonGroups = t.addonGroups.map(a => populateAddon(a, req));
+            }
+            return t;
+        }));
+
+        sendResponse(res, 200, true, "Templates fetched successfully", formattedTemplates);
+    } catch (error) {
+        console.error("GET TEMPLATES ERROR:", error);
+        sendResponse(res, 500, false, error.message);
+    }
+};
+
+exports.updateTemplate = async (req, res) => {
+    try {
+        const template = await CakeAddonTemplate.findById(req.params.id);
+        if (!template) {
+            return sendResponse(res, 404, false, "Template not found");
+        }
+
+        const { title, addonGroups, isActive, isDynamic } = req.body;
+        if (title) template.title = title;
+        if (addonGroups) template.addonGroups = Array.isArray(addonGroups) ? addonGroups : JSON.parse(addonGroups);
+        if (isActive !== undefined) template.isActive = String(isActive) === "true";
+        if (isDynamic !== undefined) template.isDynamic = String(isDynamic) === "true";
+
+        await template.save();
+        sendResponse(res, 200, true, "Template updated successfully", template);
+    } catch (error) {
+        console.error("UPDATE TEMPLATE ERROR:", error);
+        sendResponse(res, 500, false, error.message);
+    }
+};
+
+exports.deleteTemplate = async (req, res) => {
+    try {
+        await CakeAddonTemplate.findByIdAndDelete(req.params.id);
+        sendResponse(res, 200, true, "Template deleted successfully");
+    } catch (error) {
+        console.error("DELETE TEMPLATE ERROR:", error);
+        sendResponse(res, 500, false, error.message);
+    }
+};
 
 const normalizeUploadPath = (filePath) => {
     if (!filePath) return filePath;

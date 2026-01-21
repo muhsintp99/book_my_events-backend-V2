@@ -10,4 +10,10 @@ router.get("/provider/:providerId", addonController.getAddonsByProvider);
 router.put("/:id", upload.single("icon"), addonController.updateAddon);
 router.delete("/:id", addonController.deleteAddon);
 
+// CRUD for Templates
+router.post("/templates", addonController.createTemplate);
+router.get("/templates/provider/:providerId", addonController.getTemplatesByProvider);
+router.put("/templates/:id", addonController.updateTemplate);
+router.delete("/templates/:id", addonController.deleteTemplate);
+
 module.exports = router;

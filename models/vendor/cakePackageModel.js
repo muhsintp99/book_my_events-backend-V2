@@ -105,10 +105,24 @@ const CakeSchema = new mongoose.Schema(
     /* ================= ADD ONS ================= */
     addons: [
       {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "CakeAddon",
+        addonId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "CakeAddon",
+        },
+        selectedItems: [
+          {
+            type: mongoose.Schema.Types.ObjectId,
+          }
+        ]
       },
     ],
+
+
+    addonTemplate: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "CakeAddonTemplate",
+    },
+
 
     /* ================= SHIPPING ================= */
     shipping: {
