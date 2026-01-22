@@ -376,6 +376,20 @@ exports.createCake = async (req, res) => {
     body.thumbnail = req.files.thumbnail[0].path;
     body.images = req.files?.images?.map((f) => f.path) || [];
 
+
+     if (req.files?.variationImages?.length && body.variations?.length) {
+      body.variations = body.variations.map((v, index) => {
+        const file = req.files.variationImages[index];
+        if (file) {
+          return {
+            ...v,
+            image: file.path
+          };
+        }
+        return v;
+      });
+    }
+
     body.cakeId = generateCakeId();
 
     const cake = await Cake.create(body);
@@ -992,49 +1006,67 @@ exports.updateCake = async (req, res) => {
       return sendResponse(res, 404, false, "Cake not found");
     }
 
-    // Vendor authorization
-    if (
-      req.user?.role === "vendor" &&
-      cake.provider?.toString() !== req.user._id.toString()
-    ) {
-      return sendResponse(res, 403, false, "Unauthorized to update this cake");
-    }
-
     const body = sanitizeCakeData(req.body);
     const filesToDelete = [];
 
+    // =========================
+    // THUMBNAIL
+    // =========================
     if (req.files?.thumbnail?.[0]) {
       if (cake.thumbnail) filesToDelete.push(cake.thumbnail);
       body.thumbnail = req.files.thumbnail[0].path;
     }
 
+    // =========================
+    // GALLERY IMAGES
+    // =========================
     if (req.files?.images) {
       if (cake.images?.length) filesToDelete.push(...cake.images);
       body.images = req.files.images.map((f) => f.path);
     }
 
     // =========================
-    // SAFE PRICE INFO MERGE
+    // ✅ STEP 4: VARIATION IMAGES HANDLING (ADD HERE)
     // =========================
+    if (req.files?.variationImages?.length && body.variations?.length) {
+      body.variations = body.variations.map((v, index) => {
+        const file = req.files.variationImages[index];
 
+        if (file) {
+          // delete old image if exists
+          const oldVar = cake.variations?.[index];
+          if (oldVar?.image) {
+            filesToDelete.push(oldVar.image);
+          }
+
+          return {
+            ...v,
+            image: file.path
+          };
+        }
+        return v;
+      });
+    }
+
+    // =========================
+    // APPLY UPDATE
+    // =========================
     Object.assign(cake, body);
-
-
-
 
     await cake.save();
 
-
-    if (filesToDelete.length) await deleteFiles(filesToDelete);
+    if (filesToDelete.length) {
+      await deleteFiles(filesToDelete);
+    }
 
     const updatedCake = await populateCake(cake._id, req);
-
     sendResponse(res, 200, true, "Cake updated successfully", updatedCake);
   } catch (error) {
     console.error("UPDATE CAKE ERROR:", error);
     sendResponse(res, 500, false, error.message);
   }
 };
+
 
 /* =====================================================
    DELETE CAKE

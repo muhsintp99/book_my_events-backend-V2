@@ -47,6 +47,7 @@ router.post(
   upload.fields([
     { name: "thumbnail", maxCount: 1 },
     { name: "images", maxCount: 10 },
+    { name: "variationImages", maxCount: 20 }
   ]),
   cakeController.createCake
 );
