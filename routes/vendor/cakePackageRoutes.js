@@ -25,6 +25,9 @@ router.get("/module/:moduleId", cakeController.getCakesByModule);
 // Get cakes by provider
 router.get("/provider/:providerId", cakeController.getCakesByProvider);
 
+// Get cakes by category
+router.get("/category/:categoryId", cakeController.getCakesByCategory);
+
 // Get top pick cakes
 router.get("/top-picks", cakeController.getTopPickCakes);
 
