@@ -177,6 +177,12 @@ const sanitizeCakeData = (body) => {
     items: [],
   });
 
+  if (Array.isArray(data.relatedItems.items)) {
+    data.relatedItems.items = data.relatedItems.items
+      .filter((id) => id && mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
+  }
+
   if (data.relatedItems.linkBy === "product") {
     data.relatedItems.linkByRef = "Cake";
   } else {
@@ -290,11 +296,33 @@ const populateCake = async (id, req = null) => {
     });
   }
 
-  // Normalize related items
+  // Normalize and Robustly Populate Related Items
   if (cake.relatedItems?.items?.length > 0) {
-    cake.relatedItems.items = cake.relatedItems.items.map((item) => {
-      if (!item) return null;
+    const rawItems = cake.relatedItems.items;
+    const linkBy = cake.relatedItems.linkBy;
+    const currentRef = cake.relatedItems.linkByRef;
 
+    // 1. Identify items that failed to populate (still IDs)
+    const unpopulatedIds = rawItems.filter((i) => typeof i === "string" || i instanceof mongoose.Types.ObjectId);
+
+    if (unpopulatedIds.length > 0) {
+      // 2. Try fetching them from the ALTERNATIVE collection
+      const altModelName = currentRef === "Cake" ? "Category" : "Cake";
+      const altPopulated = await mongoose.model(altModelName).find({ _id: { $in: unpopulatedIds } }).lean();
+
+      // 3. Merge them back into the list
+      cake.relatedItems.items = rawItems.map((item) => {
+        const id = (item._id || item).toString();
+        const foundAlt = altPopulated.find((a) => a._id.toString() === id);
+        return foundAlt || item;
+      });
+    }
+
+    // 4. Final normalization for all successfully populated items
+    cake.relatedItems.items = cake.relatedItems.items.map((item) => {
+      if (!item || typeof item === "string" || item instanceof mongoose.Types.ObjectId) return item;
+
+      // Handle both Cakes (thumbnail) and Categories (image)
       if (item.thumbnail) {
         item.thumbnail = item.thumbnail.startsWith("http")
           ? item.thumbnail
@@ -307,8 +335,11 @@ const populateCake = async (id, req = null) => {
           : `${baseUrl}${normalizeUploadPath(item.image)}`;
       }
 
+      // Ensure name or title is available for subtitle in frontend
+      if (item.title && !item.name) item.name = item.title;
+
       return item;
-    }).filter(Boolean);
+    });
   }
 
   // Protect when provider is missing
