@@ -3,14 +3,26 @@ const Profile = require("../../models/vendor/Profile");
 const VendorProfile = require("../../models/vendor/vendorProfile");
 const User = require("../../models/User");
 
+// Module Models
+const Vehicle = require("../../models/vendor/Vehicle");
+const Cake = require("../../models/vendor/cakePackageModel");
+const Catering = require("../../models/vendor/Catering");
+const Photography = require("../../models/vendor/PhotographyPackage");
+const Venue = require("../../models/vendor/Venue");
+const Makeup = require("../../models/admin/makeupPackageModel");
+const Package = require("../../models/admin/Package");
+const Booking = require("../../models/vendor/Booking");
+
 // Create a new profile
 
 exports.getAllVendors = async (req, res) => {
   try {
+    const { sort, order = "desc" } = req.query;
+
     const vendors = await VendorProfile.find()
       .populate({
         path: "user",
-        select: "firstName lastName email phone role"
+        select: "firstName lastName email phone role profilePhoto"
       })
       .populate({
         path: "module",
@@ -21,10 +33,46 @@ exports.getAllVendors = async (req, res) => {
         select: "name description coordinates city country isActive isTopZone icon"
       });
 
+    // Enhance vendors with counts
+    const enhancedVendors = await Promise.all(
+      vendors.map(async (v) => {
+        const vendorId = v.user?._id;
+        if (!vendorId) return { ...v.toObject(), packageCount: 0, bookingCount: 0 };
+
+        const [vehicles, cakes, catering, photography, venues, makeup, genericPackages, bookings] = await Promise.all([
+          Vehicle.countDocuments({ provider: vendorId }),
+          Cake.countDocuments({ provider: vendorId }),
+          Catering.countDocuments({ provider: vendorId }),
+          Photography.countDocuments({ provider: vendorId }),
+          Venue.countDocuments({ provider: vendorId }),
+          Makeup.countDocuments({ provider: vendorId }),
+          Package.countDocuments({ provider: vendorId }),
+          Booking.countDocuments({ providerId: vendorId })
+        ]);
+
+        return {
+          ...v.toObject(),
+          packageCount: vehicles + cakes + catering + photography + venues + makeup + genericPackages,
+          bookingCount: bookings
+        };
+      })
+    );
+
+    // Sorting
+    if (sort === "packageCount") {
+      enhancedVendors.sort((a, b) =>
+        order === "asc" ? a.packageCount - b.packageCount : b.packageCount - a.packageCount
+      );
+    } else if (sort === "bookingCount") {
+      enhancedVendors.sort((a, b) =>
+        order === "asc" ? a.bookingCount - b.bookingCount : b.bookingCount - a.bookingCount
+      );
+    }
+
     return res.status(200).json({
       success: true,
-      count: vendors.length,
-      data: vendors
+      count: enhancedVendors.length,
+      data: enhancedVendors
     });
   } catch (error) {
     console.error("Get all vendors error:", error);
@@ -807,6 +855,93 @@ exports.getKyc = async (req, res) => {
   } catch (error) {
     console.error("Get KYC Error:", error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ✅ GET PROVIDER FULL DETAILS (ADMIN)
+exports.getProviderAdminDetails = async (req, res) => {
+  try {
+    const { providerId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(providerId)) {
+      return res.status(400).json({ success: false, message: "Invalid provider ID format" });
+    }
+
+    // 1. Fetch Profile Data in Parallel
+    const [user, profile, vendorProfile] = await Promise.all([
+      User.findById(providerId).select("-password -refreshToken -otp"),
+      Profile.findOne({ userId: providerId }),
+      VendorProfile.findOne({ user: providerId })
+        .populate("module", "title moduleId icon")
+        .populate("zone", "name description coordinates city country isActive isTopZone icon")
+    ]);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // 2. Fetch Packages from all modules
+    const [vehicles, cakes, catering, photography, venues, makeup, genericPackages] = await Promise.all([
+      Vehicle.find({ provider: providerId }).populate("category brand zone"),
+      Cake.find({ provider: providerId }).populate("category module"),
+      Catering.find({ provider: providerId }).populate("categories module"),
+      Photography.find({ provider: providerId }).populate("categories module"),
+      Venue.find({ provider: providerId }).populate("categories module packages"),
+      Makeup.find({ provider: providerId }).populate("categories module"),
+      Package.find({ provider: providerId }).populate("categories module")
+    ]);
+
+    // 3. Fetch Booking History
+    const bookings = await Booking.find({ providerId: providerId })
+      .populate("userId", "firstName lastName email phone")
+      .populate("moduleId", "title icon")
+      .populate("vehicleId", "name licensePlateNumber")
+      .populate("cakeId", "name thumbnail")
+      .populate("venueId", "venueName thumbnail")
+      .populate("photographyId", "packageTitle thumbnail")
+      .populate("cateringId", "title thumbnail")
+      .populate("makeupId", "packageTitle thumbnail")
+      .sort({ createdAt: -1 });
+
+    // 4. Construct Full Profile Response
+    const fullProfile = {
+      user,
+      profile: profile || null,
+      vendorProfile: vendorProfile || null,
+      banner: vendorProfile?.coverImage || "",
+      logo: vendorProfile?.logo || profile?.profilePhoto || user?.profilePhoto || ""
+    };
+
+    const allPackages = [
+      ...vehicles.map(p => ({ ...p.toObject(), type: "Vehicle" })),
+      ...cakes.map(p => ({ ...p.toObject(), type: "Cake" })),
+      ...catering.map(p => ({ ...p.toObject(), type: "Catering" })),
+      ...photography.map(p => ({ ...p.toObject(), type: "Photography" })),
+      ...venues.map(p => ({ ...p.toObject(), type: "Venue" })),
+      ...makeup.map(p => ({ ...p.toObject(), type: "Makeup" })),
+      ...genericPackages.map(p => ({ ...p.toObject(), type: "Package" }))
+    ];
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        profile: fullProfile,
+        packages: allPackages,
+        bookings: bookings,
+        stats: {
+          totalPackages: allPackages.length,
+          totalBookings: bookings.length,
+          activePackages: allPackages.filter(p => p.isActive).length
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("Get Provider Admin Details Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
 

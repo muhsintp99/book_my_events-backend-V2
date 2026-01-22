@@ -31,6 +31,9 @@ router.get("/vendor/:providerId", profileController.getSingleVendor);
 // ✅ DELETE VENDOR ONLY (FIXED)
 router.delete("/vendor/:vendorId", profileController.deleteVendorOnly);
 
+// ✅ GET PROVIDER FULL DETAILS (ADMIN)
+router.get("/admin/vendor/:providerId/details", profileController.getProviderAdminDetails);
+
 /* ---------- PROFILE ROUTES ---------- */
 
 // Create Profile
