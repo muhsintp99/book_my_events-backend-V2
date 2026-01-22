@@ -48,6 +48,17 @@ function calculateTimeline(bookingDate) {
 }
 
 // =======================================================
+// HELPER: NORMALIZE EXTRA PRICE (Handle Object vs Number)
+// =======================================================
+function normalizeExtraPrice(value) {
+  if (typeof value === "number") return value;
+  if (typeof value === "object" && value !== null) {
+    return Number(value.price || 0);
+  }
+  return Number(value) || 0;
+}
+
+// =======================================================
 // CREATE BOOKING (UNIFIED FOR ALL MODULES)
 // =======================================================
 // exports.createBooking = async (req, res) => {
@@ -909,7 +920,7 @@ exports.createBooking = async (req, res) => {
         // Extra Hours
         if (hours && hours > (basicPkg.includedHours || 0)) {
           const extraHours = hours - (basicPkg.includedHours || 0);
-          const hourCharge = extraHours * (pricingMap.extraHourPrice || 0);
+          const hourCharge = extraHours * normalizeExtraPrice(pricingMap.extraHourPrice);
           console.log(`⏰ Extra Hours: ${extraHours}, Charge: ${hourCharge}`);
           extraCharges += hourCharge;
         }
@@ -917,8 +928,8 @@ exports.createBooking = async (req, res) => {
         // Extra Kilometers
         if (distanceKm && distanceKm > (basicPkg.includedKilometers || 0)) {
           const extraKm = distanceKm - (basicPkg.includedKilometers || 0);
-          const kmCharge = extraKm * (pricingMap.extraKmPrice || 0);
-          console.log(`\u{1F6E3}\u{FE0F} Extra KM: ${extraKm}, Charge: ${kmCharge}`);
+          const kmCharge = extraKm * normalizeExtraPrice(pricingMap.extraKmPrice);
+          console.log(`🛣️ Extra KM: ${extraKm}, Charge: ${kmCharge}`);
           extraCharges += kmCharge;
         }
 
@@ -927,7 +938,7 @@ exports.createBooking = async (req, res) => {
 
         // Populate legacy fields for response visibility
         pricing.perDayPrice = transportPrice;
-        pricing.perHourCharge = pricingMap.extraHourPrice || 0;
+        pricing.perHourCharge = normalizeExtraPrice(pricingMap.extraHourPrice);
 
         console.log("📍 Base Price calculated:", pricing.basePrice);
 
@@ -1106,8 +1117,8 @@ exports.createBooking = async (req, res) => {
             includedKilometers: 0,
             includedHours: 0,
           },
-          extraKmPrice: serviceProvider.pricing?.extraKmPrice || 0,
-          extraHourPrice: serviceProvider.pricing?.extraHourPrice || 0,
+          extraKmPrice: normalizeExtraPrice(serviceProvider.pricing?.extraKmPrice),
+          extraHourPrice: normalizeExtraPrice(serviceProvider.pricing?.extraHourPrice),
           discount: serviceProvider.pricing?.discount || {
             type: "none",
             value: 0,
