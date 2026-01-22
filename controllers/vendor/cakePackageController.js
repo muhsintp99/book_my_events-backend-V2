@@ -201,6 +201,7 @@ const populateCake = async (id, req = null) => {
     .populate("category", "title image description")
     .populate("subCategories", "title image")
     .populate("provider", "firstName lastName email phone profilePhoto")
+    .populate("relatedItems.items")
     .populate({
       path: "addons.addonId",
       select: "title description icon priceList isActive",
@@ -287,6 +288,27 @@ const populateCake = async (id, req = null) => {
       }
       return v;
     });
+  }
+
+  // Normalize related items
+  if (cake.relatedItems?.items?.length > 0) {
+    cake.relatedItems.items = cake.relatedItems.items.map((item) => {
+      if (!item) return null;
+
+      if (item.thumbnail) {
+        item.thumbnail = item.thumbnail.startsWith("http")
+          ? item.thumbnail
+          : `${baseUrl}${normalizeUploadPath(item.thumbnail)}`;
+      }
+
+      if (item.image) {
+        item.image = item.image.startsWith("http")
+          ? item.image
+          : `${baseUrl}${normalizeUploadPath(item.image)}`;
+      }
+
+      return item;
+    }).filter(Boolean);
   }
 
   // Protect when provider is missing
