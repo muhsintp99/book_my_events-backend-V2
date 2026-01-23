@@ -362,6 +362,11 @@ const populateCake = async (id, req = null) => {
       if (item.title && !item.name) item.name = item.title;
       if (item.name && !item.title) item.title = item.name;
 
+      // ✅ Remove nested relatedItems to prevent double listing in response
+      delete item.relatedItems;
+      delete item.addons;
+      delete item.variations;
+
       return item;
     });
   }
