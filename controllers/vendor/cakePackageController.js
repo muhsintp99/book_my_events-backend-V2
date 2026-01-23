@@ -177,6 +177,12 @@ const sanitizeCakeData = (body) => {
     items: [],
   });
 
+  if (Array.isArray(data.relatedItems.items)) {
+    data.relatedItems.items = data.relatedItems.items
+      .filter((id) => id && mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
+  }
+
   if (data.relatedItems.linkBy === "product") {
     data.relatedItems.linkByRef = "Cake";
   } else {
@@ -201,6 +207,7 @@ const populateCake = async (id, req = null) => {
     .populate("category", "title image description")
     .populate("subCategories", "title image")
     .populate("provider", "firstName lastName email phone profilePhoto")
+    .populate("relatedItems.items")
     .populate({
       path: "addons.addonId",
       select: "title description icon priceList isActive",
@@ -237,6 +244,17 @@ const populateCake = async (id, req = null) => {
 
 
   if (!cake) return null;
+
+  // ✅ Add Billing Summary early to ensure it's always included in the response
+  // This helps the frontend "Billing Summary" section map correctly
+  cake.billingSummary = {
+    basePrice: cake.basePrice || 0,
+    discountType: cake.discountType || "none",
+    discountValue: cake.discountValue || 0,
+    finalPrice: cake.finalPrice || 0,
+    shippingFee: cake.shipping?.price || 0,
+    totalPayable: (cake.finalPrice || 0) + (cake.shipping?.price || 0)
+  };
 
   // Process manual addons to only show selected items
   if (cake.addons && cake.addons.length > 0) {
@@ -286,6 +304,59 @@ const populateCake = async (id, req = null) => {
           : `${baseUrl}${v.image.startsWith("/uploads") ? v.image : "/uploads/cake-packages/" + v.image}`;
       }
       return v;
+    });
+  }
+
+  // Normalize and Robustly Populate Related Items
+  if (cake.relatedItems?.items?.length > 0) {
+    const rawItems = cake.relatedItems.items;
+    const currentRef = cake.relatedItems.linkByRef || (cake.relatedItems.linkBy === "product" ? "Cake" : "Category");
+
+    // 1. Identify items that failed to populate (still IDs)
+    const unpopulatedIds = rawItems.filter((i) => typeof i === "string" || i instanceof mongoose.Types.ObjectId);
+
+    if (unpopulatedIds.length > 0) {
+      // 2. Try fetching from both collections to be safe, using explicit models
+      const CakeModel = mongoose.model("Cake");
+      const CategoryModel = mongoose.model("Category");
+
+      const [cakesResult, categoriesResult] = await Promise.all([
+        CakeModel.find({ _id: { $in: unpopulatedIds } }).lean(),
+        CategoryModel.find({ _id: { $in: unpopulatedIds } }).lean()
+      ]);
+
+      const allPopulated = [...cakesResult, ...categoriesResult];
+
+      // 3. Merge them back into the list
+      cake.relatedItems.items = rawItems.map((item) => {
+        const id = (item._id || item || "").toString();
+        const found = allPopulated.find((a) => a._id.toString() === id);
+        return found || item;
+      });
+    }
+
+    // 4. Final normalization for all successfully populated items
+    cake.relatedItems.items = cake.relatedItems.items.map((item) => {
+      if (!item || typeof item === "string" || item instanceof mongoose.Types.ObjectId) return item;
+
+      // Handle both Cakes (thumbnail) and Categories (image)
+      if (item.thumbnail) {
+        item.thumbnail = item.thumbnail.startsWith("http")
+          ? item.thumbnail
+          : `${baseUrl}${normalizeUploadPath(item.thumbnail)}`;
+      }
+
+      if (item.image) {
+        item.image = item.image.startsWith("http")
+          ? item.image
+          : `${baseUrl}${normalizeUploadPath(item.image)}`;
+      }
+
+      // Ensure BOTH name and title are available for frontend consistency
+      if (item.title && !item.name) item.name = item.title;
+      if (item.name && !item.title) item.title = item.name;
+
+      return item;
     });
   }
 
@@ -375,20 +446,6 @@ exports.createCake = async (req, res) => {
 
     body.thumbnail = req.files.thumbnail[0].path;
     body.images = req.files?.images?.map((f) => f.path) || [];
-
-
-     if (req.files?.variationImages?.length && body.variations?.length) {
-      body.variations = body.variations.map((v, index) => {
-        const file = req.files.variationImages[index];
-        if (file) {
-          return {
-            ...v,
-            image: file.path
-          };
-        }
-        return v;
-      });
-    }
 
     body.cakeId = generateCakeId();
 
@@ -1006,67 +1063,49 @@ exports.updateCake = async (req, res) => {
       return sendResponse(res, 404, false, "Cake not found");
     }
 
+    // Vendor authorization
+    if (
+      req.user?.role === "vendor" &&
+      cake.provider?.toString() !== req.user._id.toString()
+    ) {
+      return sendResponse(res, 403, false, "Unauthorized to update this cake");
+    }
+
     const body = sanitizeCakeData(req.body);
     const filesToDelete = [];
 
-    // =========================
-    // THUMBNAIL
-    // =========================
     if (req.files?.thumbnail?.[0]) {
       if (cake.thumbnail) filesToDelete.push(cake.thumbnail);
       body.thumbnail = req.files.thumbnail[0].path;
     }
 
-    // =========================
-    // GALLERY IMAGES
-    // =========================
     if (req.files?.images) {
       if (cake.images?.length) filesToDelete.push(...cake.images);
       body.images = req.files.images.map((f) => f.path);
     }
 
     // =========================
-    // ✅ STEP 4: VARIATION IMAGES HANDLING (ADD HERE)
+    // SAFE PRICE INFO MERGE
     // =========================
-    if (req.files?.variationImages?.length && body.variations?.length) {
-      body.variations = body.variations.map((v, index) => {
-        const file = req.files.variationImages[index];
 
-        if (file) {
-          // delete old image if exists
-          const oldVar = cake.variations?.[index];
-          if (oldVar?.image) {
-            filesToDelete.push(oldVar.image);
-          }
-
-          return {
-            ...v,
-            image: file.path
-          };
-        }
-        return v;
-      });
-    }
-
-    // =========================
-    // APPLY UPDATE
-    // =========================
     Object.assign(cake, body);
+
+
+
 
     await cake.save();
 
-    if (filesToDelete.length) {
-      await deleteFiles(filesToDelete);
-    }
+
+    if (filesToDelete.length) await deleteFiles(filesToDelete);
 
     const updatedCake = await populateCake(cake._id, req);
+
     sendResponse(res, 200, true, "Cake updated successfully", updatedCake);
   } catch (error) {
     console.error("UPDATE CAKE ERROR:", error);
     sendResponse(res, 500, false, error.message);
   }
 };
-
 
 /* =====================================================
    DELETE CAKE
