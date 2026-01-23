@@ -160,6 +160,7 @@ const CakeSchema = new mongoose.Schema(
     shipping: {
       free: { type: Boolean, default: false },
       flatRate: { type: Boolean, default: false },
+      takeaway: { type: Boolean, default: false },
       price: { type: Number, default: 0 },
     },
 

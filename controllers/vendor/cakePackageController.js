@@ -171,11 +171,13 @@ const sanitizeCakeData = (body) => {
   }
 
   // Shipping
-  data.shipping = parseJSON(data.shipping, {
-    free: false,
-    flatRate: false,
-    price: 0,
-  });
+  const shippingData = parseJSON(data.shipping, {});
+  data.shipping = {
+    free: String(shippingData.free) === "true",
+    flatRate: String(shippingData.flatRate) === "true",
+    takeaway: String(shippingData.takeaway) === "true",
+    price: Number(shippingData.price || 0),
+  };
 
   // Related Items
   data.relatedItems = parseJSON(data.relatedItems, {
