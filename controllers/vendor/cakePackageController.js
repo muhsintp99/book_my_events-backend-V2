@@ -452,8 +452,8 @@ exports.createCake = async (req, res) => {
       return sendResponse(res, 400, false, "Thumbnail is required");
     }
 
-    body.thumbnail = req.files.thumbnail[0].path;
-    body.images = req.files?.images?.map((f) => f.path) || [];
+    body.thumbnail = normalizeUploadPath(req.files.thumbnail[0].path);
+    body.images = req.files?.images?.map((f) => normalizeUploadPath(f.path)) || [];
 
     // ✅ Variation Images mapping
     if (req.files?.variationImages && body.variations?.length) {
@@ -461,8 +461,10 @@ exports.createCake = async (req, res) => {
         if (v.image && typeof v.image === "string" && v.image.startsWith("VAR_FILE_")) {
           const idx = parseInt(v.image.replace("VAR_FILE_", ""));
           if (req.files.variationImages[idx]) {
-            v.image = req.files.variationImages[idx].path;
+            v.image = normalizeUploadPath(req.files.variationImages[idx].path);
           }
+        } else if (v.image) {
+          v.image = normalizeUploadPath(v.image);
         }
         return v;
       });
@@ -1097,12 +1099,12 @@ exports.updateCake = async (req, res) => {
 
     if (req.files?.thumbnail?.[0]) {
       if (cake.thumbnail) filesToDelete.push(cake.thumbnail);
-      body.thumbnail = req.files.thumbnail[0].path;
+      body.thumbnail = normalizeUploadPath(req.files.thumbnail[0].path);
     }
 
     if (req.files?.images) {
       if (cake.images?.length) filesToDelete.push(...cake.images);
-      body.images = req.files.images.map((f) => f.path);
+      body.images = req.files.images.map((f) => normalizeUploadPath(f.path));
     }
 
     // ✅ Variation Images mapping
@@ -1111,8 +1113,10 @@ exports.updateCake = async (req, res) => {
         if (v.image && typeof v.image === "string" && v.image.startsWith("VAR_FILE_")) {
           const idx = parseInt(v.image.replace("VAR_FILE_", ""));
           if (req.files.variationImages[idx]) {
-            v.image = req.files.variationImages[idx].path;
+            v.image = normalizeUploadPath(req.files.variationImages[idx].path);
           }
+        } else if (v.image) {
+          v.image = normalizeUploadPath(v.image);
         }
         return v;
       });
