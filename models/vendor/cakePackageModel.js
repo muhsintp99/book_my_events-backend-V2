@@ -161,7 +161,6 @@ const CakeSchema = new mongoose.Schema(
       free: { type: Boolean, default: false },
       flatRate: { type: Boolean, default: false },
       takeaway: { type: Boolean, default: false },
-      takeawayLocation: { type: String, default: "" },
       price: { type: Number, default: 0 },
     },
 

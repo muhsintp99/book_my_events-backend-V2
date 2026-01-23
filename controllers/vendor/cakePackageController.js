@@ -176,7 +176,6 @@ const sanitizeCakeData = (body) => {
     free: String(shippingData.free) === "true",
     flatRate: String(shippingData.flatRate) === "true",
     takeaway: String(shippingData.takeaway) === "true",
-    takeawayLocation: shippingData.takeawayLocation || "",
     price: Number(shippingData.price || 0),
   };
 
