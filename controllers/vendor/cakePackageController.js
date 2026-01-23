@@ -245,17 +245,6 @@ const populateCake = async (id, req = null) => {
 
   if (!cake) return null;
 
-  // ✅ Add Billing Summary early to ensure it's always included in the response
-  // This helps the frontend "Billing Summary" section map correctly
-  cake.billingSummary = {
-    basePrice: cake.basePrice || 0,
-    discountType: cake.discountType || "none",
-    discountValue: cake.discountValue || 0,
-    finalPrice: cake.finalPrice || 0,
-    shippingFee: cake.shipping?.price || 0,
-    totalPayable: (cake.finalPrice || 0) + (cake.shipping?.price || 0)
-  };
-
   // Process manual addons to only show selected items
   if (cake.addons && cake.addons.length > 0) {
     cake.addons = cake.addons.map((addon) => {
@@ -362,10 +351,12 @@ const populateCake = async (id, req = null) => {
       if (item.title && !item.name) item.name = item.title;
       if (item.name && !item.title) item.title = item.name;
 
-      // ✅ Remove nested relatedItems to prevent double listing in response
+      // ✅ Remove unnecessary nested fields to prevent double listing and heavy response
       delete item.relatedItems;
       delete item.addons;
       delete item.variations;
+      delete item.billingSummary;
+      delete item.priceInfo;
 
       return item;
     });
