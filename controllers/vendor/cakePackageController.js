@@ -13,9 +13,15 @@ const Subscription = require("../../models/admin/Subscription");
 
 const normalizeUploadPath = (filePath) => {
   if (!filePath) return filePath;
-  const normalized = filePath.replace(/\\/g, "/");
+  let normalized = filePath.replace(/\\/g, "/");
   const index = normalized.toLowerCase().indexOf("/uploads");
-  return index !== -1 ? normalized.substring(index) : normalized;
+  if (index !== -1) {
+    return normalized.substring(index);
+  }
+  if (normalized.toLowerCase().startsWith("uploads")) {
+    return "/" + normalized;
+  }
+  return normalized;
 };
 
 const generateCakeId = () => {
@@ -290,7 +296,7 @@ const populateCake = async (id, req = null) => {
       if (v.image) {
         v.image = v.image.startsWith("http")
           ? v.image
-          : `${baseUrl}${v.image.startsWith("/uploads") ? v.image : "/uploads/cake-packages/" + v.image}`;
+          : `${baseUrl}${normalizeUploadPath(v.image)}`;
       }
       return v;
     });
@@ -448,6 +454,19 @@ exports.createCake = async (req, res) => {
 
     body.thumbnail = req.files.thumbnail[0].path;
     body.images = req.files?.images?.map((f) => f.path) || [];
+
+    // ✅ Variation Images mapping
+    if (req.files?.variationImages && body.variations?.length) {
+      body.variations = body.variations.map((v) => {
+        if (v.image && typeof v.image === "string" && v.image.startsWith("VAR_FILE_")) {
+          const idx = parseInt(v.image.replace("VAR_FILE_", ""));
+          if (req.files.variationImages[idx]) {
+            v.image = req.files.variationImages[idx].path;
+          }
+        }
+        return v;
+      });
+    }
 
     body.cakeId = generateCakeId();
 
@@ -1084,6 +1103,19 @@ exports.updateCake = async (req, res) => {
     if (req.files?.images) {
       if (cake.images?.length) filesToDelete.push(...cake.images);
       body.images = req.files.images.map((f) => f.path);
+    }
+
+    // ✅ Variation Images mapping
+    if (req.files?.variationImages && body.variations?.length) {
+      body.variations = body.variations.map((v) => {
+        if (v.image && typeof v.image === "string" && v.image.startsWith("VAR_FILE_")) {
+          const idx = parseInt(v.image.replace("VAR_FILE_", ""));
+          if (req.files.variationImages[idx]) {
+            v.image = req.files.variationImages[idx].path;
+          }
+        }
+        return v;
+      });
     }
 
     // =========================
