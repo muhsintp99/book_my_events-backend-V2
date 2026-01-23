@@ -352,6 +352,12 @@ const populateCake = async (id, req = null) => {
           : `${baseUrl}${normalizeUploadPath(item.image)}`;
       }
 
+      if (item.images && Array.isArray(item.images)) {
+        item.images = item.images.map(img =>
+          img.startsWith("http") ? img : `${baseUrl}${normalizeUploadPath(img)}`
+        );
+      }
+
       // Ensure BOTH name and title are available for frontend consistency
       if (item.title && !item.name) item.name = item.title;
       if (item.name && !item.title) item.title = item.name;
