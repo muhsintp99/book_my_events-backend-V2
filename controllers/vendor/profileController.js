@@ -102,12 +102,25 @@ exports.deleteVendorOnly = async (req, res) => {
       });
     }
 
-    // Delete ONLY VendorProfile
-    await VendorProfile.findOneAndDelete({ user: vendorId });
+    // 2. Clear out all associated data (Perform in parallel)
+    console.log(`[deleteVendorOnly] Cleaning up data for provider: ${vendorId}`);
+    await Promise.all([
+      Vehicle.deleteMany({ provider: vendorId }),
+      Cake.deleteMany({ provider: vendorId }),
+      Catering.deleteMany({ provider: vendorId }),
+      Photography.deleteMany({ provider: vendorId }),
+      Venue.deleteMany({ provider: vendorId }),
+      Makeup.deleteMany({ provider: vendorId }),
+      Package.deleteMany({ provider: vendorId }),
+      Booking.deleteMany({ providerId: vendorId }),
+      Profile.findOneAndDelete({ userId: vendorId }),
+      VendorProfile.findOneAndDelete({ user: vendorId }),
+      User.findByIdAndDelete(vendorId)
+    ]);
 
     return res.status(200).json({
       success: true,
-      message: "Vendor deleted successfully (User & Profile retained)"
+      message: "Vendor and all associated data deleted successfully. Email is now free."
     });
 
   } catch (error) {

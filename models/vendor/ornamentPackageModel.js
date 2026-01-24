@@ -1,0 +1,173 @@
+const mongoose = require("mongoose");
+
+const OrnamentSchema = new mongoose.Schema(
+    {
+        /* ================= BASIC INFO ================= */
+        name: {
+            type: String,
+            required: [true, "Product name is required"],
+            trim: true,
+        },
+        description: {
+            type: String,
+            trim: true,
+        },
+        category: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Category",
+            required: [true, "Category is required"],
+        },
+        subCategory: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Category",
+        },
+        unit: {
+            type: String, // e.g., "Gram", "Kg", "Piece"
+        },
+        weight: {
+            type: Number,
+        },
+        material: {
+            type: String, // e.g., "Gold", "Silver", "Platinum", "Diamond"
+        },
+
+        /* ================= IMAGES ================= */
+        thumbnail: {
+            type: String,
+            required: [true, "Thumbnail image is required"],
+        },
+        galleryImages: [
+            {
+                type: String,
+            },
+        ],
+        ornamentId: {
+            type: String,
+            unique: true,
+            sparse: true,
+        },
+
+        /* ================= AVAILABILITY & PRICING ================= */
+        availabilityMode: {
+            type: String,
+            enum: ["purchase", "rental", "all"],
+            default: "purchase",
+        },
+
+        buyPricing: {
+            unitPrice: { type: Number, default: 0 },
+            discountType: {
+                type: String,
+                enum: ["flat", "percentage", "none"],
+                default: "none",
+            },
+            discountValue: { type: Number, default: 0 },
+            tax: { type: Number, default: 0 }, // GST %
+            totalPrice: { type: Number, default: 0 },
+        },
+
+        rentalPricing: {
+            pricePerDay: { type: Number, default: 0 },
+            minimumDays: { type: Number, default: 1 },
+            lateCharges: { type: Number, default: 0 },
+            totalPrice: { type: Number, default: 0 },
+            advanceForBooking: { type: Number, default: 0 },
+            damagePolicy: { type: String, trim: true },
+        },
+
+        /* ================= STOCK ================= */
+        stock: {
+            quantity: { type: Number, default: 0 },
+            lowStockAlert: { type: Number, default: 0 },
+        },
+
+        /* ================= SHIPPING ================= */
+        shipping: {
+            freeShipping: { type: Boolean, default: false },
+            flatRateShipping: { type: Boolean, default: false },
+            shippingPrice: { type: Number, default: 0 },
+        },
+
+        /* ================= FEATURES & OCCASIONS ================= */
+        suitableOccasions: [{ type: String }], // e.g., ["Marriage", "Engagement", "Birthday"]
+
+        features: {
+            wedding: { type: Boolean, default: false },
+            valentine: { type: Boolean, default: false },
+            festive: { type: Boolean, default: false },
+            dailyWear: { type: Boolean, default: false },
+            casualOutings: { type: Boolean, default: false },
+            anniversary: { type: Boolean, default: false },
+            engagement: { type: Boolean, default: false },
+        },
+
+        suitableFor: {
+            men: { type: Boolean, default: false },
+            women: { type: Boolean, default: false },
+            kids: { type: Boolean, default: false },
+            bride: { type: Boolean, default: false },
+            groom: { type: Boolean, default: false },
+        },
+
+        style: {
+            antique: { type: Boolean, default: false },
+            traditional: { type: Boolean, default: false },
+            navaratna: { type: Boolean, default: false },
+            bridal: { type: Boolean, default: false },
+        },
+
+        /* ================= TERMS & TAGS ================= */
+        termsAndConditions: [
+            {
+                heading: { type: String, trim: true },
+                points: [{ type: String, trim: true }],
+            },
+        ],
+        tags: [{ type: String }],
+
+        /* ================= RELATED ITEMS ================= */
+        relatedItems: {
+            linkBy: {
+                type: String,
+                enum: ["product", "category"],
+                default: "category",
+            },
+            items: [
+                {
+                    type: mongoose.Schema.Types.ObjectId,
+                    refPath: "relatedItems.linkByRef",
+                },
+            ],
+            linkByRef: {
+                type: String,
+                enum: ["Ornament", "Category"],
+            },
+        },
+
+        /* ================= STATUS & PROVIDER ================= */
+        isActive: {
+            type: Boolean,
+            default: true,
+            index: true,
+        },
+        provider: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+            index: true,
+        },
+        module: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Module",
+            required: true,
+        },
+    },
+    { timestamps: true }
+);
+
+// Indexes
+OrnamentSchema.index({ provider: 1, isActive: 1 });
+OrnamentSchema.index({ category: 1 });
+OrnamentSchema.index({ name: "text", tags: "text" });
+
+module.exports = mongoose.model("Ornament", OrnamentSchema);
