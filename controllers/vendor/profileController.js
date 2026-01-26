@@ -11,7 +11,9 @@ const Photography = require("../../models/vendor/PhotographyPackage");
 const Venue = require("../../models/vendor/Venue");
 const Makeup = require("../../models/admin/makeupPackageModel");
 const Package = require("../../models/admin/Package");
+
 const Booking = require("../../models/vendor/Booking");
+const Ornament = require("../../models/vendor/ornamentPackageModel");
 
 // Create a new profile
 
@@ -36,23 +38,40 @@ exports.getAllVendors = async (req, res) => {
     // Enhance vendors with counts
     const enhancedVendors = await Promise.all(
       vendors.map(async (v) => {
-        const vendorId = v.user?._id;
-        if (!vendorId) return { ...v.toObject(), packageCount: 0, bookingCount: 0 };
+        const userRef = v.user?._id;
+        const profileRef = v._id;
 
-        const [vehicles, cakes, catering, photography, venues, makeup, genericPackages, bookings] = await Promise.all([
-          Vehicle.countDocuments({ provider: vendorId }),
-          Cake.countDocuments({ provider: vendorId }),
-          Catering.countDocuments({ provider: vendorId }),
-          Photography.countDocuments({ provider: vendorId }),
-          Venue.countDocuments({ provider: vendorId }),
-          Makeup.countDocuments({ provider: vendorId }),
-          Package.countDocuments({ provider: vendorId }),
-          Booking.countDocuments({ providerId: vendorId })
+        const [vehicles, cakes, catering, photography, venues, makeup, genericPackages, ornaments, bookings] = await Promise.all([
+          Vehicle.countDocuments({ provider: { $in: [userRef, profileRef] } }),
+          Cake.countDocuments({ provider: { $in: [userRef, profileRef] } }),
+          Catering.countDocuments({ provider: { $in: [userRef, profileRef] } }),
+          Photography.countDocuments({ provider: { $in: [userRef, profileRef] } }),
+          Venue.countDocuments({ provider: { $in: [userRef, profileRef] } }),
+          Makeup.countDocuments({ provider: { $in: [userRef, profileRef] } }),
+          Package.countDocuments({ provider: { $in: [userRef, profileRef] } }),
+          Ornament.countDocuments({ provider: { $in: [userRef, profileRef] } }),
+          Booking.countDocuments({ providerId: userRef })
         ]);
+
+        if (v.user?.email === 'muhammedamantext@gmail.com') {
+          console.log('DEBUG COUNTS for muhammedamantext@gmail.com:', {
+            vendorId: userRef,
+            profileId: profileRef,
+            vehicles,
+            cakes,
+            catering,
+            photography,
+            venues,
+            makeup,
+            genericPackages,
+            ornaments,
+            bookings
+          });
+        }
 
         return {
           ...v.toObject(),
-          packageCount: vehicles + cakes + catering + photography + venues + makeup + genericPackages,
+          packageCount: vehicles + cakes + catering + photography + venues + makeup + genericPackages + ornaments,
           bookingCount: bookings
         };
       })
@@ -112,6 +131,8 @@ exports.deleteVendorOnly = async (req, res) => {
       Venue.deleteMany({ provider: vendorId }),
       Makeup.deleteMany({ provider: vendorId }),
       Package.deleteMany({ provider: vendorId }),
+
+      Ornament.deleteMany({ provider: vendorId }),
       Booking.deleteMany({ providerId: vendorId }),
       Profile.findOneAndDelete({ userId: vendorId }),
       VendorProfile.findOneAndDelete({ user: vendorId }),
@@ -605,6 +626,16 @@ exports.updateProfile = async (req, res) => {
       updatedData.profilePhoto = `/uploads/profiles/${req.file.filename}`;
     }
 
+    // Handle cover image upload
+    if (req.files) {
+      if (req.files.profilePhoto && req.files.profilePhoto[0]) {
+        updatedData.profilePhoto = `/uploads/profiles/${req.files.profilePhoto[0].filename}`;
+      }
+      if (req.files.coverImage && req.files.coverImage[0]) {
+        updatedData.coverImage = `/uploads/profiles/${req.files.coverImage[0].filename}`;
+      }
+    }
+
     // ✅ VENDOR UPDATE
     if (role === "vendor" || vendorName) {
       if (vendorName) updatedData.vendorName = vendorName;
@@ -894,14 +925,16 @@ exports.getProviderAdminDetails = async (req, res) => {
     }
 
     // 2. Fetch Packages from all modules
-    const [vehicles, cakes, catering, photography, venues, makeup, genericPackages] = await Promise.all([
+    const [vehicles, cakes, catering, photography, venues, makeup, genericPackages, ornaments] = await Promise.all([
       Vehicle.find({ provider: providerId }).populate("category brand zone"),
       Cake.find({ provider: providerId }).populate("category module"),
       Catering.find({ provider: providerId }).populate("categories module"),
       Photography.find({ provider: providerId }).populate("categories module"),
       Venue.find({ provider: providerId }).populate("categories module packages"),
       Makeup.find({ provider: providerId }).populate("categories module"),
-      Package.find({ provider: providerId }).populate("categories module")
+
+      Package.find({ provider: providerId }).populate("categories module"),
+      Ornament.find({ provider: providerId }).populate("category subCategory module")
     ]);
 
     // 3. Fetch Booking History
@@ -932,7 +965,9 @@ exports.getProviderAdminDetails = async (req, res) => {
       ...photography.map(p => ({ ...p.toObject(), type: "Photography" })),
       ...venues.map(p => ({ ...p.toObject(), type: "Venue" })),
       ...makeup.map(p => ({ ...p.toObject(), type: "Makeup" })),
-      ...genericPackages.map(p => ({ ...p.toObject(), type: "Package" }))
+
+      ...genericPackages.map(p => ({ ...p.toObject(), type: "Package" })),
+      ...ornaments.map(p => ({ ...p.toObject(), type: "Ornament" }))
     ];
 
     return res.status(200).json({

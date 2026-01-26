@@ -18,6 +18,16 @@ const upload = createUpload("profiles", {
 
 // Get ALL Vendors
 router.get("/vendors/all", profileController.getAllVendors);
+router.get("/debug/ornaments", async (req, res) => {
+  try {
+    const Ornament = require("../../models/vendor/ornamentPackageModel");
+    const ornaments = await Ornament.find({}).select("provider name").lean();
+    const counts = await Ornament.countDocuments({});
+    res.json({ counts, ornaments });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
 // ✅ UPDATE VENDOR BIO
 router.put(
   "/vendor/:vendorId/bio",
@@ -45,8 +55,11 @@ router.get("/", profileController.getProfiles);
 // Get Profile by Provider ID
 router.get("/provider/:providerId", profileController.getProfileByProviderId);
 
-// Update Profile
-router.put("/:id", upload.single("profilePhoto"), profileController.updateProfile);
+// Update Profile (with profilePhoto and coverImage)
+router.put("/:id", upload.fields([
+  { name: "profilePhoto", maxCount: 1 },
+  { name: "coverImage", maxCount: 1 }
+]), profileController.updateProfile);
 
 // Delete Profile
 router.delete("/:id", profileController.deleteProfile);

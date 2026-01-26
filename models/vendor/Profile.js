@@ -109,6 +109,10 @@ const profileSchema = new mongoose.Schema(
       type: String,
       default: ""
     },
+    coverImage: {
+      type: String,
+      default: ""
+    },
     email: {
       type: String,
       trim: true,
