@@ -121,11 +121,22 @@ const sanitizeOrnamentData = (body) => {
         shippingPrice: Number(shippingData.shippingPrice || 0),
     };
 
-    // Features
-    data.features = parseJSON(data.features, {});
-    data.suitableFor = parseJSON(data.suitableFor, {});
-    data.style = parseJSON(data.style, {});
-    data.suitableOccasions = parseJSON(data.suitableOccasions, []);
+    // Features (nested object with arrays - like UI structure)
+    data.occasions = parseJSON(data.occasions, []);
+    
+    const featuresData = parseJSON(data.features, {});
+    data.features = {
+        basicFeatures: Array.isArray(featuresData.basicFeatures) 
+            ? featuresData.basicFeatures 
+            : parseJSON(data.basicFeatures, []),
+        suitableFor: Array.isArray(featuresData.suitableFor)
+            ? featuresData.suitableFor
+            : parseJSON(data.suitableFor, []),
+        style: Array.isArray(featuresData.style)
+            ? featuresData.style
+            : parseJSON(data.style, []),
+    };
+    
     data.tags = parseJSON(data.tags, []);
     data.termsAndConditions = parseJSON(data.termsAndConditions, []);
 

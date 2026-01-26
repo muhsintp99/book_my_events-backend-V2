@@ -89,31 +89,37 @@ const OrnamentSchema = new mongoose.Schema(
         },
 
         /* ================= FEATURES & OCCASIONS ================= */
-        suitableOccasions: [{ type: String }], // e.g., ["Marriage", "Engagement", "Birthday"]
+        occasions: [{ type: String }], // e.g., ["Marriage", "Engagement", "Wedding", "Festival"]
 
         features: {
-            wedding: { type: Boolean, default: false },
-            valentine: { type: Boolean, default: false },
-            festive: { type: Boolean, default: false },
-            dailyWear: { type: Boolean, default: false },
-            casualOutings: { type: Boolean, default: false },
-            anniversary: { type: Boolean, default: false },
-            engagement: { type: Boolean, default: false },
-        },
+            basicFeatures: [
+                {
+                    type: String,
+                    enum: [
+                        "wedding",
+                        "valentine",
+                        "festive",
+                        "dailyWear",
+                        "casualOutings",
+                        "anniversary",
+                        "engagement",
+                    ],
+                },
+            ],
 
-        suitableFor: {
-            men: { type: Boolean, default: false },
-            women: { type: Boolean, default: false },
-            kids: { type: Boolean, default: false },
-            bride: { type: Boolean, default: false },
-            groom: { type: Boolean, default: false },
-        },
+            suitableFor: [
+                {
+                    type: String,
+                    enum: ["men", "women", "kids", "bride", "groom"],
+                },
+            ],
 
-        style: {
-            antique: { type: Boolean, default: false },
-            traditional: { type: Boolean, default: false },
-            navaratna: { type: Boolean, default: false },
-            bridal: { type: Boolean, default: false },
+            style: [
+                {
+                    type: String,
+                    enum: ["antique", "traditional", "navaratna", "bridal"],
+                },
+            ],
         },
 
         /* ================= TERMS & TAGS ================= */
