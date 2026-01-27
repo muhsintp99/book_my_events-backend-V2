@@ -727,18 +727,97 @@ exports.updateProfile = async (req, res) => {
             throw saveError;
           }
         }
-
-        return res.status(200).json({
-          success: true,
-          message: "Profile updated successfully",
-          data: profile,
-        });
       }
 
-      console.log(`[updateProfile] Vendor profile updated successfully for user: ${id}`);
+      // =====================================================
+      // NEW: ROBUST SYNC TO USER AND VENDORPROFILE
+      // =====================================================
+      // Ensure we have a string User ID and convert to ObjectId for queries
+      let userIdStr = id;
+      if (profile.userId) {
+        userIdStr = profile.userId._id ? profile.userId._id.toString() : profile.userId.toString();
+      }
+
+      const targetUserId = mongoose.Types.ObjectId.isValid(userIdStr)
+        ? new mongoose.Types.ObjectId(userIdStr)
+        : null;
+
+      if (!targetUserId) {
+        console.error(`[updateProfile] Invalid User ID for sync: ${userIdStr}`);
+      } else {
+        console.log(`[updateProfile] Initiating sync for User ID: ${targetUserId}`);
+
+        // Prepare name fields - ensure lastName is not empty for User model
+        const rawName = (vendorName || profile.vendorName || "Vendor").trim();
+        const nameParts = rawName.split(/\s+/);
+        const firstNameSync = nameParts[0] || "Vendor";
+        let lastNameSync = nameParts.slice(1).join(" ");
+
+        // Ensure lastName is at least a space to satisfy 'required' validation if name is single word
+        if (!lastNameSync) lastNameSync = " ";
+
+        // Update User Model
+        const userUpdateFields = {
+          firstName: firstNameSync,
+          lastName: lastNameSync,
+          phone: mobileNumber || profile.mobileNumber,
+          mobile: mobileNumber || profile.mobileNumber,
+        };
+
+        if (updatedData.socialLinks) userUpdateFields.socialMedia = updatedData.socialLinks;
+        if (updatedData.profilePhoto) userUpdateFields.profilePhoto = updatedData.profilePhoto;
+
+        try {
+          const updatedUser = await User.findByIdAndUpdate(targetUserId, { $set: userUpdateFields }, { new: true });
+          if (updatedUser) {
+            console.log(`[updateProfile] Synced data to User: ${targetUserId} (${updatedUser.firstName} ${updatedUser.lastName})`);
+          } else {
+            console.warn(`[updateProfile] User not found for sync: ${targetUserId}`);
+          }
+        } catch (userErr) {
+          console.error(`[updateProfile] User sync error:`, userErr.message);
+        }
+
+        // Update VendorProfile Model
+        const vendorUpdateFields = {
+          storeName: rawName,
+          ownerFirstName: firstNameSync,
+          ownerLastName: lastNameSync,
+          ownerPhone: mobileNumber || profile.mobileNumber,
+          latitude: latitude || updatedData.latitude,
+          longitude: longitude || updatedData.longitude,
+        };
+
+        // Handle businessAddress sync
+        if (businessAddress || profile.businessAddress) {
+          vendorUpdateFields.storeAddress = {
+            fullAddress: businessAddress || profile.businessAddress
+          };
+        }
+
+        if (updatedData.storeAddress) vendorUpdateFields.storeAddress = updatedData.storeAddress;
+        if (updatedData.profilePhoto) vendorUpdateFields.logo = updatedData.profilePhoto;
+        if (updatedData.coverImage) vendorUpdateFields.coverImage = updatedData.coverImage;
+
+        try {
+          const updatedVendor = await VendorProfile.findOneAndUpdate(
+            { user: targetUserId },
+            { $set: vendorUpdateFields },
+            { new: true, upsert: false } // Only update if exists
+          );
+          if (updatedVendor) {
+            console.log(`[updateProfile] Synced data to VendorProfile for user: ${targetUserId} (Store: ${updatedVendor.storeName})`);
+          } else {
+            console.warn(`[updateProfile] VendorProfile not found for sync: ${targetUserId}. This is normal if they haven't registered a store yet.`);
+          }
+        } catch (vendorErr) {
+          console.error(`[updateProfile] VendorProfile sync error:`, vendorErr.message);
+        }
+      }
+
       return res.status(200).json({
         success: true,
-        message: "Vendor profile updated successfully",
+        message: "Profile and linked records updated successfully",
         data: profile,
       });
     }

@@ -6,6 +6,7 @@ const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
 const Subscription = require("../../models/admin/Subscription");
+const { enhanceProviderDetails } = require("../../utils/providerHelper");
 
 
 // ---------------------- Helper: Parse JSON or array ----------------------
@@ -41,12 +42,21 @@ const deleteFileIfExists = (filePath) => {
 };
 
 // ---------------------- Helper: Populate Package ----------------------
-const populatePhotography = async (id) => {
-  return await Photography.findById(id)
+const populatePhotography = async (id, req = null) => {
+  let pkg = await Photography.findById(id)
     .populate("module")
     .populate("categories")
-    .populate("provider", "firstName lastName email phone")
-    .populate("createdBy", "firstName lastName email phone");
+    .populate("provider", "firstName lastName email phone profilePhoto")
+    .populate("createdBy", "firstName lastName email phone")
+    .lean();
+
+  if (!pkg) return null;
+
+  if (pkg.provider) {
+    pkg.provider = await enhanceProviderDetails(pkg.provider, req);
+  }
+
+  return pkg;
 };
 
 // =======================================================================
@@ -196,34 +206,34 @@ exports.getSingleVendorForPhotographyModule = async (req, res) => {
 
         subscription: subscription
           ? {
-              isSubscribed: subscription.status === "active",
-              status: subscription.status,
-              plan: subscription.planId,
-              module: subscription.moduleId,
-              billing: {
-                startDate: subscription.startDate,
-                endDate: subscription.endDate,
-                paymentId: subscription.paymentId,
-                autoRenew: subscription.autoRenew
-              },
-              access: {
-                canAccess: subscription.status === "active" && !isExpired,
-                isExpired,
-                daysLeft
-              }
+            isSubscribed: subscription.status === "active",
+            status: subscription.status,
+            plan: subscription.planId,
+            module: subscription.moduleId,
+            billing: {
+              startDate: subscription.startDate,
+              endDate: subscription.endDate,
+              paymentId: subscription.paymentId,
+              autoRenew: subscription.autoRenew
+            },
+            access: {
+              canAccess: subscription.status === "active" && !isExpired,
+              isExpired,
+              daysLeft
             }
+          }
           : {
-              isSubscribed: false,
-              status: "none",
-              plan: null,
-              module: null,
-              billing: null,
-              access: {
-                canAccess: false,
-                isExpired: true,
-                daysLeft: 0
-              }
+            isSubscribed: false,
+            status: "none",
+            plan: null,
+            module: null,
+            billing: null,
+            access: {
+              canAccess: false,
+              isExpired: true,
+              daysLeft: 0
             }
+          }
       }
     });
 
@@ -487,9 +497,9 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
       const isExpired = sub ? sub.endDate < now : true;
       const daysLeft = sub
         ? Math.max(
-            0,
-            Math.ceil((sub.endDate - now) / (1000 * 60 * 60 * 24))
-          )
+          0,
+          Math.ceil((sub.endDate - now) / (1000 * 60 * 60 * 24))
+        )
         : 0;
 
       return {
@@ -510,34 +520,34 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
         // 🔥 SUBSCRIPTION
         subscription: sub
           ? {
-              isSubscribed: sub.status === "active",
-              status: sub.status,
-              plan: sub.planId,
-              module: sub.moduleId,
-              billing: {
-                startDate: sub.startDate,
-                endDate: sub.endDate,
-                paymentId: sub.paymentId,
-                autoRenew: sub.autoRenew
-              },
-              access: {
-                canAccess: sub.status === "active" && !isExpired,
-                isExpired,
-                daysLeft
-              }
+            isSubscribed: sub.status === "active",
+            status: sub.status,
+            plan: sub.planId,
+            module: sub.moduleId,
+            billing: {
+              startDate: sub.startDate,
+              endDate: sub.endDate,
+              paymentId: sub.paymentId,
+              autoRenew: sub.autoRenew
+            },
+            access: {
+              canAccess: sub.status === "active" && !isExpired,
+              isExpired,
+              daysLeft
             }
+          }
           : {
-              isSubscribed: false,
-              status: "none",
-              plan: null,
-              module: null,
-              billing: null,
-              access: {
-                canAccess: false,
-                isExpired: true,
-                daysLeft: 0
-              }
+            isSubscribed: false,
+            status: "none",
+            plan: null,
+            module: null,
+            billing: null,
+            access: {
+              canAccess: false,
+              isExpired: true,
+              daysLeft: 0
             }
+          }
       };
     });
 

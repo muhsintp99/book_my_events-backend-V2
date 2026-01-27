@@ -318,18 +318,28 @@ const { v4: uuidv4 } = require("uuid");
 const Catering = require("../../models/vendor/Catering");
 const VendorProfile = require("../../models/vendor/vendorProfile");
 const User = require("../../models/User");
+const { enhanceProviderDetails } = require("../../utils/providerHelper");
 
 // ----------------------------- Helpers -----------------------------
 const deleteFileIfExists = (filePath) => {
   if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
 };
 
-const populateCatering = async (id) => {
-  return await Catering.findById(id)
+const populateCatering = async (id, req = null) => {
+  let cater = await Catering.findById(id)
     .populate("module", "title images")
     .populate("categories", "title image")
-    .populate("provider", "firstName lastName email phone")
-    .populate("createdBy", "firstName lastName email phone");
+    .populate("provider", "firstName lastName email phone profilePhoto")
+    .populate("createdBy", "firstName lastName email phone")
+    .lean();
+
+  if (!cater) return null;
+
+  if (cater.provider) {
+    cater.provider = await enhanceProviderDetails(cater.provider, req);
+  }
+
+  return cater;
 };
 
 // ----------------------------- CREATE -----------------------------
@@ -361,8 +371,8 @@ exports.createCatering = async (req, res) => {
     let parsedCategories = [];
 
     // Parse JSON safely
-    try { parsedIncludes = JSON.parse(includes || "[]"); } catch {}
-    try { parsedCategories = JSON.parse(categories || "[]"); } catch {}
+    try { parsedIncludes = JSON.parse(includes || "[]"); } catch { }
+    try { parsedCategories = JSON.parse(categories || "[]"); } catch { }
 
     const images = req.files?.images
       ? req.files.images.map((file) => `/uploads/catering/${file.filename}`)
@@ -382,7 +392,7 @@ exports.createCatering = async (req, res) => {
       cateringType,
       includes: parsedIncludes,
       price,
-        advanceBookingAmount: Number(advanceBookingAmount) || 0,
+      advanceBookingAmount: Number(advanceBookingAmount) || 0,
 
       images,
       thumbnail,
@@ -420,7 +430,7 @@ exports.updateCatering = async (req, res) => {
       cateringType,
       includes,
       price,
-        advanceBookingAmount, // ✅ ADD THIS
+      advanceBookingAmount, // ✅ ADD THIS
 
       updatedBy
     } = req.body;
@@ -454,9 +464,9 @@ exports.updateCatering = async (req, res) => {
     catering.cateringType = cateringType || catering.cateringType;
     catering.price = price || catering.price;
     catering.updatedBy = updatedBy;
-if (advanceBookingAmount !== undefined) {
-  catering.advanceBookingAmount = Number(advanceBookingAmount);
-}
+    if (advanceBookingAmount !== undefined) {
+      catering.advanceBookingAmount = Number(advanceBookingAmount);
+    }
 
     await catering.save();
 
@@ -629,29 +639,11 @@ exports.getVendorsForCateringModule = async (req, res) => {
     const baseUrl = `${req.protocol}://${req.get("host")}`;
 
     // 🔥 Merge User + VendorProfile
-    const final = users.map(u => {
-      const vp = vendorProfiles.find(v => v.user.toString() === u._id.toString());
-
-      return {
-        _id: u._id,
-        firstName: u.firstName,
-        lastName: u.lastName,
-        email: u.email,
-        phone: u.phone,
-
-        profilePhoto: u.profilePhoto
-          ? u.profilePhoto.startsWith("http")
-            ? u.profilePhoto
-            : `${baseUrl}${u.profilePhoto}`
-          : null,
-
-        storeName: vp?.storeName || `${u.firstName} ${u.lastName}`,
-        logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
-        coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
-
-        hasVendorProfile: !!vp
-      };
-    });
+    const final = await Promise.all(
+      users.map(async (u) => {
+        return await enhanceProviderDetails(u, req);
+      })
+    );
 
     // ⭐ If providerId → return SINGLE vendor
     if (providerId) {

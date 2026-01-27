@@ -6,6 +6,7 @@ const Category = require("../../models/admin/category");
 const VendorProfile = require("../../models/vendor/vendorProfile");
 const User = require("../../models/User");
 const Subscription = require("../../models/admin/Subscription");
+const { enhanceProviderDetails } = require("../../utils/providerHelper");
 
 /* =====================================================
    HELPERS
@@ -386,31 +387,11 @@ const populateCake = async (id, req = null) => {
     };
     return cake;
   }
-
-  // Fetch VendorProfile linked to provider
-  const vendorProfile = await VendorProfile.findOne({ user: cake.provider._id })
-    .select("storeName logo coverImage")
-    .lean();
-
-  if (vendorProfile) {
-    cake.provider.storeName = vendorProfile.storeName;
-    cake.provider.logo = vendorProfile.logo
-      ? `${baseUrl}${vendorProfile.logo}`
-      : null;
-    cake.provider.coverImage = vendorProfile.coverImage
-      ? `${baseUrl}${vendorProfile.coverImage}`
-      : null;
-    cake.provider.hasVendorProfile = true;
+  // Standardize provider details
+  if (cake.provider) {
+    cake.provider = await enhanceProviderDetails(cake.provider, req);
   } else {
-    cake.provider.storeName = `${cake.provider.firstName || ""} ${cake.provider.lastName || ""
-      }`.trim();
-    cake.provider.logo = cake.provider.profilePhoto
-      ? cake.provider.profilePhoto.startsWith("http")
-        ? cake.provider.profilePhoto
-        : `${baseUrl}${cake.provider.profilePhoto}`
-      : null;
-    cake.provider.coverImage = null;
-    cake.provider.hasVendorProfile = false;
+    cake.provider = await enhanceProviderDetails(null, req);
   }
 
   return cake;

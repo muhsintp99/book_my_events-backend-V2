@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Venue = require("../../models/vendor/Venue");
 const Category = require("../../models/admin/category");
+const { enhanceProviderDetails } = require("../../utils/providerHelper");
 
 // Helper function to convert old format to new format
 const convertLegacyPricing = (oldPricing) => {
@@ -169,80 +170,80 @@ const normalizeFormData = (data) => {
     "acType",
   ];
 
- exports.updateDiscount = async (req, res) => {
-  try {
-    const venueId = req.params.id;
+  exports.updateDiscount = async (req, res) => {
+    try {
+      const venueId = req.params.id;
 
-    if (!mongoose.Types.ObjectId.isValid(venueId)) {
-      return res.status(400).json({
+      if (!mongoose.Types.ObjectId.isValid(venueId)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid venue ID",
+        });
+      }
+
+      const { packageDiscount, nonAc } = req.body;
+
+      // Validate discount values
+      const discountData = {
+        packageDiscount: parseFloat(packageDiscount) || 0,
+        nonAc: parseFloat(nonAc) || 0
+      };
+
+      // packageDiscount is a percentage (0-100)
+      if (discountData.packageDiscount < 0 || discountData.packageDiscount > 100) {
+        return res.status(400).json({
+          success: false,
+          message: "Package discount must be between 0 and 100",
+        });
+      }
+
+      // nonAc can be any positive number (no upper limit)
+      if (discountData.nonAc < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Non-AC discount must be a positive number",
+        });
+      }
+
+      const venue = await Venue.findByIdAndUpdate(
+        venueId,
+        { discount: discountData },
+        { new: true, runValidators: true }
+      )
+        .populate('categories', 'title image categoryId module isActive')
+        .populate('module', 'title moduleId icon isActive')
+        .populate('packages')
+        .populate('createdBy', 'name email phone')
+        .populate({
+          path: 'provider',
+          select: 'userId firstName lastName email phone',
+          populate: {
+            path: 'profile',
+            select: 'mobileNumber socialLinks profilePhoto'
+          }
+        });
+
+      if (!venue) {
+        return res.status(404).json({
+          success: false,
+          message: "Venue not found",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: venue,
+        message: "Discount updated successfully",
+      });
+    } catch (err) {
+      console.error("Error in updateDiscount:", err.message);
+      res.status(500).json({
         success: false,
-        message: "Invalid venue ID",
+        message: "Failed to update discount",
+        error: err.message,
       });
     }
-
-    const { packageDiscount, nonAc } = req.body;
-
-    // Validate discount values
-    const discountData = {
-      packageDiscount: parseFloat(packageDiscount) || 0,
-      nonAc: parseFloat(nonAc) || 0
-    };
-
-    // packageDiscount is a percentage (0-100)
-    if (discountData.packageDiscount < 0 || discountData.packageDiscount > 100) {
-      return res.status(400).json({
-        success: false,
-        message: "Package discount must be between 0 and 100",
-      });
-    }
-
-    // nonAc can be any positive number (no upper limit)
-    if (discountData.nonAc < 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Non-AC discount must be a positive number",
-      });
-    }
-
-    const venue = await Venue.findByIdAndUpdate(
-      venueId,
-      { discount: discountData },
-      { new: true, runValidators: true }
-    )
-      .populate('categories', 'title image categoryId module isActive')
-      .populate('module', 'title moduleId icon isActive')
-      .populate('packages')
-      .populate('createdBy', 'name email phone')
-      .populate({
-        path: 'provider',
-        select: 'userId firstName lastName email phone',
-        populate: {
-          path: 'profile',
-          select: 'mobileNumber socialLinks profilePhoto'
-        }
-      });
-
-    if (!venue) {
-      return res.status(404).json({
-        success: false,
-        message: "Venue not found",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: venue,
-      message: "Discount updated successfully",
-    });
-  } catch (err) {
-    console.error("Error in updateDiscount:", err.message);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update discount",
-      error: err.message,
-    });
-  }
-};
+  };
   stringFields.forEach((field) => {
     if (Array.isArray(normalized[field])) {
       normalized[field] = normalized[field][0];
@@ -274,9 +275,9 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c; // Distance in kilometers
 };
@@ -310,7 +311,7 @@ const getMaxPrice = (pricingSchedule) => {
   return maxPrice;
 };
 const normalizePricingSchedule = (schedule) => {
-  const days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+  const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 
   const newSchedule = {};
 
@@ -431,9 +432,9 @@ exports.createVenue = async (req, res) => {
       }
       data.searchTags = Array.isArray(tags)
         ? tags
-            .flat()
-            .filter((t) => t && typeof t === "string" && t.trim())
-            .map((t) => t.trim())
+          .flat()
+          .filter((t) => t && typeof t === "string" && t.trim())
+          .map((t) => t.trim())
         : [];
     } else {
       data.searchTags = [];
@@ -999,11 +1000,11 @@ exports.filterVenues = async (req, res) => {
     const appliedFilters = {
       location: useLocationFilter
         ? {
-            latitude: userLat,
-            longitude: userLon,
-            radius: searchRadius,
-            unit: "km",
-          }
+          latitude: userLat,
+          longitude: userLon,
+          radius: searchRadius,
+          unit: "km",
+        }
         : null,
       categoryId: categoryId || null,
       moduleId: moduleId || null,
@@ -1038,16 +1039,26 @@ exports.filterVenues = async (req, res) => {
       },
     };
 
+    // Standardize all providers
+    const enhancedVenues = await Promise.all(
+      paginatedVenues.map(async (venue) => {
+        if (venue.provider) {
+          venue.provider = await enhanceProviderDetails(venue.provider, req);
+        }
+        return venue;
+      })
+    );
+
     res.status(200).json({
       success: true,
-      count: paginatedVenues.length,
+      count: enhancedVenues.length,
       totalResults,
       page: parseInt(page),
       totalPages,
       appliedFilters,
-      data: paginatedVenues,
+      data: enhancedVenues,
       message:
-        paginatedVenues.length === 0
+        enhancedVenues.length === 0
           ? "No venues found matching your filter criteria"
           : "Venues filtered successfully",
     });
@@ -1142,7 +1153,7 @@ exports.searchVenues = async (req, res) => {
     }
 
     // Fetch venues
-    let venues = await Venue.find(searchQuery)  .sort({ createdAt: -1 })
+    let venues = await Venue.find(searchQuery).sort({ createdAt: -1 })
 
       .populate({
         path: "categories",
@@ -1218,6 +1229,13 @@ exports.searchVenues = async (req, res) => {
     // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const paginatedVenues = venues.slice(skip, skip + parseInt(limit));
+    // Enhance provider details
+    await Promise.all(paginatedVenues.map(async (venue) => {
+      if (venue.provider) {
+        venue.provider = await enhanceProviderDetails(venue.provider, req);
+      }
+    }));
+
     const totalResults = venues.length;
     const totalPages = Math.ceil(totalResults / parseInt(limit));
 
@@ -1271,14 +1289,7 @@ const applyVenuePopulates = (query) => {
       // no 'select' here — we want full package object (images, thumbnail, price, includes, createdAt, etc.)
     })
     .populate("createdBy", "name email phone")
-    .populate({
-      path: "provider",
-      select: "userId firstName lastName email phone profile",
-      populate: {
-        path: "profile",
-        select: "mobileNumber socialLinks profilePhoto",
-      },
-    });
+    .populate("provider", "firstName lastName email phone profilePhoto");
 };
 
 
@@ -1367,6 +1378,7 @@ exports.getModuleCategories = async (req, res) => {
 //   }
 // };
 // Get all venues (fixed - full package fields populated)
+// Get all venues (fixed - full package fields populated)
 exports.getVenues = async (req, res) => {
   try {
     let query = Venue.find().sort({ createdAt: -1 }).lean();
@@ -1381,10 +1393,19 @@ exports.getVenues = async (req, res) => {
       });
     }
 
+    const enhancedVenues = await Promise.all(
+      venues.map(async (venue) => {
+        if (venue.provider) {
+          venue.provider = await enhanceProviderDetails(venue.provider, req);
+        }
+        return venue;
+      })
+    );
+
     res.status(200).json({
       success: true,
-      count: venues.length,
-      data: venues,
+      count: enhancedVenues.length,
+      data: enhancedVenues,
     });
   } catch (error) {
     console.error("Error fetching venues:", error);
@@ -1470,18 +1491,28 @@ exports.getVenuesByLocation = async (req, res) => {
 
     venuesInZone.sort((a, b) => a.distance - b.distance);
 
+    // Standardize providers
+    const enhancedVenues = await Promise.all(
+      venuesInZone.map(async (venue) => {
+        if (venue.provider) {
+          venue.provider = await enhanceProviderDetails(venue.provider, req);
+        }
+        return venue;
+      })
+    );
+
     res.status(200).json({
       success: true,
-      count: venuesInZone.length,
+      count: enhancedVenues.length,
       searchParams: {
         latitude,
         longitude,
         zoneRadius: zoneRadiusKm,
         unit: "km",
       },
-      data: venuesInZone,
+      data: enhancedVenues,
       message:
-        venuesInZone.length === 0
+        enhancedVenues.length === 0
           ? `No venues found within ${zoneRadiusKm}km zone`
           : "Venues in zone fetched successfully",
     });
@@ -1536,12 +1567,22 @@ exports.getVenuesByProvider = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
+    // Standardize providers
+    const enhancedVenues = await Promise.all(
+      venues.map(async (venue) => {
+        if (venue.provider) {
+          venue.provider = await enhanceProviderDetails(venue.provider, req);
+        }
+        return venue;
+      })
+    );
+
     res.status(200).json({
       success: true,
-      count: venues.length,
-      data: venues,
+      count: enhancedVenues.length,
+      data: enhancedVenues,
       message:
-        venues.length === 0
+        enhancedVenues.length === 0
           ? "No venues found for this provider"
           : "Venues fetched successfully",
     });
@@ -1639,6 +1680,11 @@ exports.getVenue = async (req, res) => {
       });
     }
 
+    // Enhance provider details
+    if (venue.provider) {
+      venue.provider = await enhanceProviderDetails(venue.provider, req);
+    }
+
     res.status(200).json({
       success: true,
       data: venue,
@@ -1667,12 +1713,12 @@ exports.updateVenue = async (req, res) => {
     let data = normalizeFormData(req.body);
 
     // Parse pricing schedule
-   if (data.pricingSchedule && typeof data.pricingSchedule === "string") {
-  const parsed = JSON.parse(data.pricingSchedule);
-  data.pricingSchedule = Array.isArray(parsed)
-    ? convertLegacyPricing(parsed)
-    : parsed;
-}
+    if (data.pricingSchedule && typeof data.pricingSchedule === "string") {
+      const parsed = JSON.parse(data.pricingSchedule);
+      data.pricingSchedule = Array.isArray(parsed)
+        ? convertLegacyPricing(parsed)
+        : parsed;
+    }
 
 
     // Parse categories
@@ -1742,9 +1788,9 @@ exports.updateVenue = async (req, res) => {
       }
       data.searchTags = Array.isArray(tags)
         ? tags
-            .flat()
-            .filter((t) => t && typeof t === "string")
-            .map((t) => t.trim())
+          .flat()
+          .filter((t) => t && typeof t === "string")
+          .map((t) => t.trim())
         : [];
     }
 
@@ -1876,12 +1922,22 @@ exports.getVenuesByCategory = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
+    // Enhance provider details
+    const enhancedVenues = await Promise.all(
+      venues.map(async (venue) => {
+        if (venue.provider) {
+          venue.provider = await enhanceProviderDetails(venue.provider, req);
+        }
+        return venue;
+      })
+    );
+
     res.status(200).json({
       success: true,
-      count: venues.length,
-      data: venues,
+      count: enhancedVenues.length,
+      data: enhancedVenues,
       message:
-        venues.length === 0
+        enhancedVenues.length === 0
           ? "No venues found for this category"
           : "Venues fetched successfully",
     });
@@ -1934,12 +1990,22 @@ exports.getVenuesByModule = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
+    // Enhance provider details
+    const enhancedVenues = await Promise.all(
+      venues.map(async (venue) => {
+        if (venue.provider) {
+          venue.provider = await enhanceProviderDetails(venue.provider, req);
+        }
+        return venue;
+      })
+    );
+
     res.status(200).json({
       success: true,
-      count: venues.length,
-      data: venues,
+      count: enhancedVenues.length,
+      data: enhancedVenues,
       message:
-        venues.length === 0
+        enhancedVenues.length === 0
           ? "No venues found for this module"
           : "Venues fetched successfully",
     });
@@ -2277,7 +2343,7 @@ exports.deleteVenue = async (req, res) => {
 exports.toggleTopPickStatus = async (req, res) => {
   try {
     const venueId = req.params.id;
-    
+
     if (!mongoose.Types.ObjectId.isValid(venueId)) {
       return res.status(400).json({
         success: false,
@@ -2286,10 +2352,10 @@ exports.toggleTopPickStatus = async (req, res) => {
     }
 
     // Get current venue status - use collection.findOne to get raw document
-    const venue = await Venue.collection.findOne({ 
-      _id: new mongoose.Types.ObjectId(venueId) 
+    const venue = await Venue.collection.findOne({
+      _id: new mongoose.Types.ObjectId(venueId)
     });
-    
+
     if (!venue) {
       return res.status(404).json({
         success: false,
@@ -2301,12 +2367,12 @@ exports.toggleTopPickStatus = async (req, res) => {
 
     // ✅ Prepare update object
     const updateData = { isTopPick: newStatus };
-    
+
     // Fix discount if it's corrupted (not a proper object)
-    if (!venue.discount || 
-        typeof venue.discount !== 'object' || 
-        venue.discount === null ||
-        !venue.discount.packageDiscount === undefined) {
+    if (!venue.discount ||
+      typeof venue.discount !== 'object' ||
+      venue.discount === null ||
+      !venue.discount.packageDiscount === undefined) {
       updateData.discount = { packageDiscount: 0, nonAc: 0 };
     }
 
@@ -2350,7 +2416,7 @@ exports.toggleTopPickStatus = async (req, res) => {
 exports.toggleActiveStatus = async (req, res) => {
   try {
     const venueId = req.params.id;
-    
+
     if (!mongoose.Types.ObjectId.isValid(venueId)) {
       return res.status(400).json({
         success: false,
@@ -2359,10 +2425,10 @@ exports.toggleActiveStatus = async (req, res) => {
     }
 
     // Get current venue status - use collection.findOne to get raw document
-    const venue = await Venue.collection.findOne({ 
-      _id: new mongoose.Types.ObjectId(venueId) 
+    const venue = await Venue.collection.findOne({
+      _id: new mongoose.Types.ObjectId(venueId)
     });
-    
+
     if (!venue) {
       return res.status(404).json({
         success: false,
@@ -2374,12 +2440,12 @@ exports.toggleActiveStatus = async (req, res) => {
 
     // ✅ Prepare update object
     const updateData = { isActive: newStatus };
-    
+
     // Fix discount if it's corrupted (not a proper object)
-    if (!venue.discount || 
-        typeof venue.discount !== 'object' || 
-        venue.discount === null ||
-        venue.discount.packageDiscount === undefined) {
+    if (!venue.discount ||
+      typeof venue.discount !== 'object' ||
+      venue.discount === null ||
+      venue.discount.packageDiscount === undefined) {
       updateData.discount = { packageDiscount: 0, nonAc: 0 };
     }
 
@@ -2580,11 +2646,11 @@ exports.sortVenues = async (req, res) => {
       sortBy: sortBy,
       searchParams: useLocationFilter
         ? {
-            latitude: userLat,
-            longitude: userLon,
-            radius: searchRadius,
-            unit: "km",
-          }
+          latitude: userLat,
+          longitude: userLon,
+          radius: searchRadius,
+          unit: "km",
+        }
         : null,
       data: sortedVenues,
       message: "Venues sorted successfully",
@@ -2630,7 +2696,7 @@ exports.getTopPicks = async (req, res) => {
       query.longitude = { $exists: true, $ne: null };
     }
 
-    let venues = await Venue.find(query) .sort({ createdAt: -1 })
+    let venues = await Venue.find(query).sort({ createdAt: -1 })
       .populate({
         path: "categories",
         select: "title image categoryId module isActive",
@@ -2681,11 +2747,11 @@ exports.getTopPicks = async (req, res) => {
       count: venues.length,
       searchParams: useLocationFilter
         ? {
-            latitude: userLat,
-            longitude: userLon,
-            radius: searchRadius,
-            unit: "km",
-          }
+          latitude: userLat,
+          longitude: userLon,
+          radius: searchRadius,
+          unit: "km",
+        }
         : null,
       data: venues,
       message:

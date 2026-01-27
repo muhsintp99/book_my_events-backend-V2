@@ -5,6 +5,7 @@ const path = require("path");
 const Category = require("../../models/admin/category");
 const VendorProfile = require("../../models/vendor/vendorProfile");
 const User = require("../../models/User");
+const { enhanceProviderDetails } = require("../../utils/providerHelper");
 
 /* =====================================================
    HELPERS
@@ -123,11 +124,11 @@ const sanitizeOrnamentData = (body) => {
 
     // Features (nested object with arrays - like UI structure)
     data.occasions = parseJSON(data.occasions, []);
-    
+
     const featuresData = parseJSON(data.features, {});
     data.features = {
-        basicFeatures: Array.isArray(featuresData.basicFeatures) 
-            ? featuresData.basicFeatures 
+        basicFeatures: Array.isArray(featuresData.basicFeatures)
+            ? featuresData.basicFeatures
             : parseJSON(data.basicFeatures, []),
         suitableFor: Array.isArray(featuresData.suitableFor)
             ? featuresData.suitableFor
@@ -136,7 +137,7 @@ const sanitizeOrnamentData = (body) => {
             ? featuresData.style
             : parseJSON(data.style, []),
     };
-    
+
     data.tags = parseJSON(data.tags, []);
     data.termsAndConditions = parseJSON(data.termsAndConditions, []);
 
@@ -208,11 +209,11 @@ const populateOrnament = async (id, req = null) => {
         });
     }
 
-    // Provider store info
-    const vendorProfile = await VendorProfile.findOne({ user: ornament.provider._id }).select("storeName logo coverImage").lean();
-    if (vendorProfile) {
-        ornament.provider.storeName = vendorProfile.storeName;
-        ornament.provider.logo = vendorProfile.logo ? `${baseUrl}${vendorProfile.logo}` : null;
+    // Standardize provider details
+    if (ornament.provider) {
+        ornament.provider = await enhanceProviderDetails(ornament.provider, req);
+    } else {
+        ornament.provider = await enhanceProviderDetails(null, req);
     }
 
     return ornament;

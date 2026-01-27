@@ -64,27 +64,27 @@ const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true },
   phone: { type: String, trim: true },
-  
+
   // Additional fields for direct storage (optional - can be used as fallback)
 
-   profilePhoto: { 
-    type: String, 
-    trim: true, 
+  profilePhoto: {
+    type: String,
+    trim: true,
     default: "" // e.g. /Uploads/profiles/xyz.jpg
   },
-  
-  mobile: { 
-    type: String, 
+
+  mobile: {
+    type: String,
     trim: true,
     default: ''
   },
-  socialMedia: { 
-    type: socialMediaSchema, 
-    default: () => ({}) 
+  socialMedia: {
+    type: socialMediaSchema,
+    default: () => ({})
   },
-  
-  role: { type: String, enum: ['superadmin','admin','vendor','user'], default: 'user' },
-  
+
+  role: { type: String, enum: ['superadmin', 'admin', 'vendor', 'user'], default: 'user' },
+
   otp: String,
   otpExpire: Date,
   isActive: { type: Boolean, default: true },
@@ -93,7 +93,7 @@ const UserSchema = new mongoose.Schema({
   refreshToken: String,
   resetPasswordToken: String,
   resetPasswordExpire: Date
-}, { 
+}, {
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
@@ -107,8 +107,15 @@ UserSchema.virtual('profile', {
   justOne: true
 });
 
+UserSchema.virtual('vendorProfile', {
+  ref: 'VendorProfile',
+  localField: '_id',
+  foreignField: 'user',
+  justOne: true
+});
+
 // Pre-save middleware for password hashing
-UserSchema.pre('save', async function(next) {
+UserSchema.pre('save', async function (next) {
   if (this.isModified('password')) {
     const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
@@ -117,12 +124,12 @@ UserSchema.pre('save', async function(next) {
 });
 
 // Method to compare password
-UserSchema.methods.comparePassword = async function(candidatePassword) {
+UserSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
 // Custom toJSON to exclude sensitive fields
-UserSchema.methods.toJSON = function() {
+UserSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;
   delete obj.refreshToken;

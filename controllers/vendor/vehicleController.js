@@ -2,6 +2,7 @@ const Vehicle = require("../../models/vendor/Vehicle");
 const VendorProfile = require("../../models/vendor/vendorProfile");
 const User = require("../../models/User");
 const Subscription = require("../../models/admin/Subscription");
+const { enhanceProviderDetails } = require("../../utils/providerHelper");
 const fs = require("fs").promises;
 const path = require("path");
 const mongoose = require("mongoose");
@@ -69,17 +70,36 @@ const attachVehicleImageUrls = (vehicle) => {
 };
 
 const sendResponse = (
-  res,
-  status,
-  success,
-  message,
-  data = null,
-  meta = null
+  res, status, success, message, data = null, meta = null
 ) => {
   const response = { success, message };
   if (data) response.data = data;
   if (meta) response.meta = meta;
   return res.status(status).json(response);
+};
+
+const populateVehicle = async (id, req = null) => {
+  let vehicle = await Vehicle.findById(id)
+    .populate("brand")
+    .populate({
+      path: "category",
+      model: "Category",
+      select: "title image isActive subCategories",
+    })
+    .populate("provider", "firstName lastName email phone profilePhoto")
+    .populate("zone")
+    .lean();
+
+  if (!vehicle) return null;
+
+  if (vehicle.provider) {
+    vehicle.provider = await enhanceProviderDetails(vehicle.provider, req);
+  }
+
+  attachVehicleImageUrls(vehicle);
+  await populateSubCategories(vehicle);
+
+  return vehicle;
 };
 
 const populateProvider = {
@@ -743,47 +763,23 @@ exports.getVehicles = async (req, res) => {
       Vehicle.countDocuments(query),
     ]);
 
-    // Manually populate subcategories for each vehicle
-    for (let vehicle of vehicles) {
-      if (vehicle.category && vehicle.subCategories?.length) {
-        const subCategoryIds = vehicle.subCategories.map((id) => id.toString());
+    // Standardize all vehicles
+    const enhancedVehicles = await Promise.all(
+      vehicles.map(async (vehicle) => {
+        if (vehicle.provider) {
+          vehicle.provider = await enhanceProviderDetails(vehicle.provider, req);
+        }
+        await populateSubCategories(vehicle);
+        return attachVehicleImageUrls(vehicle);
+      })
+    );
 
-        const categorySubs = Array.isArray(vehicle.category?.subCategories)
-          ? vehicle.category.subCategories
-          : [];
-
-        vehicle.subCategories = categorySubs
-          .filter((sub) => subCategoryIds.includes(sub._id.toString()))
-          .map((sub) => ({
-            _id: sub._id,
-            title: sub.title,
-            image: sub.image,
-            isActive: sub.isActive,
-          }));
-
-        delete vehicle.category.subCategories;
-      }
-    }
-
-    const meta = {
-      total,
-      page: Number(page),
-      limit: Number(limit),
-      totalPages: Math.ceil(total / Number(limit)),
-    };
-    for (let vehicle of vehicles) {
-      attachVehicleImageUrls(vehicle);
-    }
-    for (let vehicle of vehicles) {
-      attachVehicleImageUrls(vehicle);
-      await populateSubCategories(vehicle);
-    }
     sendResponse(
       res,
       200,
       true,
       "Vehicles retrieved successfully",
-      vehicles,
+      enhancedVehicles,
       meta
     );
   } catch (error) {
@@ -795,41 +791,10 @@ exports.getVehicles = async (req, res) => {
 // ================= GET SINGLE VEHICLE =================
 exports.getVehicle = async (req, res) => {
   try {
-    const vehicle = await Vehicle.findById(req.params.id)
-      .populate("brand")
-      .populate({
-        path: "category",
-        model: "Category",
-        select: "title image isActive subCategories",
-      })
-      .populate(populateProvider)
-      .populate("zone")
-      .lean();
+    const vehicle = await populateVehicle(req.params.id, req);
 
     if (!vehicle) {
       return sendResponse(res, 404, false, "Vehicle not found");
-    }
-    attachVehicleImageUrls(vehicle);
-    await populateSubCategories(vehicle);
-
-    // Manually populate subcategories
-    if (vehicle.category && vehicle.subCategories?.length) {
-      const subCategoryIds = vehicle.subCategories.map((id) => id.toString());
-
-      const categorySubs = Array.isArray(vehicle.category?.subCategories)
-        ? vehicle.category.subCategories
-        : [];
-
-      vehicle.subCategories = categorySubs
-        .filter((sub) => subCategoryIds.includes(sub._id.toString()))
-        .map((sub) => ({
-          _id: sub._id,
-          title: sub.title,
-          image: sub.image,
-          isActive: sub.isActive,
-        }));
-
-      delete vehicle.category.subCategories;
     }
 
     sendResponse(res, 200, true, "Vehicle retrieved successfully", vehicle);
@@ -880,12 +845,24 @@ exports.getVehiclesByProvider = async (req, res) => {
       totalPages: Math.ceil(total / Number(limit)),
     };
 
+    // Standardize all vehicles
+    const enhancedVehicles = await Promise.all(
+      vehicles.map(async (v) => {
+        const vehicle = v.toObject ? v.toObject() : v;
+        if (vehicle.provider) {
+          vehicle.provider = await enhanceProviderDetails(vehicle.provider, req);
+        }
+        await populateSubCategories(vehicle);
+        return attachVehicleImageUrls(vehicle);
+      })
+    );
+
     sendResponse(
       res,
       200,
       true,
       "Provider vehicles retrieved successfully",
-      vehicles,
+      enhancedVehicles,
       meta
     );
   } catch (error) {
@@ -945,34 +922,20 @@ exports.getVendorsForVehicleModule = async (req, res) => {
 
     const baseUrl = `${req.protocol}://${req.get("host")}`;
 
-    const final = users.map((user) => {
-      const vp = vendorProfiles.find(
-        (v) => v.user.toString() === user._id.toString()
-      );
-      const sub = subscriptions.find(
-        (s) => s.userId.toString() === user._id.toString()
-      );
+    const final = await Promise.all(
+      users.map(async (user) => {
+        const enhanced = await enhanceProviderDetails(user, req);
+        const sub = subscriptions.find(
+          (s) => s.userId.toString() === user._id.toString()
+        );
 
-      const now = new Date();
-      const isExpired = sub ? sub.endDate < now : true;
-      const daysLeft = sub
-        ? Math.max(0, Math.ceil((sub.endDate - now) / (1000 * 60 * 60 * 24)))
-        : 0;
+        const now = new Date();
+        const isExpired = sub ? sub.endDate < now : true;
+        const daysLeft = sub
+          ? Math.max(0, Math.ceil((sub.endDate - now) / (1000 * 60 * 60 * 24)))
+          : 0;
 
-      return {
-        _id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        phone: user.phone,
-        profilePhoto: user.profilePhoto
-          ? `${baseUrl}${user.profilePhoto}`
-          : null,
-        storeName: vp?.storeName || `${user.firstName} ${user.lastName}`,
-        logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
-        coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
-        hasVendorProfile: true,
-        subscription: sub
+        enhanced.subscription = sub
           ? {
             isSubscribed: sub.status === "active",
             status: sub.status,
@@ -981,6 +944,7 @@ exports.getVendorsForVehicleModule = async (req, res) => {
             billing: {
               startDate: sub.startDate,
               endDate: sub.endDate,
+              paymentId: sub.paymentId,
               autoRenew: sub.autoRenew,
             },
             access: {
@@ -1000,9 +964,11 @@ exports.getVendorsForVehicleModule = async (req, res) => {
               isExpired: true,
               daysLeft: 0,
             },
-          },
-      };
-    });
+          };
+
+        return enhanced;
+      })
+    );
 
     // SINGLE vendor
     if (providerId) {
@@ -1811,15 +1777,20 @@ exports.searchVehicles = async (req, res) => {
       vehicles.sort((a, b) => a.distance - b.distance);
     }
 
-    // Pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const paginatedVehicles = vehicles.slice(skip, skip + parseInt(limit));
-    const totalResults = vehicles.length;
-    const totalPages = Math.ceil(totalResults / parseInt(limit));
+    // Standardize all vehicles
+    const enhancedVehicles = await Promise.all(
+      paginatedVehicles.map(async (v) => {
+        const vehicle = v.toObject ? v.toObject() : v;
+        if (vehicle.provider) {
+          vehicle.provider = await enhanceProviderDetails(vehicle.provider, req);
+        }
+        return vehicle;
+      })
+    );
 
     const response = {
       success: true,
-      count: paginatedVehicles.length,
+      count: enhancedVehicles.length,
       totalResults,
       page: parseInt(page),
       totalPages,
@@ -1830,7 +1801,7 @@ exports.searchVehicles = async (req, res) => {
         radius: useLocationFilter ? searchRadius : null,
         categoryId: categoryId || null,
       },
-      data: paginatedVehicles,
+      data: enhancedVehicles,
       message:
         paginatedVehicles.length === 0
           ? "No vehicles found matching your search criteria"
