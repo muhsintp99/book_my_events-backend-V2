@@ -273,6 +273,38 @@ exports.getAllOrnaments = async (req, res) => {
     }
 };
 
+exports.getOrnamentsByProvider = async (req, res) => {
+    try {
+        const { providerId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(providerId)) {
+            return sendResponse(res, 400, false, "Invalid provider ID");
+        }
+
+        const ornaments = await Ornament.find({
+            provider: providerId,
+            isActive: true
+        }).sort({ createdAt: -1 });
+
+        const final = await Promise.all(
+            ornaments.map(o => populateOrnament(o._id, req))
+        );
+
+        return sendResponse(
+            res,
+            200,
+            true,
+            "Provider ornaments fetched successfully",
+            final,
+            { count: final.length }
+        );
+    } catch (error) {
+        console.error("GET ORNAMENTS BY PROVIDER ERROR:", error);
+        return sendResponse(res, 500, false, error.message);
+    }
+};
+
+
 exports.getOrnamentById = async (req, res) => {
     try {
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {

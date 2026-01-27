@@ -23,6 +23,8 @@ router.post(
 
 // Get all ornaments
 router.get("/", ornamentController.getAllOrnaments);
+// Get ornaments by provider
+router.get("/provider/:providerId", ornamentController.getOrnamentsByProvider);
 
 // Get single ornament by ID
 router.get("/:id", ornamentController.getOrnamentById);
