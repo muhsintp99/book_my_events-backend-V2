@@ -167,6 +167,10 @@ const OrnamentSchema = new mongoose.Schema(
             ref: "Module",
             required: true,
         },
+        isTopPick: {
+            type: Boolean,
+            default: false,
+        },
     },
     { timestamps: true }
 );

@@ -263,7 +263,7 @@ exports.getAllOrnaments = async (req, res) => {
         if (module && mongoose.Types.ObjectId.isValid(module)) query.module = module;
         if (provider && mongoose.Types.ObjectId.isValid(provider)) query.provider = provider;
 
-        const ornaments = await Ornament.find(query).sort({ createdAt: -1 });
+        const ornaments = await Ornament.find(query).sort({ isTopPick: -1, createdAt: -1 });
         const final = await Promise.all(ornaments.map((o) => populateOrnament(o._id, req)));
 
         sendResponse(res, 200, true, "Ornaments fetched successfully", final, { count: final.length });
@@ -357,5 +357,127 @@ exports.deleteOrnament = async (req, res) => {
     } catch (error) {
         console.error("DELETE ORNAMENT ERROR:", error);
         sendResponse(res, 500, false, error.message);
+    }
+};
+
+// ----------------------------- GET VENDORS FOR ORNAMENT MODULE (SINGLE + ALL) -----------------------------
+exports.getVendorsForOrnamentModule = async (req, res) => {
+    try {
+        const { moduleId } = req.params;
+
+        // Support both providerId & providerid
+        const providerId = req.query.providerId || req.query.providerid || null;
+
+        if (!mongoose.Types.ObjectId.isValid(moduleId)) {
+            return sendResponse(res, 400, false, "Invalid module ID");
+        }
+
+        // Base query
+        let query = { module: moduleId };
+
+        // If providerId passed -> fetch only that vendor
+        if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
+            query.user = providerId;
+        }
+
+        // Fetch VendorProfiles
+        const vendorProfiles = await VendorProfile.find(query)
+            .select("user storeName logo coverImage")
+            .lean();
+
+        if (!vendorProfiles.length) {
+            return sendResponse(res, 200, true, "Vendor not found for this module", providerId ? null : []);
+        }
+
+        const vendorIds = vendorProfiles.map((vp) => vp.user);
+
+        // Fetch Users
+        const users = await User.find({ _id: { $in: vendorIds } })
+            .select("firstName lastName email phone profilePhoto")
+            .lean();
+
+        // Merge User + VendorProfile
+        const final = await Promise.all(
+            users.map(async (u) => {
+                return await enhanceProviderDetails(u, req);
+            })
+        );
+
+        // If providerId -> return SINGLE vendor
+        if (providerId) {
+            return sendResponse(res, 200, true, "Vendor fetched successfully", final[0] || null);
+        }
+
+        // Else -> return ALL vendors
+        return sendResponse(res, 200, true, "Vendors fetched successfully", final, { count: final.length });
+    } catch (err) {
+        console.error("❌ Get Ornament Vendors Error:", err);
+        return sendResponse(res, 500, false, err.message);
+    }
+};
+
+// ----------------------------- GET PACKAGES BY PROVIDER -----------------------------
+exports.getOrnamentPackagesByProvider = async (req, res) => {
+    try {
+        const { providerId } = req.params;
+        const { moduleId } = req.query;
+
+        if (!mongoose.Types.ObjectId.isValid(providerId)) {
+            return sendResponse(res, 400, false, "Invalid provider ID");
+        }
+
+        const query = { provider: providerId };
+        if (moduleId && mongoose.Types.ObjectId.isValid(moduleId)) query.module = moduleId;
+
+        const ornaments = await Ornament.find(query)
+            .populate("module", "title")
+            .populate("category", "title image")
+            .populate("provider", "firstName lastName email phone")
+            .sort({ isTopPick: -1, createdAt: -1 });
+
+        const final = await Promise.all(ornaments.map((o) => populateOrnament(o._id, req)));
+
+        return sendResponse(res, 200, true, "Provider packages fetched successfully", final, { count: final.length });
+    } catch (err) {
+        console.error("❌ Get Provider Packages Error:", err);
+        return sendResponse(res, 500, false, err.message);
+    }
+};
+
+// ----------------------------- TOGGLE ACTIVE -----------------------------
+exports.toggleActiveStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(id)) return sendResponse(res, 400, false, "Invalid ID");
+
+        const pkg = await Ornament.findById(id);
+        if (!pkg) return sendResponse(res, 404, false, "Not found");
+
+        pkg.isActive = !pkg.isActive;
+        await pkg.save();
+
+        return sendResponse(res, 200, true, `Ornament ${pkg.isActive ? "activated" : "deactivated"}`, pkg);
+    } catch (err) {
+        console.error("❌ Toggle Active Error:", err);
+        return sendResponse(res, 500, false, err.message);
+    }
+};
+
+// ----------------------------- TOGGLE TOP PICK -----------------------------
+exports.toggleTopPickStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(id)) return sendResponse(res, 400, false, "Invalid ID");
+
+        const pkg = await Ornament.findById(id);
+        if (!pkg) return sendResponse(res, 404, false, "Not found");
+
+        pkg.isTopPick = !pkg.isTopPick;
+        await pkg.save();
+
+        return sendResponse(res, 200, true, `Top pick ${pkg.isTopPick ? "enabled" : "disabled"}`, pkg);
+    } catch (err) {
+        console.error("❌ Toggle TopPick Error:", err);
+        return sendResponse(res, 500, false, err.message);
     }
 };

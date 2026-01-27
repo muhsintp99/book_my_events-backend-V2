@@ -7,6 +7,16 @@ const createUpload = require("../../middlewares/upload");
 // Create multer instance
 const upload = createUpload("ornaments");
 
+// -------- Vendor List --------
+router.get("/vendors/:moduleId", ornamentController.getVendorsForOrnamentModule);
+
+// -------- Vendor Packages --------
+router.get("/provider/:providerId", ornamentController.getOrnamentPackagesByProvider);
+
+// -------- TopPick & Active --------
+router.patch("/:id/toggle-active", ornamentController.toggleActiveStatus);
+router.patch("/:id/toggle-top-pick", ornamentController.toggleTopPickStatus);
+
 /* =====================================================
    CRUD ROUTES
 ===================================================== */
@@ -23,8 +33,6 @@ router.post(
 
 // Get all ornaments
 router.get("/", ornamentController.getAllOrnaments);
-// Get ornaments by provider
-router.get("/provider/:providerId", ornamentController.getOrnamentsByProvider);
 
 // Get single ornament by ID
 router.get("/:id", ornamentController.getOrnamentById);
