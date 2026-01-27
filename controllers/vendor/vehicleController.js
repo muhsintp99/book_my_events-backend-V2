@@ -763,6 +763,14 @@ exports.getVehicles = async (req, res) => {
       Vehicle.countDocuments(query),
     ]);
 
+    // Create metadata for pagination
+    const meta = {
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(total / Number(limit)),
+    };
+
     // Standardize all vehicles
     const enhancedVehicles = await Promise.all(
       vehicles.map(async (vehicle) => {
