@@ -258,6 +258,14 @@ const bookingSchema = new mongoose.Schema(
       },
       default: null,
     },
+    ornamentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Ornament",
+      required: function () {
+        return this.moduleType === "Ornaments";
+      },
+      default: null,
+    },
 
     packageId: {
       type: mongoose.Schema.Types.ObjectId,

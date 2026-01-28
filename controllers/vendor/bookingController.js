@@ -11,6 +11,7 @@ const Photography = require("../../models/vendor/PhotographyPackage");
 const Catering = require("../../models/vendor/Catering");
 const Vehicle = require("../../models/vendor/Vehicle");
 const Cake = require("../../models/vendor/cakePackageModel");
+const Ornament = require("../../models/vendor/ornamentPackageModel");
 
 const AUTH_API_URL = "https://api.bookmyevent.ae/api/auth/login";
 
@@ -588,6 +589,8 @@ exports.createBooking = async (req, res) => {
       customerMessage,
       variations,
       decorationIncluded,
+      ornamentId,
+      bookingMode, // purchase | rental
     } = req.body;
 
     console.log("=".repeat(60));
@@ -740,8 +743,15 @@ exports.createBooking = async (req, res) => {
       });
     }
 
-    const moduleType = moduleData.title;
-    console.log("🔥 MODULE TYPE:", moduleType);
+    const moduleType = (moduleData.title || "").trim();
+    const moduleKey = moduleType.toLowerCase();
+
+    console.log("🔥 BOOKING DEBUG:", {
+      moduleTitle: moduleData.title,
+      moduleType,
+      moduleKey,
+      ornamentId
+    });
     // ===============================
     // PAYMENT TYPE NORMALIZATION (FIX)
     // ===============================
@@ -1017,6 +1027,40 @@ exports.createBooking = async (req, res) => {
         pricing.basePrice = Number(serviceProvider.price) || 0;
         break;
 
+      case "Ornament":
+      case "Ornaments":
+        console.log("💍 Processing Ornament booking...");
+        if (!ornamentId) {
+          return res.status(400).json({
+            success: false,
+            message: "ornamentId is required for Ornaments booking",
+          });
+        }
+
+        serviceProvider = await Ornament.findById(ornamentId).lean();
+        if (!serviceProvider) {
+          return res.status(404).json({
+            success: false,
+            message: "Ornament not found",
+          });
+        }
+
+        // Determine pricing based on booking mode
+        const mode = (bookingMode || serviceProvider.availabilityMode || "purchase").toLowerCase();
+        console.log("💍 Ornament Mode:", mode);
+
+        if (mode === "rental") {
+          const rental = serviceProvider.rentalPricing || {};
+          const rentalDays = Number(days) > 0 ? Number(days) : 1;
+          pricing.basePrice = (Number(rental.pricePerDay) || 0) * rentalDays;
+          pricing.perDayPrice = Number(rental.pricePerDay) || 0;
+        } else {
+          // Default to purchase
+          const buy = serviceProvider.buyPricing || {};
+          pricing.basePrice = Number(buy.totalPrice) || Number(buy.unitPrice) || 0;
+        }
+        break;
+
       default:
         return res.status(400).json({
           success: false,
@@ -1062,7 +1106,9 @@ exports.createBooking = async (req, res) => {
           ? serviceProvider.advanceDeposit
           : moduleType === "Cake"
             ? serviceProvider.priceInfo?.advanceBookingAmount
-            : serviceProvider.advanceBookingAmount
+            : (moduleKey === "ornament" || moduleKey === "ornaments")
+              ? (bookingMode === "rental" ? serviceProvider.rentalPricing?.advanceForBooking : 0)
+              : serviceProvider.advanceBookingAmount
       ) || 0;
 
     advanceAmount = Math.max(advanceAmount, 0);
@@ -1130,16 +1176,22 @@ exports.createBooking = async (req, res) => {
         },
       }),
 
+      // ================= ORNAMENTS =================
+      ...((moduleKey === "ornament" || moduleKey === "ornaments") && {
+        ornamentId,
+        bookingMode: bookingMode || "purchase",
+      }),
+
       // ================= OTHER MODULES =================
       venueId: moduleType === "Venues" ? venueId : undefined,
       makeupId:
-        moduleType === "Makeup" || moduleType === "Makeup Artist"
+        (moduleType === "Makeup" || moduleType === "Makeup Artist")
           ? makeupId
           : undefined,
       photographyId: moduleType === "Photography" ? photographyId : undefined,
       cateringId: moduleType === "Catering" ? cateringId : undefined,
       numberOfGuests:
-        moduleType === "Venues" || moduleType === "Catering"
+        (moduleType === "Venues" || moduleType === "Catering")
           ? numberOfGuests
           : undefined,
 
@@ -1204,6 +1256,7 @@ exports.getBookingsByUser = async (req, res) => {
       .populate("packageId")
       .populate("moduleId")
       .populate("cakeId")
+      .populate("ornamentId")
 
       .select(
         "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount"
@@ -1411,6 +1464,7 @@ exports.getBookingsByProvider = async (req, res) => {
       .populate("packageId")
       .populate("userId")
       .populate("moduleId")
+      .populate("ornamentId")
       .select(
         "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount +discountValue +couponDiscountValue"
       )
@@ -1523,6 +1577,7 @@ exports.getUpcomingBookings = async (req, res) => {
       .populate("packageId")
       .populate("userId")
       .populate("moduleId")
+      .populate("ornamentId")
       .select("+paymentStatus +paymentType +status +bookingType +finalPrice")
       .lean();
 
@@ -1593,6 +1648,7 @@ exports.getPastBookings = async (req, res) => {
       .populate("packageId")
       .populate("userId")
       .populate("moduleId")
+      .populate("ornamentId")
       .select("+paymentStatus +paymentType +status +bookingType +finalPrice")
       .lean();
 
