@@ -403,7 +403,8 @@ exports.createSmartGatewayPayment = async (req, res) => {
       .populate("venueId")
       .populate("makeupId")
       .populate("photographyId")
-      .populate("cateringId");
+      .populate("cateringId")
+      .populate("ornamentId");
 
     if (!booking) {
       return res.status(404).json({
@@ -416,7 +417,11 @@ exports.createSmartGatewayPayment = async (req, res) => {
     let amountToPay = 0;
 
     // 🎂 CAKE → FULL PAYMENT
-    if (booking.moduleType === "Cake") {
+    // 💍 ORNAMENTS → FULL PAYMENT
+    if (
+      booking.moduleType === "Cake" ||
+      booking.moduleType === "Ornaments"
+    ) {
       amountToPay = Number(booking.finalPrice);
     }
 
@@ -442,6 +447,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
       }
     }
 
+    // ❌ FINAL SAFETY CHECK
     if (amountToPay <= 0) {
       return res.status(400).json({
         success: false,
@@ -449,7 +455,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
       });
     }
 
-    const amount = amountToPay.toFixed(2); // ✅ FIXED
+    const amount = amountToPay.toFixed(2);
     const orderId = `order_${bookingId}_${Date.now()}`;
 
     /* ================= RETURN URL ================= */
@@ -464,8 +470,8 @@ exports.createSmartGatewayPayment = async (req, res) => {
       customer_email: booking.userId.email,
       customer_phone: booking.userId.mobile || "9999999999",
       description:
-        booking.moduleType === "Cake"
-          ? `Cake Payment ₹${amount}`
+        booking.moduleType === "Cake" || booking.moduleType === "Ornaments"
+          ? `Full Payment ₹${amount}`
           : `Advance Payment ₹${amount}`,
       return_url: returnUrl,
 
@@ -493,9 +499,9 @@ exports.createSmartGatewayPayment = async (req, res) => {
     booking.paymentStatus = "initiated";
     booking.paymentOrderId = orderId;
 
-    // Cake → full payment later
+    // Full payment modules → remaining = finalPrice
     booking.paidAmount = 0;
-    booking.remainingAmount = booking.finalPrice;
+    booking.remainingAmount = Number(booking.finalPrice) || 0;
 
     await booking.save();
 
@@ -503,7 +509,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
       success: true,
       order_id: orderId,
       bookingId,
-      payableAmount: amount, // ✅ FIXED
+      payableAmount: amount,
       payment_links: session.payment_links,
       return_url: returnUrl,
     });
@@ -516,6 +522,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
     });
   }
 };
+
 
 /**
  * JUSPAY WEBHOOK HANDLER
