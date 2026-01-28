@@ -1051,13 +1051,28 @@ exports.createBooking = async (req, res) => {
 
         if (mode === "rental") {
           const rental = serviceProvider.rentalPricing || {};
-          const rentalDays = Number(days) > 0 ? Number(days) : 1;
-          pricing.basePrice = (Number(rental.pricePerDay) || 0) * rentalDays;
+          const minDays = Number(rental.minimumDays) || 1;
+          const requestedDays = Number(days) || 0;
+          const finalRentalDays = Math.max(requestedDays, minDays);
+
+          console.log(`💍 Rental days: Requested=${requestedDays}, Min=${minDays}, Final=${finalRentalDays}`);
+
+          pricing.basePrice = (Number(rental.pricePerDay) || 0) * finalRentalDays;
           pricing.perDayPrice = Number(rental.pricePerDay) || 0;
+          pricing.discount = 0; // Rentals usually don't have separate discount in this schema
         } else {
           // Default to purchase
           const buy = serviceProvider.buyPricing || {};
           pricing.basePrice = Number(buy.totalPrice) || Number(buy.unitPrice) || 0;
+
+          // Re-calculate discount if necessary or at least snapshot it
+          if (buy.discountType === "flat") {
+            pricing.discount = Number(buy.discountValue) || 0;
+          } else if (buy.discountType === "percentage") {
+            pricing.discount = (Number(buy.unitPrice || 0) * Number(buy.discountValue || 0)) / 100;
+          } else {
+            pricing.discount = 0;
+          }
         }
         break;
 
@@ -1107,7 +1122,9 @@ exports.createBooking = async (req, res) => {
           : moduleType === "Cake"
             ? serviceProvider.priceInfo?.advanceBookingAmount
             : (moduleKey === "ornament" || moduleKey === "ornaments")
-              ? (bookingMode === "rental" ? serviceProvider.rentalPricing?.advanceForBooking : 0)
+              ? ((bookingMode || serviceProvider.availabilityMode || "purchase").toLowerCase() === "rental"
+                ? serviceProvider.rentalPricing?.advanceForBooking
+                : 0)
               : serviceProvider.advanceBookingAmount
       ) || 0;
 
