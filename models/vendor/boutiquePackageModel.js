@@ -132,9 +132,12 @@ const BoutiqueSchema = new mongoose.Schema(
         },
 
         /* ================= SPECIALIZED FIELDS ================= */
-        fabric: {
-            type: String, // Silk, Cotton, Linen, Velvet, etc.
+        material: {
+            type: String, // Silk, Cotton, Linen, Velvet, etc. (mirrors ingredients in Cake)
         },
+        availableColors: [{ type: String }], // e.g. ["Red", "Blue", "Black"]
+        availableSizes: [{ type: String }], // e.g. ["S", "M", "L", "XL"]
+
         careInstructions: {
             type: String, // Dry clean only, Hand wash, etc.
         },

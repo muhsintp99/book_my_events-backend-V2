@@ -150,7 +150,9 @@ const sanitizeBoutiqueData = (body) => {
     if (data.provider) data.provider = parseObjectId(data.provider);
 
     // Specialized Fields
-    if (data.fabric) data.fabric = data.fabric.trim();
+    if (data.material) data.material = data.material.trim();
+    if (data.availableColors) data.availableColors = parseJSON(data.availableColors, []);
+    if (data.availableSizes) data.availableSizes = parseJSON(data.availableSizes, []);
     if (data.careInstructions) data.careInstructions = data.careInstructions.trim();
 
     // Rental Availability
