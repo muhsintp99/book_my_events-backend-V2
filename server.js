@@ -563,6 +563,7 @@ app.use("/api/availability", require("./routes/vendor/availabilityRoutes"));
 app.use("/api/cakes", require("./routes/vendor/cakePackageRoutes"));
 app.use("/api/cake-addons", require("./routes/vendor/cakeAddonRoutes"));
 app.use("/api/ornaments", require("./routes/vendor/ornamentPackageRoutes"));
+app.use("/api/boutiques", require("./routes/vendor/boutiqueRoutes"));
 
 
 app.use(
