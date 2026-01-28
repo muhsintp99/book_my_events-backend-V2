@@ -14,6 +14,7 @@ const Package = require("../../models/admin/Package");
 
 const Booking = require("../../models/vendor/Booking");
 const Ornament = require("../../models/vendor/ornamentPackageModel");
+const Boutique = require("../../models/vendor/boutiquePackageModel");
 
 // Create a new profile
 
@@ -41,7 +42,7 @@ exports.getAllVendors = async (req, res) => {
         const userRef = v.user?._id;
         const profileRef = v._id;
 
-        const [vehicles, cakes, catering, photography, venues, makeup, genericPackages, ornaments, bookings] = await Promise.all([
+        const [vehicles, cakes, catering, photography, venues, makeup, genericPackages, ornaments, boutiques, bookings] = await Promise.all([
           Vehicle.countDocuments({ provider: { $in: [userRef, profileRef] } }),
           Cake.countDocuments({ provider: { $in: [userRef, profileRef] } }),
           Catering.countDocuments({ provider: { $in: [userRef, profileRef] } }),
@@ -50,6 +51,7 @@ exports.getAllVendors = async (req, res) => {
           Makeup.countDocuments({ provider: { $in: [userRef, profileRef] } }),
           Package.countDocuments({ provider: { $in: [userRef, profileRef] } }),
           Ornament.countDocuments({ provider: { $in: [userRef, profileRef] } }),
+          Boutique.countDocuments({ provider: { $in: [userRef, profileRef] } }),
           Booking.countDocuments({ providerId: userRef })
         ]);
 
@@ -71,7 +73,7 @@ exports.getAllVendors = async (req, res) => {
 
         return {
           ...v.toObject(),
-          packageCount: vehicles + cakes + catering + photography + venues + makeup + genericPackages + ornaments,
+          packageCount: vehicles + cakes + catering + photography + venues + makeup + genericPackages + ornaments + boutiques,
           bookingCount: bookings
         };
       })
@@ -133,6 +135,7 @@ exports.deleteVendorOnly = async (req, res) => {
       Package.deleteMany({ provider: vendorId }),
 
       Ornament.deleteMany({ provider: vendorId }),
+      Boutique.deleteMany({ provider: vendorId }),
       Booking.deleteMany({ providerId: vendorId }),
       Profile.findOneAndDelete({ userId: vendorId }),
       VendorProfile.findOneAndDelete({ user: vendorId }),
@@ -1004,7 +1007,7 @@ exports.getProviderAdminDetails = async (req, res) => {
     }
 
     // 2. Fetch Packages from all modules
-    const [vehicles, cakes, catering, photography, venues, makeup, genericPackages, ornaments] = await Promise.all([
+    const [vehicles, cakes, catering, photography, venues, makeup, genericPackages, ornaments, boutiques] = await Promise.all([
       Vehicle.find({ provider: providerId }).populate("category brand zone"),
       Cake.find({ provider: providerId }).populate("category module"),
       Catering.find({ provider: providerId }).populate("categories module"),
@@ -1013,7 +1016,8 @@ exports.getProviderAdminDetails = async (req, res) => {
       Makeup.find({ provider: providerId }).populate("categories module"),
 
       Package.find({ provider: providerId }).populate("categories module"),
-      Ornament.find({ provider: providerId }).populate("category subCategory module")
+      Ornament.find({ provider: providerId }).populate("category subCategory module"),
+      Boutique.find({ provider: providerId }).populate("category subCategory module")
     ]);
 
     // 3. Fetch Booking History
@@ -1046,7 +1050,8 @@ exports.getProviderAdminDetails = async (req, res) => {
       ...makeup.map(p => ({ ...p.toObject(), type: "Makeup" })),
 
       ...genericPackages.map(p => ({ ...p.toObject(), type: "Package" })),
-      ...ornaments.map(p => ({ ...p.toObject(), type: "Ornament" }))
+      ...ornaments.map(p => ({ ...p.toObject(), type: "Ornament" })),
+      ...boutiques.map(p => ({ ...p.toObject(), type: "Boutique" }))
     ];
 
     return res.status(200).json({
