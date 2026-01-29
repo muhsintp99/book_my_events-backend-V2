@@ -115,12 +115,18 @@ const sanitizeOrnamentData = (body) => {
     };
 
     // Shipping
-    const shippingData = parseJSON(data.shipping, {});
-    data.shipping = {
-        freeShipping: String(shippingData.freeShipping) === "true",
-        flatRateShipping: String(shippingData.flatRateShipping) === "true",
-        shippingPrice: Number(shippingData.shippingPrice || 0),
-    };
+// Shipping (Cake-style with Takeaway + Map)
+const shippingData = parseJSON(data.shipping, {});
+data.shipping = {
+    freeShipping: String(shippingData.freeShipping) === "true",
+    flatRateShipping: String(shippingData.flatRateShipping) === "true",
+    takeaway: String(shippingData.takeaway) === "true",
+    takeawayLocation: shippingData.takeawayLocation || "",
+    pickupLatitude: shippingData.pickupLatitude || "",
+    pickupLongitude: shippingData.pickupLongitude || "",
+    shippingPrice: Number(shippingData.shippingPrice || 0),
+};
+
 
     // Features (nested object with arrays - like UI structure)
     data.occasions = parseJSON(data.occasions, []);

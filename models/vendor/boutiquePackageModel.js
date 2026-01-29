@@ -109,13 +109,17 @@ const BoutiqueSchema = new mongoose.Schema(
         },
 
         /* ================= SHIPPING ================= */
-        shipping: {
-            free: { type: Boolean, default: false },
-            flatRate: { type: Boolean, default: false },
-            takeaway: { type: Boolean, default: false },
-            takeawayLocation: { type: String, default: "" },
-            price: { type: Number, default: 0 },
-        },
+       /* ================= SHIPPING ================= */
+shipping: {
+    free: { type: Boolean, default: false },
+    flatRate: { type: Boolean, default: false },
+    takeaway: { type: Boolean, default: false },
+    takeawayLocation: { type: String, default: "" },
+    pickupLatitude: { type: String, default: "" },
+    pickupLongitude: { type: String, default: "" },
+    price: { type: Number, default: 0 },
+},
+
 
         /* ================= FEATURES & OCCASIONS ================= */
         occasions: [{ type: String }],

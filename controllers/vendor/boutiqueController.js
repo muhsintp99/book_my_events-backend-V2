@@ -119,14 +119,18 @@ const sanitizeBoutiqueData = (body) => {
     };
 
     // Shipping
-    const shippingData = parseJSON(data.shipping, {});
-    data.shipping = {
-        free: String(shippingData.free) === "true",
-        flatRate: String(shippingData.flatRate) === "true",
-        takeaway: String(shippingData.takeaway) === "true",
-        takeawayLocation: shippingData.takeawayLocation || "",
-        price: Number(shippingData.price || 0),
-    };
+   // Shipping (with Takeaway + Map)
+const shippingData = parseJSON(data.shipping, {});
+data.shipping = {
+    free: String(shippingData.free) === "true",
+    flatRate: String(shippingData.flatRate) === "true",
+    takeaway: String(shippingData.takeaway) === "true",
+    takeawayLocation: shippingData.takeawayLocation || "",
+    pickupLatitude: shippingData.pickupLatitude || "",
+    pickupLongitude: shippingData.pickupLongitude || "",
+    price: Number(shippingData.price || 0),
+};
+
 
     data.occasions = parseJSON(data.occasions, []);
     data.tags = parseJSON(data.tags, []);
