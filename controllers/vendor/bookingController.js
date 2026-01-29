@@ -12,6 +12,7 @@ const Catering = require("../../models/vendor/Catering");
 const Vehicle = require("../../models/vendor/Vehicle");
 const Cake = require("../../models/vendor/cakePackageModel");
 const Ornament = require("../../models/vendor/ornamentPackageModel");
+const Boutique = require("../../models/vendor/boutiquePackageModel");
 
 const AUTH_API_URL = "https://api.bookmyevent.ae/api/auth/login";
 
@@ -601,6 +602,7 @@ exports.createBooking = async (req, res) => {
     console.log("📌 Time Slot (RAW):", JSON.stringify(timeSlot));
     console.log("📌 Type of timeSlot:", typeof timeSlot);
     console.log("📌 Is Array:", Array.isArray(timeSlot));
+    console.log("📌 Boutique ID:", req.body.boutiqueId);
 
     // BASIC VALIDATION
     if (!moduleId || !bookingDate || !bookingType) {
@@ -757,10 +759,8 @@ exports.createBooking = async (req, res) => {
     // ===============================
     let normalizedPaymentType = paymentType;
 
-    if (moduleType === "Cake") {
-      if (paymentType === "COD") {
-        normalizedPaymentType = "Cash";
-      }
+    if (paymentType === "COD" || paymentType === "cod") {
+      normalizedPaymentType = "Cash";
     }
 
     // USER HANDLING
@@ -1076,6 +1076,103 @@ exports.createBooking = async (req, res) => {
         }
         break;
 
+      case "Boutique":
+      case "Boutiques":
+        console.log("👗 Processing Boutique booking...");
+        const { boutiqueId } = req.body;
+        if (!boutiqueId) {
+          return res.status(400).json({
+            success: false,
+            message: "boutiqueId is required for Boutique booking",
+          });
+        }
+
+        serviceProvider = await Boutique.findById(boutiqueId).lean();
+        if (!serviceProvider) {
+          return res.status(404).json({
+            success: false,
+            message: "Boutique item not found",
+          });
+        }
+
+        const bMode = (bookingMode || serviceProvider.availabilityMode || "purchase").toLowerCase();
+        console.log("👗 Boutique Mode:", bMode);
+
+        let boutiqueBasePrice = 0;
+        calculatedVariations = [];
+
+        if (Array.isArray(variations) && variations.length > 0) {
+          // Handle variations
+          for (const selected of variations) {
+            const boutiqueVar = serviceProvider.variations?.find(
+              (v) => v._id.toString() === selected._id?.toString()
+            );
+
+            const qty = Number(selected.quantity) > 0 ? Number(selected.quantity) : 1;
+            let price = 0;
+
+            if (boutiqueVar) {
+              price = bMode === "rental"
+                ? (Number(serviceProvider.rentalPricing?.pricePerDay) || 0)
+                : (Number(boutiqueVar.price) || Number(serviceProvider.buyPricing?.unitPrice) || 0);
+            } else {
+              // Fallback to base pricing if variation not found or product has no variations
+              price = bMode === "rental"
+                ? (Number(serviceProvider.rentalPricing?.pricePerDay) || 0)
+                : (Number(serviceProvider.buyPricing?.unitPrice) || 0);
+            }
+
+            const total = price * qty;
+
+            calculatedVariations.push({
+              variationId: boutiqueVar ? boutiqueVar._id : undefined,
+              name: boutiqueVar ? boutiqueVar.name : (selected.name || "Default"),
+              price: price,
+              quantity: qty,
+              totalPrice: total,
+            });
+            boutiqueBasePrice += total;
+          }
+        } else {
+          // No variations, use base pricing
+          const qty = Number(req.body.quantity) > 0 ? Number(req.body.quantity) : 1;
+          const price = bMode === "rental"
+            ? (Number(serviceProvider.rentalPricing?.pricePerDay) || 0)
+            : (Number(serviceProvider.buyPricing?.unitPrice) || 0);
+
+          boutiqueBasePrice = price * qty;
+
+          calculatedVariations.push({
+            name: "Default",
+            price: price,
+            quantity: qty,
+            totalPrice: boutiqueBasePrice
+          });
+        }
+
+        pricing.basePrice = boutiqueBasePrice;
+
+        if (bMode === "rental") {
+          const rental = serviceProvider.rentalPricing || {};
+          const minDays = Number(rental.minimumDays) || 1;
+          const requestedDays = Number(days) || 1;
+          const finalRentalDays = Math.max(requestedDays, minDays);
+
+          pricing.basePrice = pricing.basePrice * finalRentalDays;
+          pricing.perDayPrice = (Number(rental.pricePerDay) || 0);
+          pricing.discount = 0;
+        } else {
+          const buy = serviceProvider.buyPricing || {};
+          if (buy.discountType === "flat") {
+            pricing.discount = Number(buy.discountValue) || 0;
+          } else if (buy.discountType === "percentage") {
+            pricing.discount = (pricing.basePrice * (Number(buy.discountValue) || 0)) / 100;
+          } else {
+            pricing.discount = 0;
+          }
+        }
+        break;
+
       default:
         return res.status(400).json({
           success: false,
@@ -1125,7 +1222,11 @@ exports.createBooking = async (req, res) => {
               ? ((bookingMode || serviceProvider.availabilityMode || "purchase").toLowerCase() === "rental"
                 ? serviceProvider.rentalPricing?.advanceForBooking
                 : 0)
-              : serviceProvider.advanceBookingAmount
+              : (moduleType === "Boutique" || moduleType === "Boutiques")
+                ? ((bookingMode || serviceProvider.availabilityMode || "purchase").toLowerCase() === "rental"
+                  ? serviceProvider.rentalPricing?.advanceForBooking
+                  : 0)
+                : serviceProvider.advanceBookingAmount
       ) || 0;
 
     advanceAmount = Math.max(advanceAmount, 0);
@@ -1193,6 +1294,18 @@ exports.createBooking = async (req, res) => {
         },
       }),
 
+      // ================= BOUTIQUE =================
+      ...((moduleType === "Boutique" || moduleType === "Boutiques") && {
+        boutiqueId: req.body.boutiqueId,
+        boutiqueVariations: calculatedVariations,
+        bookingMode: bookingMode || "purchase",
+        deliveryType,
+        rentalPeriod: (bookingMode === "rental") ? {
+          from: req.body.rentalFrom,
+          to: req.body.rentalTo
+        } : undefined
+      }),
+
       // ================= ORNAMENTS =================
       ...((moduleKey === "ornament" || moduleKey === "ornaments") && {
         ornamentId,
@@ -1207,6 +1320,7 @@ exports.createBooking = async (req, res) => {
           : undefined,
       photographyId: moduleType === "Photography" ? photographyId : undefined,
       cateringId: moduleType === "Catering" ? cateringId : undefined,
+      boutiqueId: (moduleType === "Boutique" || moduleType === "Boutiques") ? req.body.boutiqueId : undefined,
       numberOfGuests:
         (moduleType === "Venues" || moduleType === "Catering")
           ? numberOfGuests
@@ -1274,6 +1388,7 @@ exports.getBookingsByUser = async (req, res) => {
       .populate("moduleId")
       .populate("cakeId")
       .populate("ornamentId")
+      .populate("boutiqueId")
 
       .select(
         "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount"
@@ -1482,6 +1597,7 @@ exports.getBookingsByProvider = async (req, res) => {
       .populate("userId")
       .populate("moduleId")
       .populate("ornamentId")
+      .populate("boutiqueId")
       .select(
         "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount +discountValue +couponDiscountValue"
       )
@@ -1530,6 +1646,7 @@ exports.getBookingById = async (req, res) => {
       .populate("packageId")
       .populate("userId")
       .populate("moduleId")
+      .populate("boutiqueId")
       .select(
         "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount +discountValue +couponDiscountValue"
       )

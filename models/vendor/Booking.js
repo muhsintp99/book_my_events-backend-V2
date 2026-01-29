@@ -266,6 +266,14 @@ const bookingSchema = new mongoose.Schema(
       },
       default: null,
     },
+    boutiqueId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Boutique",
+      required: function () {
+        return this.moduleType === "Boutique" || this.moduleType === "Boutiques";
+      },
+      default: null,
+    },
 
     packageId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -391,6 +399,34 @@ const bookingSchema = new mongoose.Schema(
     ],
 
     // ===============================
+    // BOUTIQUE VARIATIONS
+    // ===============================
+    boutiqueVariations: [
+      {
+        variationId: {
+          type: mongoose.Schema.Types.ObjectId,
+        },
+        name: {
+          type: String,
+          required: true,
+        },
+        price: {
+          type: Number,
+          required: true,
+        },
+        quantity: {
+          type: Number,
+          default: 1,
+          min: 1,
+        },
+        totalPrice: {
+          type: Number,
+          required: true,
+        },
+      },
+    ],
+
+    // ===============================
     // STATUS
     // ===============================
     status: {
@@ -416,8 +452,22 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       enum: ["Takeaway", "Home Delivery"],
       required: function () {
-        return this.moduleType === "Cake";
+        return this.moduleType === "Cake" || this.moduleType === "Boutique" || this.moduleType === "Boutiques";
       },
+    },
+
+    // ===============================
+    // RENTAL / PURCHASE MODE
+    // ===============================
+    bookingMode: {
+      type: String,
+      enum: ["purchase", "rental"],
+      default: "purchase",
+    },
+
+    rentalPeriod: {
+      from: { type: Date },
+      to: { type: Date },
     },
 
 
@@ -438,6 +488,7 @@ const bookingSchema = new mongoose.Schema(
         "Bank Transfer",
         "Net Banking",
         "Other",
+        null
       ],
       default: null,
     },
