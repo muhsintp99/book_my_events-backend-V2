@@ -10,6 +10,9 @@ const upload = createUpload("boutique");
 // -------- Vendor List --------
 router.get("/vendors/:moduleId", boutiqueController.getVendorsForBoutiqueModule);
 
+// -------- Collections --------
+router.get("/collections/list", boutiqueController.getCollections);
+
 // -------- Vendor Packages --------
 router.get("/provider/:providerId", boutiqueController.getBoutiquePackagesByProvider);
 

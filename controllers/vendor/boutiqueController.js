@@ -131,6 +131,14 @@ const sanitizeBoutiqueData = (body) => {
     data.occasions = parseJSON(data.occasions, []);
     data.tags = parseJSON(data.tags, []);
 
+    // Collections
+    data.collections = parseJSON(data.collections, []);
+    if (Array.isArray(data.collections)) {
+        data.collections = data.collections.filter((c) =>
+            ["For Men", "For Women", "For Bride", "For Groom"].includes(c)
+        );
+    }
+
     // Related Items
     data.relatedItems = parseJSON(data.relatedItems, {
         linkBy: "category",
@@ -284,13 +292,16 @@ exports.createBoutique = async (req, res) => {
 
 exports.getAllBoutiques = async (req, res) => {
     try {
-        const { search, category, module, provider } = req.query;
+        const { search, category, module, provider, collection } = req.query;
         let query = {};
 
         if (search) query.$text = { $search: search };
         if (category && mongoose.Types.ObjectId.isValid(category)) query.category = category;
         if (module && mongoose.Types.ObjectId.isValid(module)) query.module = module;
         if (provider && mongoose.Types.ObjectId.isValid(provider)) query.provider = provider;
+        if (collection && ["For Men", "For Women", "For Bride", "For Groom"].includes(collection)) {
+            query.collections = collection;
+        }
 
         const boutiques = await Boutique.find(query).sort({ isTopPick: -1, createdAt: -1 });
         const final = await Promise.all(boutiques.map((b) => populateBoutique(b._id, req)));
@@ -475,5 +486,35 @@ exports.toggleTopPickStatus = async (req, res) => {
     } catch (err) {
         console.error("❌ Toggle TopPick Error:", err);
         return sendResponse(res, 500, false, err.message);
+    }
+};
+exports.getCollections = async (req, res) => {
+    try {
+        const collections = ["For Men", "For Women", "For Bride", "For Groom"];
+        
+        const collectionData = await Promise.all(
+            collections.map(async (collection) => {
+                const packages = await Boutique.find({
+                    collections: collection,
+                    isActive: true,
+                }).sort({ isTopPick: -1, createdAt: -1 }).lean();
+
+                const populatedPackages = await Promise.all(
+                    packages.map((pkg) => populateBoutique(pkg._id, req))
+                );
+
+                return {
+                    name: collection,
+                    count: populatedPackages.length,
+                    icon: `collection-${collection.toLowerCase().replace(/\s+/g, "-")}`,
+                    packages: populatedPackages,
+                };
+            })
+        );
+
+        sendResponse(res, 200, true, "Collections fetched successfully", collectionData);
+    } catch (error) {
+        console.error("GET COLLECTIONS ERROR:", error);
+        sendResponse(res, 500, false, error.message);
     }
 };

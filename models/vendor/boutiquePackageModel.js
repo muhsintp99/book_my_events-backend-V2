@@ -35,6 +35,15 @@ const BoutiqueSchema = new mongoose.Schema(
             ref: "Category",
         },
 
+        /* ================= COLLECTIONS (For Men, For Women, etc) ================= */
+        collections: [
+            {
+                type: String,
+                enum: ["For Men", "For Women", "For Bride", "For Groom"],
+                index: true,
+            },
+        ],
+
         /* ================= IMAGES ================= */
         thumbnail: {
             type: String,
