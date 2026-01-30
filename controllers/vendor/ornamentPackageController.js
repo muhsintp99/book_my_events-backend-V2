@@ -276,8 +276,17 @@ exports.getAllOrnaments = async (req, res) => {
         if (category && mongoose.Types.ObjectId.isValid(category)) query.category = category;
         if (module && mongoose.Types.ObjectId.isValid(module)) query.module = module;
         if (provider && mongoose.Types.ObjectId.isValid(provider)) query.provider = provider;
-        if (collection && ["For Men", "For Women", "For Bride", "For Groom", "For Kids"].includes(collection)) {
-            query.collections = collection;
+
+        // Support both 'collections' field and 'features.suitableFor' field
+        if (collection) {
+            // Normalize the collection parameter: "For Women" -> "women"
+            const normalizedCollection = collection.replace(/^For\s+/i, '').toLowerCase();
+
+            // Query both the collections array AND the features.suitableFor array
+            query.$or = [
+                { collections: collection }, // Check exact match in collections array
+                { "features.suitableFor": normalizedCollection } // Check normalized match in suitableFor
+            ];
         }
 
         const ornaments = await Ornament.find(query).sort({ isTopPick: -1, createdAt: -1 });
