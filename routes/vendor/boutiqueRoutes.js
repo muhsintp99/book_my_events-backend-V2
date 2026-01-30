@@ -8,10 +8,17 @@ const createUpload = require("../../middlewares/upload");
 const upload = createUpload("boutique");
 
 // -------- Vendor List --------
+router.get("/vendors-list", boutiqueController.getBoutiqueVendors);
 router.get("/vendors/:moduleId", boutiqueController.getVendorsForBoutiqueModule);
 
 // -------- Collections --------
 router.get("/collections/list", boutiqueController.getCollections);
+
+// -------- Categories --------
+router.get("/categories/list", boutiqueController.getCategories);
+
+// -------- Occasions --------
+router.get("/occasions/list", boutiqueController.getOccasions);
 
 // -------- Vendor Packages --------
 router.get("/provider/:providerId", boutiqueController.getBoutiquePackagesByProvider);

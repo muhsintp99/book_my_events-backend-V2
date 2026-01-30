@@ -494,12 +494,18 @@ exports.toggleTopPickStatus = async (req, res) => {
 };
 exports.getCollections = async (req, res) => {
     try {
-        const collections = ["For Men", "For Women", "For Bride", "For Groom"];
+        const { collection } = req.query;
+        const allCollections = ["For Men", "For Women", "For Bride", "For Groom"];
+        
+        // Filter to specific collection if provided
+        const collectionsToFetch = collection && allCollections.includes(collection) 
+            ? [collection] 
+            : allCollections;
         
         const collectionData = await Promise.all(
-            collections.map(async (collection) => {
+            collectionsToFetch.map(async (coll) => {
                 const packages = await Boutique.find({
-                    collections: collection,
+                    collections: coll,
                     isActive: true,
                 }).sort({ isTopPick: -1, createdAt: -1 }).lean();
 
@@ -508,9 +514,9 @@ exports.getCollections = async (req, res) => {
                 );
 
                 return {
-                    name: collection,
+                    name: coll,
                     count: populatedPackages.length,
-                    icon: `collection-${collection.toLowerCase().replace(/\s+/g, "-")}`,
+                    icon: `collection-${coll.toLowerCase().replace(/\s+/g, "-")}`,
                     packages: populatedPackages,
                 };
             })

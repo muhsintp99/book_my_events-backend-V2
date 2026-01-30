@@ -115,17 +115,17 @@ const sanitizeOrnamentData = (body) => {
     };
 
     // Shipping
-// Shipping (Cake-style with Takeaway + Map)
-const shippingData = parseJSON(data.shipping, {});
-data.shipping = {
-    freeShipping: String(shippingData.freeShipping) === "true",
-    flatRateShipping: String(shippingData.flatRateShipping) === "true",
-    takeaway: String(shippingData.takeaway) === "true",
-    takeawayLocation: shippingData.takeawayLocation || "",
-    pickupLatitude: shippingData.pickupLatitude || "",
-    pickupLongitude: shippingData.pickupLongitude || "",
-    shippingPrice: Number(shippingData.shippingPrice || 0),
-};
+    // Shipping (Cake-style with Takeaway + Map)
+    const shippingData = parseJSON(data.shipping, {});
+    data.shipping = {
+        freeShipping: String(shippingData.freeShipping) === "true",
+        flatRateShipping: String(shippingData.flatRateShipping) === "true",
+        takeaway: String(shippingData.takeaway) === "true",
+        takeawayLocation: shippingData.takeawayLocation || "",
+        pickupLatitude: shippingData.pickupLatitude || "",
+        pickupLongitude: shippingData.pickupLongitude || "",
+        shippingPrice: Number(shippingData.shippingPrice || 0),
+    };
 
 
     // Features (nested object with arrays - like UI structure)
@@ -422,6 +422,43 @@ exports.getVendorsForOrnamentModule = async (req, res) => {
     }
 };
 
+exports.getOrnamentVendors = async (req, res) => {
+    try {
+        // Find the Ornament module first
+        const Module = require("../../models/admin/module");
+        const ornamentModule = await Module.findOne({ title: /ornament/i });
+
+        if (!ornamentModule) {
+            return sendResponse(res, 404, false, "Ornament module not found");
+        }
+
+        const vendorProfiles = await VendorProfile.find({ module: ornamentModule._id })
+            .select("user storeName logo coverImage")
+            .lean();
+
+        if (!vendorProfiles.length) {
+            return sendResponse(res, 200, true, "No vendors found for Ornament module", []);
+        }
+
+        const vendorIds = vendorProfiles.map((vp) => vp.user);
+
+        const users = await User.find({ _id: { $in: vendorIds } })
+            .select("firstName lastName email phone profilePhoto")
+            .lean();
+
+        const final = await Promise.all(
+            users.map(async (u) => {
+                return await enhanceProviderDetails(u, req);
+            })
+        );
+
+        return sendResponse(res, 200, true, "Ornament vendors fetched successfully", final, { count: final.length });
+    } catch (err) {
+        console.error("❌ Get All Ornament Vendors Error:", err);
+        return sendResponse(res, 500, false, err.message);
+    }
+};
+
 // ----------------------------- GET PACKAGES BY PROVIDER -----------------------------
 exports.getOrnamentPackagesByProvider = async (req, res) => {
     try {
@@ -485,5 +522,130 @@ exports.toggleTopPickStatus = async (req, res) => {
     } catch (err) {
         console.error("❌ Toggle TopPick Error:", err);
         return sendResponse(res, 500, false, err.message);
+    }
+};
+
+// ----------------------------- GET COLLECTIONS (For Men, For Women, etc) -----------------------------
+exports.getCollections = async (req, res) => {
+    try {
+        const { collection } = req.query;
+        const suitableForOptions = ["men", "women", "kids", "bride", "groom"];
+        const displayNames = {
+            men: "For Men",
+            women: "For Women",
+            kids: "For Kids",
+            bride: "For Bride",
+            groom: "For Groom"
+        };
+
+        const optionsToFetch = collection && suitableForOptions.includes(collection)
+            ? [collection]
+            : suitableForOptions;
+
+        const collectionData = await Promise.all(
+            optionsToFetch.map(async (opt) => {
+                const packages = await Ornament.find({
+                    "features.suitableFor": opt,
+                    isActive: true,
+                }).sort({ isTopPick: -1, createdAt: -1 }).lean();
+
+                const populatedPackages = await Promise.all(
+                    packages.map((pkg) => populateOrnament(pkg._id, req))
+                );
+
+                return {
+                    name: displayNames[opt],
+                    slug: opt,
+                    count: populatedPackages.length,
+                    icon: `collection-${opt}`,
+                    packages: populatedPackages,
+                };
+            })
+        );
+
+        sendResponse(res, 200, true, "Collections fetched successfully", collectionData);
+    } catch (error) {
+        console.error("GET COLLECTIONS ERROR:", error);
+        sendResponse(res, 500, false, error.message);
+    }
+};
+
+// ----------------------------- GET CATEGORIES -----------------------------
+exports.getCategories = async (req, res) => {
+    try {
+        const { moduleId } = req.query;
+        let moduleFilter = {};
+
+        if (moduleId && mongoose.Types.ObjectId.isValid(moduleId)) {
+            moduleFilter = { module: moduleId };
+        } else {
+            // Find the Ornament module first
+            const Module = require("../../models/admin/module");
+            const ornamentModule = await Module.findOne({ title: /ornament/i });
+            if (ornamentModule) {
+                moduleFilter = { module: ornamentModule._id };
+            }
+        }
+
+        const categories = await Category.find({
+            ...moduleFilter,
+            parentCategory: null,
+            isActive: true
+        }).lean();
+
+        const finalCategories = await Promise.all(
+            categories.map(async (cat) => {
+                const subCats = await Category.find({
+                    parentCategory: cat._id,
+                    isActive: true
+                }).lean();
+
+                const packageCount = await Ornament.countDocuments({
+                    category: cat._id,
+                    isActive: true
+                });
+
+                return {
+                    ...cat,
+                    subCategories: subCats,
+                    packageCount
+                };
+            })
+        );
+
+        sendResponse(res, 200, true, "Categories fetched successfully", finalCategories);
+    } catch (error) {
+        console.error("GET CATEGORIES ERROR:", error);
+        sendResponse(res, 500, false, error.message);
+    }
+};
+
+// ----------------------------- GET OCCASIONS -----------------------------
+exports.getOccasions = async (req, res) => {
+    try {
+        const occasions = await Ornament.distinct("occasions", { isActive: true });
+        const occasionData = await Promise.all(
+            occasions.map(async (occ) => {
+                const packages = await Ornament.find({
+                    occasions: occ,
+                    isActive: true
+                }).sort({ isTopPick: -1, createdAt: -1 }).limit(10);
+
+                const populated = await Promise.all(
+                    packages.map(p => populateOrnament(p._id, req))
+                );
+
+                return {
+                    name: occ,
+                    count: await Ornament.countDocuments({ occasions: occ, isActive: true }),
+                    packages: populated
+                };
+            })
+        );
+
+        sendResponse(res, 200, true, "Occasions fetched successfully", occasionData);
+    } catch (error) {
+        console.error("GET OCCASIONS ERROR:", error);
+        sendResponse(res, 500, false, error.message);
     }
 };

@@ -8,7 +8,17 @@ const createUpload = require("../../middlewares/upload");
 const upload = createUpload("ornaments");
 
 // -------- Vendor List --------
+router.get("/vendors-list", ornamentController.getOrnamentVendors);
 router.get("/vendors/:moduleId", ornamentController.getVendorsForOrnamentModule);
+
+// -------- Collections --------
+router.get("/collections/list", ornamentController.getCollections);
+
+// -------- Categories --------
+router.get("/categories/list", ornamentController.getCategories);
+
+// -------- Occasions --------
+router.get("/occasions/list", ornamentController.getOccasions);
 
 // -------- Vendor Packages --------
 router.get("/provider/:providerId", ornamentController.getOrnamentPackagesByProvider);
