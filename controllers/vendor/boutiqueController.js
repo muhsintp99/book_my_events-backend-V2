@@ -119,17 +119,17 @@ const sanitizeBoutiqueData = (body) => {
     };
 
     // Shipping
-   // Shipping (with Takeaway + Map)
-const shippingData = parseJSON(data.shipping, {});
-data.shipping = {
-    free: String(shippingData.free) === "true",
-    flatRate: String(shippingData.flatRate) === "true",
-    takeaway: String(shippingData.takeaway) === "true",
-    takeawayLocation: shippingData.takeawayLocation || "",
-    pickupLatitude: shippingData.pickupLatitude || "",
-    pickupLongitude: shippingData.pickupLongitude || "",
-    price: Number(shippingData.price || 0),
-};
+    // Shipping (with Takeaway + Map)
+    const shippingData = parseJSON(data.shipping, {});
+    data.shipping = {
+        free: String(shippingData.free) === "true",
+        flatRate: String(shippingData.flatRate) === "true",
+        takeaway: String(shippingData.takeaway) === "true",
+        takeawayLocation: shippingData.takeawayLocation || "",
+        pickupLatitude: shippingData.pickupLatitude || "",
+        pickupLongitude: shippingData.pickupLongitude || "",
+        price: Number(shippingData.price || 0),
+    };
 
 
     data.occasions = parseJSON(data.occasions, []);
@@ -492,16 +492,133 @@ exports.toggleTopPickStatus = async (req, res) => {
         return sendResponse(res, 500, false, err.message);
     }
 };
+
+/* =====================================================
+   ADDITIONAL LISTS (Vendors, Categories, Occasions)
+===================================================== */
+
+exports.getBoutiqueVendors = async (req, res) => {
+    try {
+        const Module = require("../../models/admin/module");
+        const boutiqueModule = await Module.findOne({ title: /boutique/i });
+
+        if (!boutiqueModule) {
+            return sendResponse(res, 404, false, "Boutique module not found");
+        }
+
+        const vendorProfiles = await VendorProfile.find({ module: boutiqueModule._id })
+            .select("user storeName logo coverImage")
+            .lean();
+
+        if (!vendorProfiles.length) {
+            return sendResponse(res, 200, true, "No vendors found for Boutique module", []);
+        }
+
+        const vendorIds = vendorProfiles.map((vp) => vp.user);
+
+        const users = await User.find({ _id: { $in: vendorIds } })
+            .select("firstName lastName email phone profilePhoto")
+            .lean();
+
+        const final = await Promise.all(
+            users.map(async (u) => {
+                return await enhanceProviderDetails(u, req);
+            })
+        );
+
+        return sendResponse(res, 200, true, "Boutique vendors fetched successfully", final, { count: final.length });
+    } catch (err) {
+        console.error("❌ Get All Boutique Vendors Error:", err);
+        return sendResponse(res, 500, false, err.message);
+    }
+};
+
+exports.getCategories = async (req, res) => {
+    try {
+        const { moduleId } = req.query;
+        let moduleFilter = {};
+
+        if (moduleId && mongoose.Types.ObjectId.isValid(moduleId)) {
+            moduleFilter = { module: moduleId };
+        } else {
+            const Module = require("../../models/admin/module");
+            const boutiqueModule = await Module.findOne({ title: /boutique/i });
+            if (boutiqueModule) {
+                moduleFilter = { module: boutiqueModule._id };
+            }
+        }
+
+        const categories = await Category.find({
+            ...moduleFilter,
+            parentCategory: null,
+            isActive: true
+        }).lean();
+
+        const finalCategories = await Promise.all(
+            categories.map(async (cat) => {
+                const subCats = await Category.find({
+                    parentCategory: cat._id,
+                    isActive: true
+                }).lean();
+
+                const packageCount = await Boutique.countDocuments({
+                    category: cat._id,
+                    isActive: true
+                });
+
+                return {
+                    ...cat,
+                    subCategories: subCats,
+                    packageCount
+                };
+            })
+        );
+
+        sendResponse(res, 200, true, "Categories fetched successfully", finalCategories);
+    } catch (error) {
+        console.error("GET CATEGORIES ERROR:", error);
+        sendResponse(res, 500, false, error.message);
+    }
+};
+
+exports.getOccasions = async (req, res) => {
+    try {
+        const occasions = await Boutique.distinct("occasions", { isActive: true });
+        const occasionData = await Promise.all(
+            occasions.map(async (occ) => {
+                const packages = await Boutique.find({
+                    occasions: occ,
+                    isActive: true
+                }).sort({ isTopPick: -1, createdAt: -1 }).limit(10);
+
+                const populated = await Promise.all(
+                    packages.map(p => populateBoutique(p._id, req))
+                );
+
+                return {
+                    name: occ,
+                    count: await Boutique.countDocuments({ occasions: occ, isActive: true }),
+                    packages: populated
+                };
+            })
+        );
+
+        sendResponse(res, 200, true, "Occasions fetched successfully", occasionData);
+    } catch (error) {
+        console.error("GET OCCASIONS ERROR:", error);
+        sendResponse(res, 500, false, error.message);
+    }
+};
 exports.getCollections = async (req, res) => {
     try {
         const { collection } = req.query;
         const allCollections = ["For Men", "For Women", "For Bride", "For Groom"];
-        
+
         // Filter to specific collection if provided
-        const collectionsToFetch = collection && allCollections.includes(collection) 
-            ? [collection] 
+        const collectionsToFetch = collection && allCollections.includes(collection)
+            ? [collection]
             : allCollections;
-        
+
         const collectionData = await Promise.all(
             collectionsToFetch.map(async (coll) => {
                 const packages = await Boutique.find({
