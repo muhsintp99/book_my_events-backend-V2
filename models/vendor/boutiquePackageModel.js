@@ -39,7 +39,7 @@ const BoutiqueSchema = new mongoose.Schema(
         collections: [
             {
                 type: String,
-                enum: ["For Men", "For Women", "For Bride", "For Groom"],
+                enum: ["For Men", "For Women", "For Bride", "For Groom", "For Kids"],
                 index: true,
             },
         ],

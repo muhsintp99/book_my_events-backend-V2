@@ -27,6 +27,10 @@ router.get("/provider/:providerId", ornamentController.getOrnamentPackagesByProv
 router.patch("/:id/toggle-active", ornamentController.toggleActiveStatus);
 router.patch("/:id/toggle-top-pick", ornamentController.toggleTopPickStatus);
 
+// -------- Bulk Collections Migration --------
+router.post("/migrate/bulk-collections", ornamentController.bulkAddCollections);
+router.patch("/:id/add-collection", ornamentController.addCollectionToOrnament);
+
 /* =====================================================
    CRUD ROUTES
 ===================================================== */

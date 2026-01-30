@@ -147,6 +147,14 @@ const sanitizeOrnamentData = (body) => {
     data.tags = parseJSON(data.tags, []);
     data.termsAndConditions = parseJSON(data.termsAndConditions, []);
 
+    // Collections
+    data.collections = parseJSON(data.collections, []);
+    if (Array.isArray(data.collections)) {
+        data.collections = data.collections.filter((c) =>
+            ["For Men", "For Women", "For Bride", "For Groom", "For Kids"].includes(c)
+        );
+    }
+
     // Related Items
     data.relatedItems = parseJSON(data.relatedItems, {
         linkBy: "category",
@@ -261,13 +269,16 @@ exports.createOrnament = async (req, res) => {
 
 exports.getAllOrnaments = async (req, res) => {
     try {
-        const { search, category, module, provider } = req.query;
+        const { search, category, module, provider, collection } = req.query;
         let query = {};
 
         if (search) query.$text = { $search: search };
         if (category && mongoose.Types.ObjectId.isValid(category)) query.category = category;
         if (module && mongoose.Types.ObjectId.isValid(module)) query.module = module;
         if (provider && mongoose.Types.ObjectId.isValid(provider)) query.provider = provider;
+        if (collection && ["For Men", "For Women", "For Bride", "For Groom", "For Kids"].includes(collection)) {
+            query.collections = collection;
+        }
 
         const ornaments = await Ornament.find(query).sort({ isTopPick: -1, createdAt: -1 });
         const final = await Promise.all(ornaments.map((o) => populateOrnament(o._id, req)));
@@ -646,6 +657,66 @@ exports.getOccasions = async (req, res) => {
         sendResponse(res, 200, true, "Occasions fetched successfully", occasionData);
     } catch (error) {
         console.error("GET OCCASIONS ERROR:", error);
+        sendResponse(res, 500, false, error.message);
+    }
+};
+
+/* =====================================================
+   BULK UPDATE - ADD COLLECTIONS TO EXISTING ORNAMENTS
+===================================================== */
+
+exports.bulkAddCollections = async (req, res) => {
+    try {
+        const { collection } = req.body;
+
+        if (!collection || !["For Men", "For Women", "For Bride", "For Groom", "For Kids"].includes(collection)) {
+            return sendResponse(res, 400, false, "Invalid collection. Must be one of: For Men, For Women, For Bride, For Groom, For Kids");
+        }
+
+        // Update all ornaments that don't have collections yet
+        const result = await Ornament.updateMany(
+            { collections: { $exists: false } },
+            { $set: { collections: [collection] } }
+        );
+
+        sendResponse(res, 200, true, `Updated ${result.modifiedCount} ornaments with collection: ${collection}`, {
+            modifiedCount: result.modifiedCount,
+            matchedCount: result.matchedCount,
+        });
+    } catch (error) {
+        console.error("BULK UPDATE COLLECTIONS ERROR:", error);
+        sendResponse(res, 500, false, error.message);
+    }
+};
+
+exports.addCollectionToOrnament = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { collection } = req.body;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return sendResponse(res, 400, false, "Invalid ornament ID");
+        }
+
+        if (!collection || !["For Men", "For Women", "For Bride", "For Groom", "For Kids"].includes(collection)) {
+            return sendResponse(res, 400, false, "Invalid collection");
+        }
+
+        const ornament = await Ornament.findById(id);
+        if (!ornament) {
+            return sendResponse(res, 404, false, "Ornament not found");
+        }
+
+        // Add collection if it doesn't exist
+        if (!ornament.collections.includes(collection)) {
+            ornament.collections.push(collection);
+            await ornament.save();
+        }
+
+        const populated = await populateOrnament(ornament._id, req);
+        sendResponse(res, 200, true, `Collection '${collection}' added to ornament`, populated);
+    } catch (error) {
+        console.error("ADD COLLECTION ERROR:", error);
         sendResponse(res, 500, false, error.message);
     }
 };

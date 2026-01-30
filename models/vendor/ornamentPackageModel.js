@@ -21,6 +21,16 @@ const OrnamentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
     },
+
+    /* ================= COLLECTIONS (For Men, For Women, etc) ================= */
+    collections: [
+      {
+        type: String,
+        enum: ["For Men", "For Women", "For Bride", "For Groom", "For Kids"],
+        index: true,
+      },
+    ],
+
     unit: {
       type: String, // e.g., "Gram", "Kg", "Piece"
     },

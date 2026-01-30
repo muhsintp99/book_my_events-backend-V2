@@ -139,7 +139,7 @@ const sanitizeBoutiqueData = (body) => {
     data.collections = parseJSON(data.collections, []);
     if (Array.isArray(data.collections)) {
         data.collections = data.collections.filter((c) =>
-            ["For Men", "For Women", "For Bride", "For Groom"].includes(c)
+            ["For Men", "For Women", "For Bride", "For Groom", "For Kids"].includes(c)
         );
     }
 
@@ -303,7 +303,7 @@ exports.getAllBoutiques = async (req, res) => {
         if (category && mongoose.Types.ObjectId.isValid(category)) query.category = category;
         if (module && mongoose.Types.ObjectId.isValid(module)) query.module = module;
         if (provider && mongoose.Types.ObjectId.isValid(provider)) query.provider = provider;
-        if (collection && ["For Men", "For Women", "For Bride", "For Groom"].includes(collection)) {
+        if (collection && ["For Men", "For Women", "For Bride", "For Groom", "For Kids"].includes(collection)) {
             query.collections = collection;
         }
 
@@ -612,11 +612,11 @@ exports.getOccasions = async (req, res) => {
 exports.getCollections = async (req, res) => {
     try {
         const { collection } = req.query;
-        const allCollections = ["For Men", "For Women", "For Bride", "For Groom"];
-
+        const allCollections = ["For Men", "For Women", "For Bride", "For Groom", "For Kids"];
+        
         // Filter to specific collection if provided
-        const collectionsToFetch = collection && allCollections.includes(collection)
-            ? [collection]
+        const collectionsToFetch = collection && allCollections.includes(collection) 
+            ? [collection] 
             : allCollections;
 
         const collectionData = await Promise.all(
