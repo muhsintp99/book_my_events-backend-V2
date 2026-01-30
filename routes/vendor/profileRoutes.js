@@ -44,6 +44,9 @@ router.delete("/vendor/:vendorId", profileController.deleteVendorOnly);
 // ✅ GET PROVIDER FULL DETAILS (ADMIN)
 router.get("/admin/vendor/:providerId/details", profileController.getProviderAdminDetails);
 
+// ✅ GET VENDOR COLLECTION DETAILS (Aggregated User, Profile, VendorProfile)
+router.get("/vendor/:providerId/collection-details", profileController.getVendorCollectionDetails);
+
 /* ---------- PROFILE ROUTES ---------- */
 
 // Create Profile

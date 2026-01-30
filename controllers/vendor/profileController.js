@@ -1077,4 +1077,67 @@ exports.getProviderAdminDetails = async (req, res) => {
   }
 };
 
+// ✅ GET VENDOR COLLECTION DETAILS (USER, PROFILE, VENDORPROFILE)
+exports.getVendorCollectionDetails = async (req, res) => {
+  try {
+    const { providerId } = req.params;
 
+    if (!mongoose.Types.ObjectId.isValid(providerId)) {
+      return res.status(400).json({ success: false, message: "Invalid provider ID format" });
+    }
+
+    // 1. Fetch data from all three models in parallel
+    const [user, profile, vendorProfile] = await Promise.all([
+      User.findById(providerId).select("firstName lastName email phone profilePhoto"),
+      Profile.findOne({ userId: providerId }).select("-bankDetails -kycDetails"),
+      VendorProfile.findOne({ user: providerId })
+        .populate("zone", "name description city country")
+    ]);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // 2. Format the response data as requested
+    const responseData = {
+      user: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        profilePhoto: user.profilePhoto
+      },
+      profile: profile ? {
+        socialMediaLinks: profile.socialLinks || {},
+        vendorName: profile.vendorName,
+        businessAddress: profile.businessAddress,
+        profilePhoto: profile.profilePhoto,
+        coverImage: profile.coverImage
+      } : null,
+      vendorProfile: vendorProfile ? {
+        storeName: vendorProfile.storeName,
+        storeAddress: vendorProfile.storeAddress,
+        logo: vendorProfile.logo || "",
+        coverImage: vendorProfile.coverImage || "",
+        latitude: vendorProfile.latitude,
+        longitude: vendorProfile.longitude,
+        zone: vendorProfile.zone,
+        subscriptionStatus: vendorProfile.subscriptionStatus
+      } : null
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: "Vendor collection details fetched successfully",
+      data: responseData
+    });
+
+  } catch (error) {
+    console.error("Get Vendor Collection Details Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
