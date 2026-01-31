@@ -1499,8 +1499,10 @@ async function calculateVenuePricing(
 
   const perDayPrice = priceData.perDay || 0;
   const perPerson = priceData.perPerson || 0;
+  const perHour = priceData.perHour || 0;
 
-  const basePrice = perDayPrice > 0 ? perDayPrice : perPerson * numberOfGuests;
+  // Additive pricing: combine base rent (perDay/perHour) and per-guest fee
+  const basePrice = perDayPrice + (perHour * 1) + (perPerson * numberOfGuests);
 
   const discount = venue.discount?.nonAc || 0;
 
