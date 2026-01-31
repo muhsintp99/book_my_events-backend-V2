@@ -531,7 +531,6 @@ app.use("/api/delete-user", require("./routes/userDeleteRoutes"));
 // ===== Admin =====
 app.use("/api/modules", require("./routes/admin/moduleRoutes"));
 app.use("/api/secondary-modules", require("./routes/admin/secondaryModuleRoutes"));
-app.use("/api/categories", require("./routes/admin/categoryRoutes"));
 app.use("/api/vehicle-categories", require("./routes/admin/vehiclecategoryRoutes"));
 app.use("/api/brands", require("./routes/admin/brandRoutes"));
 app.use("/api/coupons", require("./routes/admin/couponsRouters"));
