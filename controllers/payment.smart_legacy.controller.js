@@ -357,8 +357,6 @@ console.log("✅ Juspay SDK initialized with BASIC Auth");
 console.log("   Merchant ID:", config.MERCHANT_ID);
 console.log("   Base URL:", config.BASE_URL);
 
-const FULL_PAYMENT_MODULES = ["Cake", "Ornaments", "Boutique"];
-
 /**
  * TEST SDK CONNECTION
  */
@@ -406,9 +404,7 @@ exports.createSmartGatewayPayment = async (req, res) => {
       .populate("makeupId")
       .populate("photographyId")
       .populate("cateringId")
-      .populate("ornamentId")
-      .populate("boutiqueId");
-
+      .populate("ornamentId");
 
     if (!booking) {
       return res.status(404).json({
@@ -422,10 +418,12 @@ exports.createSmartGatewayPayment = async (req, res) => {
 
     // 🎂 CAKE → FULL PAYMENT
     // 💍 ORNAMENTS → FULL PAYMENT
-   if (FULL_PAYMENT_MODULES.includes(booking.moduleType)) {
-  amountToPay = Number(booking.finalPrice);
-}
-
+    if (
+      booking.moduleType === "Cake" ||
+      booking.moduleType === "Ornaments"
+    ) {
+      amountToPay = Number(booking.finalPrice);
+    }
 
     // 🧾 OTHER MODULES → ADVANCE PAYMENT
     else {
@@ -471,10 +469,10 @@ exports.createSmartGatewayPayment = async (req, res) => {
       customer_id: booking.userId._id.toString(),
       customer_email: booking.userId.email,
       customer_phone: booking.userId.mobile || "9999999999",
-      description: FULL_PAYMENT_MODULES.includes(booking.moduleType)
-  ? `Full Payment ₹${amount}`
-  : `Advance Payment ₹${amount}`,
-
+      description:
+        booking.moduleType === "Cake" || booking.moduleType === "Ornaments"
+          ? `Full Payment ₹${amount}`
+          : `Advance Payment ₹${amount}`,
       return_url: returnUrl,
 
       udf1: bookingId,
@@ -502,15 +500,8 @@ exports.createSmartGatewayPayment = async (req, res) => {
     booking.paymentOrderId = orderId;
 
     // Full payment modules → remaining = finalPrice
-   booking.paidAmount = 0;
-
-if (FULL_PAYMENT_MODULES.includes(booking.moduleType)) {
-  booking.remainingAmount = 0;
-} else {
-  booking.remainingAmount =
-    Number(booking.finalPrice) - Number(amount);
-}
-
+    booking.paidAmount = 0;
+    booking.remainingAmount = Number(booking.finalPrice) || 0;
 
     await booking.save();
 
@@ -544,20 +535,14 @@ exports.juspayWebhook = async (req, res) => {
     /* ================= UPDATE BOOKING ================= */
     const booking = await Booking.findOne({ paymentOrderId: order_id });
 
-   if (booking) {
-  if (status === "CHARGED") {
-    booking.paymentStatus = "completed";
-
-    if (FULL_PAYMENT_MODULES.includes(booking.moduleType)) {
-      booking.paidAmount = booking.finalPrice;
-      booking.remainingAmount = 0;
+    if (booking) {
+      if (status === "CHARGED") {
+        booking.paymentStatus = "completed";
+      } else if (status === "FAILED") {
+        booking.paymentStatus = "failed";
+      }
+      await booking.save();
     }
-  } else if (status === "FAILED") {
-    booking.paymentStatus = "failed";
-  }
-  await booking.save();
-}
-
 
     return res.sendStatus(200);
   } catch (err) {
