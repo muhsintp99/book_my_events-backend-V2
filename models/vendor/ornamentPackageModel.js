@@ -82,6 +82,8 @@ const OrnamentSchema = new mongoose.Schema(
       lateCharges: { type: Number, default: 0 },
       totalPrice: { type: Number, default: 0 },
       advanceForBooking: { type: Number, default: 0 },
+      securityDeposit: { type: Number, default: 0 },
+      cleaningFee: { type: Number, default: 0 },
       damagePolicy: { type: String, trim: true },
     },
 
@@ -164,6 +166,15 @@ const OrnamentSchema = new mongoose.Schema(
         enum: ["Ornament", "Category"],
       },
     },
+
+    /* ================= RENTAL CALENDAR ================= */
+    rentalAvailability: [
+      {
+        from: { type: Date },
+        to: { type: Date },
+        isBooked: { type: Boolean, default: false },
+      },
+    ],
 
     /* ================= STATUS & PROVIDER ================= */
     isActive: {

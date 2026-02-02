@@ -104,6 +104,8 @@ const sanitizeOrnamentData = (body) => {
         lateCharges: Number(rp.lateCharges || 0),
         totalPrice: Number(rp.totalPrice || rp.pricePerDay || 0),
         advanceForBooking: Number(rp.advanceForBooking || 0),
+        securityDeposit: Number(rp.securityDeposit || 0),
+        cleaningFee: Number(rp.cleaningFee || 0),
         damagePolicy: rp.damagePolicy || "",
     };
 
@@ -172,6 +174,13 @@ const sanitizeOrnamentData = (body) => {
     if (data.category) data.category = parseObjectId(data.category);
     if (data.subCategory) data.subCategory = parseObjectId(data.subCategory);
     if (data.provider) data.provider = parseObjectId(data.provider);
+
+    // Rental Availability
+    data.rentalAvailability = parseJSON(data.rentalAvailability, []).map(item => ({
+        from: item.from ? new Date(item.from) : null,
+        to: item.to ? new Date(item.to) : null,
+        isBooked: String(item.isBooked) === "true",
+    })).filter(item => item.from && item.to);
 
     return data;
 };

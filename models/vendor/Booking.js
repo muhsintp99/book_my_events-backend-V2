@@ -518,6 +518,9 @@ const bookingSchema = new mongoose.Schema(
 
     advanceAmount: { type: Number, default: 0 },
     remainingAmount: { type: Number, default: 0 },
+
+    securityDeposit: { type: Number, default: 0 },
+    cleaningFee: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

@@ -1057,9 +1057,17 @@ exports.createBooking = async (req, res) => {
 
           console.log(`💍 Rental days: Requested=${requestedDays}, Min=${minDays}, Final=${finalRentalDays}`);
 
-          pricing.basePrice = (Number(rental.pricePerDay) || 0) * finalRentalDays;
+          // Base rent calculation
+          let baseRent = (Number(rental.pricePerDay) || 0) * finalRentalDays;
+
+          // Add non-refundable cleaning fee
+          const cleaningFee = Number(rental.cleaningFee) || 0;
+
+          pricing.basePrice = baseRent + cleaningFee;
           pricing.perDayPrice = Number(rental.pricePerDay) || 0;
-          pricing.discount = 0; // Rentals usually don't have separate discount in this schema
+          pricing.cleaningFee = cleaningFee;
+          pricing.securityDeposit = Number(rental.securityDeposit) || 0;
+          pricing.discount = 0;
         } else {
           // Default to purchase
           const buy = serviceProvider.buyPricing || {};
@@ -1158,8 +1166,16 @@ exports.createBooking = async (req, res) => {
           const requestedDays = Number(days) || 1;
           const finalRentalDays = Math.max(requestedDays, minDays);
 
+          // Base price already has sum of variations or base product
           pricing.basePrice = pricing.basePrice * finalRentalDays;
+
+          // Add non-refundable cleaning fee
+          const cleaningFee = Number(rental.cleaningFee) || 0;
+          pricing.basePrice += cleaningFee;
+
           pricing.perDayPrice = (Number(rental.pricePerDay) || 0);
+          pricing.cleaningFee = cleaningFee;
+          pricing.securityDeposit = Number(rental.securityDeposit) || 0;
           pricing.discount = 0;
         } else {
           const buy = serviceProvider.buyPricing || {};
@@ -1209,7 +1225,15 @@ exports.createBooking = async (req, res) => {
       }
     }
 
-    const finalPrice = Math.max(afterDiscount - couponDiscountValue, 0);
+    let finalPrice = Math.max(afterDiscount - couponDiscountValue, 0);
+
+    // [REAL WORLD RENTAL UPGRADE] 
+    // Add refundable security deposit to total finalPrice for rentals
+    const securityDeposit = pricing.securityDeposit || 0;
+    const cleaningFee = pricing.cleaningFee || 0;
+    if (securityDeposit > 0) {
+      finalPrice += securityDeposit;
+    }
 
     // ADVANCE PAYMENT
     let advanceAmount =
@@ -1228,6 +1252,12 @@ exports.createBooking = async (req, res) => {
                   : 0)
                 : serviceProvider.advanceBookingAmount
       ) || 0;
+
+    // [REAL WORLD RENTAL UPGRADE]
+    // Initial Payment (Advance) must include the full Security Deposit
+    if (securityDeposit > 0) {
+      advanceAmount += securityDeposit;
+    }
 
     advanceAmount = Math.max(advanceAmount, 0);
     const remainingAmount = Math.max(finalPrice - advanceAmount, 0);
@@ -1340,6 +1370,9 @@ exports.createBooking = async (req, res) => {
       finalPrice,
       advanceAmount,
       remainingAmount,
+
+      securityDeposit: securityDeposit || 0,
+      cleaningFee: cleaningFee || 0,
     };
 
     console.log("💾 Creating booking...");

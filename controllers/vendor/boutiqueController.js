@@ -104,6 +104,8 @@ const sanitizeBoutiqueData = (body) => {
         lateCharges: Number(rp.lateCharges || 0),
         totalPrice: Number(rp.totalPrice || rp.pricePerDay || 0),
         advanceForBooking: Number(rp.advanceForBooking || 0),
+        securityDeposit: Number(rp.securityDeposit || 0),
+        cleaningFee: Number(rp.cleaningFee || 0),
         damagePolicy: rp.damagePolicy || "",
     };
 
@@ -613,10 +615,10 @@ exports.getCollections = async (req, res) => {
     try {
         const { collection } = req.query;
         const allCollections = ["For Men", "For Women", "For Bride", "For Groom", "For Kids"];
-        
+
         // Filter to specific collection if provided
-        const collectionsToFetch = collection && allCollections.includes(collection) 
-            ? [collection] 
+        const collectionsToFetch = collection && allCollections.includes(collection)
+            ? [collection]
             : allCollections;
 
         const collectionData = await Promise.all(
