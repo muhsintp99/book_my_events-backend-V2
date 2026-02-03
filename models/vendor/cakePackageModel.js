@@ -156,7 +156,7 @@ const CakeSchema = new mongoose.Schema(
     },
 
 
-      /* ================= SHIPPING ================= */
+    /* ================= SHIPPING ================= */
     shipping: {
       free: { type: Boolean, default: false },
       flatRate: { type: Boolean, default: false },
@@ -213,6 +213,13 @@ const CakeSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    /* ================= TERMS & CONDITIONS ================= */
+    termsAndConditions: [
+      {
+        heading: { type: String, trim: true },
+        points: [{ type: String, trim: true }],
+      },
+    ],
   },
   { timestamps: true }
 );

@@ -136,6 +136,7 @@ const sanitizeBoutiqueData = (body) => {
 
     data.occasions = parseJSON(data.occasions, []);
     data.tags = parseJSON(data.tags, []);
+    data.termsAndConditions = parseJSON(data.termsAndConditions, []);
 
     // Collections
     data.collections = parseJSON(data.collections, []);

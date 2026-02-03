@@ -147,6 +147,7 @@ const sanitizeCakeData = (body) => {
   data.variations = parseJSON(data.variations, []);
   data.occasions = parseJSON(data.occasions, []);
   data.attributes = parseJSON(data.attributes, []);
+  data.termsAndConditions = parseJSON(data.termsAndConditions, []);
 
   // Use new Addon system (Item selection support)
   data.addons = parseJSON(data.addons, []).map((item) => {

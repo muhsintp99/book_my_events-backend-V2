@@ -178,6 +178,12 @@ const BoutiqueSchema = new mongoose.Schema(
             type: String,
             trim: true,
         },
+        termsAndConditions: [
+            {
+                heading: { type: String, trim: true },
+                points: [{ type: String, trim: true }],
+            },
+        ],
 
         /* ================= STATUS & PROVIDER ================= */
         isActive: {
