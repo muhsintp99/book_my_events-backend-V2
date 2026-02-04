@@ -35,6 +35,14 @@ const VehicleSchema = new mongoose.Schema(
       required: [true, "Category is required"],
     },
 
+    // Module
+    module: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Module",
+      required: true,
+      index: true,
+    },
+
     // Subcategory - References Category model (admin can add dynamically)
     // For Car: SUV, Sedan, Jeep, etc.
     // For Bus: Mini Bus, Standard Bus, Luxury Bus, etc.

@@ -618,10 +618,18 @@ exports.createVehicle = async (req, res) => {
   try {
     // Validate parent category
     if (body.category) {
-      const parentExists = await Category.findById(body.category).select("_id");
+      const parentExists = await Category.findById(body.category).select("_id module");
       if (!parentExists) {
         return sendResponse(res, 400, false, "Invalid parent category");
       }
+      // Auto-assign module from category if missing
+      if (!body.module && parentExists.module) {
+        body.module = parentExists.module;
+      }
+    }
+
+    if (!body.module) {
+      return sendResponse(res, 400, false, "Module is required");
     }
 
     // Verify brand exists
@@ -944,8 +952,6 @@ exports.getVendorsForVehicleModule = async (req, res) => {
       .populate("moduleId", "title icon")
       .lean();
 
-    const baseUrl = `${req.protocol}://${req.get("host")}`;
-
     const final = await Promise.all(
       users.map(async (user) => {
         const enhanced = await enhanceProviderDetails(user, req);
@@ -998,6 +1004,9 @@ exports.getVendorsForVehicleModule = async (req, res) => {
       })
     );
 
+    // ✅ FILTER OUT VENDORS WITH ZERO VEHICLES
+    const filtered = final.filter(v => v.packageCount > 0);
+
     // SINGLE vendor (don't filter)
     if (providerId) {
       return res.json({
@@ -1006,9 +1015,6 @@ exports.getVendorsForVehicleModule = async (req, res) => {
         data: final[0] || null,
       });
     }
-
-    // ✅ FILTER OUT VENDORS WITH ZERO VEHICLES
-    const filtered = final.filter(v => v.packageCount > 0);
 
     // ALL vendors (only those with vehicles)
     return res.json({
