@@ -631,6 +631,22 @@ exports.getVendorsForCateringModule = async (req, res) => {
 
     const vendorIds = vendorProfiles.map(vp => vp.user);
 
+    // ✅ COUNT CATERING PACKAGES PER VENDOR using aggregation
+    const cateringCounts = await Catering.aggregate([
+      {
+        $match: {
+          module: new mongoose.Types.ObjectId(moduleId),
+          provider: { $in: vendorIds }
+        }
+      },
+      {
+        $group: {
+          _id: "$provider",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
     // 🔥 Fetch Users
     const users = await User.find({ _id: { $in: vendorIds } })
       .select("firstName lastName email phone profilePhoto")
@@ -638,14 +654,20 @@ exports.getVendorsForCateringModule = async (req, res) => {
 
     const baseUrl = `${req.protocol}://${req.get("host")}`;
 
-    // 🔥 Merge User + VendorProfile
+    // 🔥 Merge User + VendorProfile + Package Count
     const final = await Promise.all(
       users.map(async (u) => {
-        return await enhanceProviderDetails(u, req);
+        const enhanced = await enhanceProviderDetails(u, req);
+
+        // ✅ GET CATERING COUNT FOR THIS VENDOR
+        const cateringCount = cateringCounts.find(c => c._id.toString() === u._id.toString());
+        enhanced.packageCount = cateringCount ? cateringCount.count : 0;
+
+        return enhanced;
       })
     );
 
-    // ⭐ If providerId → return SINGLE vendor
+    // ⭐ If providerId → return SINGLE vendor (don't filter)
     if (providerId) {
       return res.json({
         success: true,
@@ -653,11 +675,14 @@ exports.getVendorsForCateringModule = async (req, res) => {
       });
     }
 
-    // ⭐ Else → return ALL vendors
+    // ✅ FILTER OUT VENDORS WITH ZERO PACKAGES
+    const filtered = final.filter(v => v.packageCount > 0);
+
+    // ⭐ Else → return ALL vendors (only those with packages)
     return res.json({
       success: true,
-      count: final.length,
-      data: final
+      count: filtered.length,
+      data: filtered
     });
 
   } catch (err) {

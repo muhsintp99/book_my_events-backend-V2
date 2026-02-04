@@ -744,6 +744,22 @@ exports.getVendorsForCakeModule = async (req, res) => {
 
     const vendorIds = vendorProfiles.map((v) => v.user);
 
+    // ✅ COUNT CAKES PER VENDOR using aggregation
+    const cakeCounts = await Cake.aggregate([
+      {
+        $match: {
+          module: new mongoose.Types.ObjectId(moduleId),
+          provider: { $in: vendorIds }
+        }
+      },
+      {
+        $group: {
+          _id: "$provider",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
     const users = await User.find({ _id: { $in: vendorIds } })
       .select("firstName lastName email phone profilePhoto")
       .lean();
@@ -766,6 +782,10 @@ exports.getVendorsForCakeModule = async (req, res) => {
         (s) => s.userId.toString() === u._id.toString()
       );
 
+      // ✅ GET CAKE COUNT FOR THIS VENDOR
+      const cakeCount = cakeCounts.find(c => c._id.toString() === u._id.toString());
+      const packageCount = cakeCount ? cakeCount.count : 0;
+
       const now = new Date();
       const isExpired = sub ? sub.endDate < now : true;
       const daysLeft = sub
@@ -783,6 +803,7 @@ exports.getVendorsForCakeModule = async (req, res) => {
         logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
         coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
         hasVendorProfile: true,
+        packageCount, // ✅ ADD PACKAGE COUNT TO RESPONSE
         subscription: sub
           ? {
             isSubscribed: sub.status === "active",
@@ -816,7 +837,7 @@ exports.getVendorsForCakeModule = async (req, res) => {
       };
     });
 
-    // ✅ SINGLE VENDOR
+    // ✅ SINGLE VENDOR (don't filter for single vendor query)
     if (providerId) {
       return res.json({
         success: true,
@@ -825,12 +846,15 @@ exports.getVendorsForCakeModule = async (req, res) => {
       });
     }
 
-    // ✅ ALL VENDORS
+    // ✅ FILTER OUT VENDORS WITH ZERO PACKAGES
+    const filtered = final.filter(v => v.packageCount > 0);
+
+    // ✅ ALL VENDORS (only those with packages)
     return res.json({
       success: true,
       message: "Vendors fetched successfully",
-      count: final.length,
-      data: final,
+      count: filtered.length,
+      data: filtered,
     });
   } catch (err) {
     console.error("GET VENDORS FOR CAKE MODULE ERROR:", err);

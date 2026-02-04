@@ -37,7 +37,7 @@ const deleteFileIfExists = (filePath) => {
 
 // ---------------------- Helper: Populate Makeup ----------------------
 const populateMakeup = async (id, req = null) => {
-  const baseUrl = req 
+  const baseUrl = req
     ? `${req.protocol}://${req.get("host")}`
     : "http://api.bookmyevent.ae";
 
@@ -401,7 +401,7 @@ exports.deleteMakeupPackage = async (req, res) => {
 //     // ⭐⭐ THIS IS WHERE YOU ADD THE CODE ⭐⭐
 //     const final = vendors.map(v => {
 //       const obj = v.toObject();
-      
+
 //       // Set profilePhoto = coverImage
 //       if (obj.profile?.coverImage) {
 //         obj.profilePhoto = `${req.protocol}://${req.get("host")}${obj.profile.coverImage}`;
@@ -450,6 +450,22 @@ exports.getVendorsForMakeupModule = async (req, res) => {
 
     const vendorIds = vendorProfiles.map(v => v.user);
 
+    // ✅ COUNT PACKAGES PER VENDOR using aggregation
+    const packageCounts = await Makeup.aggregate([
+      {
+        $match: {
+          module: new mongoose.Types.ObjectId(moduleId),
+          provider: { $in: vendorIds }
+        }
+      },
+      {
+        $group: {
+          _id: "$provider",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
     const users = await User.find({ _id: { $in: vendorIds } })
       .select("firstName lastName email phone profilePhoto")
       .lean();
@@ -468,6 +484,10 @@ exports.getVendorsForMakeupModule = async (req, res) => {
       const vp = vendorProfiles.find(v => v.user.toString() === u._id.toString());
       const sub = subscriptions.find(s => s.userId.toString() === u._id.toString());
 
+      // ✅ GET PACKAGE COUNT FOR THIS VENDOR
+      const pkgCount = packageCounts.find(p => p._id.toString() === u._id.toString());
+      const packageCount = pkgCount ? pkgCount.count : 0;
+
       const now = new Date();
       const isExpired = sub ? sub.endDate < now : true;
       const daysLeft = sub
@@ -485,49 +505,53 @@ exports.getVendorsForMakeupModule = async (req, res) => {
         logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
         coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
         hasVendorProfile: true,
+        packageCount, // ✅ ADD PACKAGE COUNT TO RESPONSE
         subscription: sub
           ? {
-              isSubscribed: sub.status === "active",
-              status: sub.status,
-              plan: sub.planId,
-              module: sub.moduleId,
-              billing: {
-                startDate: sub.startDate,
-                endDate: sub.endDate,
-                paymentId: sub.paymentId,
-                autoRenew: sub.autoRenew
-              },
-              access: {
-                canAccess: sub.status === "active" && !isExpired,
-                isExpired,
-                daysLeft
-              }
+            isSubscribed: sub.status === "active",
+            status: sub.status,
+            plan: sub.planId,
+            module: sub.moduleId,
+            billing: {
+              startDate: sub.startDate,
+              endDate: sub.endDate,
+              paymentId: sub.paymentId,
+              autoRenew: sub.autoRenew
+            },
+            access: {
+              canAccess: sub.status === "active" && !isExpired,
+              isExpired,
+              daysLeft
             }
+          }
           : {
-              isSubscribed: false,
-              status: "none",
-              plan: null,
-              module: null,
-              billing: null,
-              access: {
-                canAccess: false,
-                isExpired: true,
-                daysLeft: 0
-              }
+            isSubscribed: false,
+            status: "none",
+            plan: null,
+            module: null,
+            billing: null,
+            access: {
+              canAccess: false,
+              isExpired: true,
+              daysLeft: 0
             }
+          }
       };
     });
 
-    // ✅ SINGLE VENDOR
+    // ✅ SINGLE VENDOR (don't filter for single vendor query)
     if (providerId) {
       return res.json({ success: true, data: final[0] || null });
     }
 
-    // ✅ ALL VENDORS
+    // ✅ FILTER OUT VENDORS WITH ZERO PACKAGES
+    const filtered = final.filter(v => v.packageCount > 0);
+
+    // ✅ ALL VENDORS (only those with packages)
     return res.json({
       success: true,
-      count: final.length,
-      data: final
+      count: filtered.length,
+      data: filtered
     });
 
   } catch (err) {

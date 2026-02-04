@@ -383,21 +383,48 @@ exports.getVendorsForBoutiqueModule = async (req, res) => {
 
         const vendorIds = vendorProfiles.map((vp) => vp.user);
 
+        // ✅ COUNT BOUTIQUE PACKAGES PER VENDOR using aggregation
+        const boutiqueCounts = await Boutique.aggregate([
+            {
+                $match: {
+                    module: new mongoose.Types.ObjectId(moduleId),
+                    provider: { $in: vendorIds }
+                }
+            },
+            {
+                $group: {
+                    _id: "$provider",
+                    count: { $sum: 1 }
+                }
+            }
+        ]);
+
         const users = await User.find({ _id: { $in: vendorIds } })
             .select("firstName lastName email phone profilePhoto")
             .lean();
 
         const final = await Promise.all(
             users.map(async (u) => {
-                return await enhanceProviderDetails(u, req);
+                const enhanced = await enhanceProviderDetails(u, req);
+
+                // ✅ GET BOUTIQUE COUNT FOR THIS VENDOR
+                const boutiqueCount = boutiqueCounts.find(b => b._id.toString() === u._id.toString());
+                enhanced.packageCount = boutiqueCount ? boutiqueCount.count : 0;
+
+                return enhanced;
             })
         );
 
+        // Single vendor (don't filter)
         if (providerId) {
             return sendResponse(res, 200, true, "Vendor fetched successfully", final[0] || null);
         }
 
-        return sendResponse(res, 200, true, "Vendors fetched successfully", final, { count: final.length });
+        // ✅ FILTER OUT VENDORS WITH ZERO PACKAGES
+        const filtered = final.filter(v => v.packageCount > 0);
+
+        // All vendors (only those with packages)
+        return sendResponse(res, 200, true, "Vendors fetched successfully", filtered, { count: filtered.length });
     } catch (err) {
         console.error("❌ Get Boutique Vendors Error:", err);
         return sendResponse(res, 500, false, err.message);

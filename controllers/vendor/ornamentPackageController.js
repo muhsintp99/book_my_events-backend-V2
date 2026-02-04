@@ -431,25 +431,50 @@ exports.getVendorsForOrnamentModule = async (req, res) => {
 
         const vendorIds = vendorProfiles.map((vp) => vp.user);
 
+        // ✅ COUNT ORNAMENT PACKAGES PER VENDOR using aggregation
+        const ornamentCounts = await Ornament.aggregate([
+            {
+                $match: {
+                    module: new mongoose.Types.ObjectId(moduleId),
+                    provider: { $in: vendorIds }
+                }
+            },
+            {
+                $group: {
+                    _id: "$provider",
+                    count: { $sum: 1 }
+                }
+            }
+        ]);
+
         // Fetch Users
         const users = await User.find({ _id: { $in: vendorIds } })
             .select("firstName lastName email phone profilePhoto")
             .lean();
 
-        // Merge User + VendorProfile
+        // Merge User + VendorProfile + Package Count
         const final = await Promise.all(
             users.map(async (u) => {
-                return await enhanceProviderDetails(u, req);
+                const enhanced = await enhanceProviderDetails(u, req);
+
+                // ✅ GET ORNAMENT COUNT FOR THIS VENDOR
+                const ornamentCount = ornamentCounts.find(o => o._id.toString() === u._id.toString());
+                enhanced.packageCount = ornamentCount ? ornamentCount.count : 0;
+
+                return enhanced;
             })
         );
 
-        // If providerId -> return SINGLE vendor
+        // If providerId -> return SINGLE vendor (don't filter)
         if (providerId) {
             return sendResponse(res, 200, true, "Vendor fetched successfully", final[0] || null);
         }
 
-        // Else -> return ALL vendors
-        return sendResponse(res, 200, true, "Vendors fetched successfully", final, { count: final.length });
+        // ✅ FILTER OUT VENDORS WITH ZERO PACKAGES
+        const filtered = final.filter(v => v.packageCount > 0);
+
+        // Else -> return ALL vendors (only those with packages)
+        return sendResponse(res, 200, true, "Vendors fetched successfully", filtered, { count: filtered.length });
     } catch (err) {
         console.error("❌ Get Ornament Vendors Error:", err);
         return sendResponse(res, 500, false, err.message);

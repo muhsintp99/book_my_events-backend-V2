@@ -914,6 +914,22 @@ exports.getVendorsForVehicleModule = async (req, res) => {
 
     const vendorIds = vendorProfiles.map((v) => v.user);
 
+    // ✅ COUNT VEHICLES PER VENDOR using aggregation
+    const vehicleCounts = await Vehicle.aggregate([
+      {
+        $match: {
+          module: new mongoose.Types.ObjectId(moduleId),
+          provider: { $in: vendorIds }
+        }
+      },
+      {
+        $group: {
+          _id: "$provider",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
     // Fetch user info
     const users = await User.find({ _id: { $in: vendorIds } })
       .select("firstName lastName email phone profilePhoto")
@@ -936,6 +952,10 @@ exports.getVendorsForVehicleModule = async (req, res) => {
         const sub = subscriptions.find(
           (s) => s.userId.toString() === user._id.toString()
         );
+
+        // ✅ GET VEHICLE COUNT FOR THIS VENDOR
+        const vehicleCount = vehicleCounts.find(v => v._id.toString() === user._id.toString());
+        enhanced.packageCount = vehicleCount ? vehicleCount.count : 0;
 
         const now = new Date();
         const isExpired = sub ? sub.endDate < now : true;
@@ -978,7 +998,7 @@ exports.getVendorsForVehicleModule = async (req, res) => {
       })
     );
 
-    // SINGLE vendor
+    // SINGLE vendor (don't filter)
     if (providerId) {
       return res.json({
         success: true,
@@ -987,12 +1007,15 @@ exports.getVendorsForVehicleModule = async (req, res) => {
       });
     }
 
-    // ALL vendors
+    // ✅ FILTER OUT VENDORS WITH ZERO VEHICLES
+    const filtered = final.filter(v => v.packageCount > 0);
+
+    // ALL vendors (only those with vehicles)
     return res.json({
       success: true,
       message: "Vendors fetched successfully",
-      count: final.length,
-      data: final,
+      count: filtered.length,
+      data: filtered,
     });
   } catch (error) {
     console.error("GET VEHICLE VENDORS ERROR:", error);
