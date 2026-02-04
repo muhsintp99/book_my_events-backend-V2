@@ -46,9 +46,21 @@ exports.createSubscription = async (req, res) => {
     const isLive = process.env.RAZORPAY_KEY_ID.startsWith("rzp_live");
 
     // 🔁 Pick correct Razorpay plan ID (TEST vs LIVE)
-    let razorpayPlanId = isLive
-      ? plan.razorpayPlanIdLive
-      : plan.razorpayPlanIdTest;
+   let razorpayPlanId = isLive
+  ? plan.razorpayPlanIdLive
+  : plan.razorpayPlanIdTest;
+
+// FORCE new plan if price changed
+const expectedAmount = Math.round(Number(plan.price) * 100);
+
+if (razorpayPlanId) {
+  const rpPlan = await razorpay.plans.fetch(razorpayPlanId);
+
+  if (rpPlan.item.amount !== expectedAmount) {
+    console.log("⚠️ Price changed. Creating new Razorpay plan...");
+    razorpayPlanId = null;
+  }
+}
 
     /**
      * =====================================================
