@@ -31,6 +31,9 @@ router.patch("/:id/toggle-top-pick", ornamentController.toggleTopPickStatus);
 router.post("/migrate/bulk-collections", ornamentController.bulkAddCollections);
 router.patch("/:id/add-collection", ornamentController.addCollectionToOrnament);
 
+// -------- Migration --------
+router.post("/migrate-split", ornamentController.migrateAllToSeparate);
+
 /* =====================================================
    CRUD ROUTES
 ===================================================== */
@@ -44,6 +47,17 @@ router.post(
     ]),
     ornamentController.createOrnament
 );
+
+// -------- Rental & Purchase Dedicated Routes --------
+router.get("/rental", (req, res, next) => {
+    req.query.availabilityMode = "rental";
+    next();
+}, ornamentController.getAllOrnaments);
+
+router.get("/purchase", (req, res, next) => {
+    req.query.availabilityMode = "purchase";
+    next();
+}, ornamentController.getAllOrnaments);
 
 // Get all ornaments
 router.get("/", ornamentController.getAllOrnaments);

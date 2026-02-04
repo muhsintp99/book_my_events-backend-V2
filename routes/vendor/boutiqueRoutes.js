@@ -27,6 +27,9 @@ router.get("/provider/:providerId", boutiqueController.getBoutiquePackagesByProv
 router.patch("/:id/toggle-active", boutiqueController.toggleActiveStatus);
 router.patch("/:id/toggle-top-pick", boutiqueController.toggleTopPickStatus);
 
+// -------- Migration --------
+router.post("/migrate-split", boutiqueController.migrateAllToSeparate);
+
 /* =====================================================
    CRUD ROUTES
 ===================================================== */
@@ -42,6 +45,17 @@ router.post(
     ]),
     boutiqueController.createBoutique
 );
+
+// -------- Rental & Purchase Dedicated Routes --------
+router.get("/rental", (req, res, next) => {
+    req.query.availabilityMode = "rental";
+    next();
+}, boutiqueController.getAllBoutiques);
+
+router.get("/purchase", (req, res, next) => {
+    req.query.availabilityMode = "purchase";
+    next();
+}, boutiqueController.getAllBoutiques);
 
 // Get all boutique packages
 router.get("/", boutiqueController.getAllBoutiques);

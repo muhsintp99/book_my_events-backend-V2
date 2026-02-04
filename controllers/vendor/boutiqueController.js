@@ -105,7 +105,6 @@ const sanitizeBoutiqueData = (body) => {
         totalPrice: Number(rp.totalPrice || rp.pricePerDay || 0),
         advanceForBooking: Number(rp.advanceForBooking || 0),
         securityDeposit: Number(rp.securityDeposit || 0),
-        cleaningFee: Number(rp.cleaningFee || 0),
         damagePolicy: rp.damagePolicy || "",
     };
 
@@ -131,6 +130,7 @@ const sanitizeBoutiqueData = (body) => {
         pickupLatitude: shippingData.pickupLatitude || "",
         pickupLongitude: shippingData.pickupLongitude || "",
         price: Number(shippingData.price || 0),
+        minimumShippingDays: Number(shippingData.minimumShippingDays || 0),
     };
 
 
@@ -306,6 +306,9 @@ exports.getAllBoutiques = async (req, res) => {
         if (category && mongoose.Types.ObjectId.isValid(category)) query.category = category;
         if (module && mongoose.Types.ObjectId.isValid(module)) query.module = module;
         if (provider && mongoose.Types.ObjectId.isValid(provider)) query.provider = provider;
+        if (req.query.availabilityMode) {
+            query.availabilityMode = req.query.availabilityMode;
+        }
         if (collection && ["For Men", "For Women", "For Bride", "For Groom", "For Kids"].includes(collection)) {
             query.collections = collection;
         }
@@ -645,6 +648,39 @@ exports.getCollections = async (req, res) => {
         sendResponse(res, 200, true, "Collections fetched successfully", collectionData);
     } catch (error) {
         console.error("GET COLLECTIONS ERROR:", error);
+        sendResponse(res, 500, false, error.message);
+    }
+};
+
+exports.migrateAllToSeparate = async (req, res) => {
+    try {
+        const boutiques = await Boutique.find({
+            availabilityMode: { $nin: ["purchase", "rental"] }
+        });
+
+        if (boutiques.length === 0) {
+            return sendResponse(res, 200, true, "No boutiques with 'all' mode found.");
+        }
+
+        let splitCount = 0;
+        for (const item of boutiques) {
+            const rentalItem = item.toObject();
+            delete rentalItem._id;
+            delete rentalItem.createdAt;
+            delete rentalItem.updatedAt;
+            rentalItem.availabilityMode = "rental";
+            rentalItem.boutiqueId = `BTQ-RENT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+            await Boutique.create(rentalItem);
+
+            item.availabilityMode = "purchase";
+            await item.save();
+            splitCount++;
+        }
+
+        sendResponse(res, 200, true, `Successfully split ${splitCount} boutiques into separate Purchase and Rental records.`);
+    } catch (error) {
+        console.error("MIGRATE BOUTIQUES ERROR:", error);
         sendResponse(res, 500, false, error.message);
     }
 };

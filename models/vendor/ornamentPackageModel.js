@@ -60,7 +60,7 @@ const OrnamentSchema = new mongoose.Schema(
     /* ================= AVAILABILITY & PRICING ================= */
     availabilityMode: {
       type: String,
-      enum: ["purchase", "rental", "all"],
+      enum: ["purchase", "rental"],
       default: "purchase",
     },
 
@@ -83,7 +83,6 @@ const OrnamentSchema = new mongoose.Schema(
       totalPrice: { type: Number, default: 0 },
       advanceForBooking: { type: Number, default: 0 },
       securityDeposit: { type: Number, default: 0 },
-      cleaningFee: { type: Number, default: 0 },
       damagePolicy: { type: String, trim: true },
     },
 
@@ -103,6 +102,7 @@ const OrnamentSchema = new mongoose.Schema(
       pickupLatitude: { type: String, default: "" },
       pickupLongitude: { type: String, default: "" },
       shippingPrice: { type: Number, default: 0 },
+      minimumShippingDays: { type: Number, default: 0 },
     },
 
     /* ================= FEATURES & OCCASIONS ================= */

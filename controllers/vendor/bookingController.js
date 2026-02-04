@@ -1060,12 +1060,8 @@ exports.createBooking = async (req, res) => {
           // Base rent calculation
           let baseRent = (Number(rental.pricePerDay) || 0) * finalRentalDays;
 
-          // Add non-refundable cleaning fee
-          const cleaningFee = Number(rental.cleaningFee) || 0;
-
-          pricing.basePrice = baseRent + cleaningFee;
+          pricing.basePrice = baseRent;
           pricing.perDayPrice = Number(rental.pricePerDay) || 0;
-          pricing.cleaningFee = cleaningFee;
           pricing.securityDeposit = Number(rental.securityDeposit) || 0;
           pricing.discount = 0;
         } else {
@@ -1169,12 +1165,7 @@ exports.createBooking = async (req, res) => {
           // Base price already has sum of variations or base product
           pricing.basePrice = pricing.basePrice * finalRentalDays;
 
-          // Add non-refundable cleaning fee
-          const cleaningFee = Number(rental.cleaningFee) || 0;
-          pricing.basePrice += cleaningFee;
-
           pricing.perDayPrice = (Number(rental.pricePerDay) || 0);
-          pricing.cleaningFee = cleaningFee;
           pricing.securityDeposit = Number(rental.securityDeposit) || 0;
           pricing.discount = 0;
         } else {
@@ -1230,7 +1221,6 @@ exports.createBooking = async (req, res) => {
     // [REAL WORLD RENTAL UPGRADE] 
     // Add refundable security deposit to total finalPrice for rentals
     const securityDeposit = pricing.securityDeposit || 0;
-    const cleaningFee = pricing.cleaningFee || 0;
     if (securityDeposit > 0) {
       finalPrice += securityDeposit;
     }
@@ -1372,7 +1362,6 @@ exports.createBooking = async (req, res) => {
       remainingAmount,
 
       securityDeposit: securityDeposit || 0,
-      cleaningFee: cleaningFee || 0,
     };
 
     console.log("💾 Creating booking...");

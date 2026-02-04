@@ -105,7 +105,6 @@ const sanitizeOrnamentData = (body) => {
         totalPrice: Number(rp.totalPrice || rp.pricePerDay || 0),
         advanceForBooking: Number(rp.advanceForBooking || 0),
         securityDeposit: Number(rp.securityDeposit || 0),
-        cleaningFee: Number(rp.cleaningFee || 0),
         damagePolicy: rp.damagePolicy || "",
     };
 
@@ -127,6 +126,7 @@ const sanitizeOrnamentData = (body) => {
         pickupLatitude: shippingData.pickupLatitude || "",
         pickupLongitude: shippingData.pickupLongitude || "",
         shippingPrice: Number(shippingData.shippingPrice || 0),
+        minimumShippingDays: Number(shippingData.minimumShippingDays || 0),
     };
 
 
@@ -285,6 +285,11 @@ exports.getAllOrnaments = async (req, res) => {
         if (category && mongoose.Types.ObjectId.isValid(category)) query.category = category;
         if (module && mongoose.Types.ObjectId.isValid(module)) query.module = module;
         if (provider && mongoose.Types.ObjectId.isValid(provider)) query.provider = provider;
+
+        // Filter by availability mode (purchase/rental)
+        if (req.query.availabilityMode) {
+            query.availabilityMode = req.query.availabilityMode;
+        }
 
         // Support both 'collections' field and 'features.suitableFor' field
         if (collection) {
@@ -735,6 +740,39 @@ exports.addCollectionToOrnament = async (req, res) => {
         sendResponse(res, 200, true, `Collection '${collection}' added to ornament`, populated);
     } catch (error) {
         console.error("ADD COLLECTION ERROR:", error);
+        sendResponse(res, 500, false, error.message);
+    }
+};
+
+exports.migrateAllToSeparate = async (req, res) => {
+    try {
+        const ornaments = await Ornament.find({
+            availabilityMode: { $nin: ["purchase", "rental"] }
+        });
+
+        if (ornaments.length === 0) {
+            return sendResponse(res, 200, true, "No ornaments with 'all' mode found.");
+        }
+
+        let splitCount = 0;
+        for (const item of ornaments) {
+            const rentalItem = item.toObject();
+            delete rentalItem._id;
+            delete rentalItem.createdAt;
+            delete rentalItem.updatedAt;
+            rentalItem.availabilityMode = "rental";
+            rentalItem.ornamentId = `ORN-RENT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+            await Ornament.create(rentalItem);
+
+            item.availabilityMode = "purchase";
+            await item.save();
+            splitCount++;
+        }
+
+        sendResponse(res, 200, true, `Successfully split ${splitCount} ornaments into separate Purchase and Rental records.`);
+    } catch (error) {
+        console.error("MIGRATE ORNAMENTS ERROR:", error);
         sendResponse(res, 500, false, error.message);
     }
 };
