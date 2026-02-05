@@ -572,7 +572,10 @@ app.use(
 );
 
 
-
+app.use(
+  "/api/brand-platform",
+  require("./routes/admin/brandPlatformRoutes")
+);
 
 
 app.use("/api/vendor/subscription", require("./routes/vendor/subscriptionRequest.routes"));
