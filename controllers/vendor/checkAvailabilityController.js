@@ -96,25 +96,63 @@ exports.checkAvailability = async (req, res) => {
     ========================= */
     const toId = (val) => (mongoose.Types.ObjectId.isValid(val) ? new mongoose.Types.ObjectId(val) : val);
 
+    // 🔥 ROBUST QUERY: Check BOTH module-specific field AND packageId
+    // This handles cases where bookings might have either field populated
+    const pkgId = toId(packageId);
+
     if (vehicleId || title === "Transport") {
-      conflictQuery.vehicleId = toId(vehicleId || packageId);
+      const vId = toId(vehicleId || packageId);
+      conflictQuery.$or = [
+        { vehicleId: vId },
+        { packageId: vId }
+      ];
     } else if (boutiqueId || title === "Boutique" || title === "Boutiques") {
-      conflictQuery.boutiqueId = toId(boutiqueId || packageId);
+      const bId = toId(boutiqueId || packageId);
+      conflictQuery.$or = [
+        { boutiqueId: bId },
+        { packageId: bId }
+      ];
     } else if (ornamentId || title === "Ornaments" || title === "Ornament") {
-      conflictQuery.ornamentId = toId(ornamentId || packageId);
+      const oId = toId(ornamentId || packageId);
+      conflictQuery.$or = [
+        { ornamentId: oId },
+        { packageId: oId }
+      ];
     } else if (cakeId || title === "Cake") {
-      conflictQuery.cakeId = toId(cakeId || packageId);
+      const cId = toId(cakeId || packageId);
+      conflictQuery.$or = [
+        { cakeId: cId },
+        { packageId: cId }
+      ];
     } else if (venueId || title === "Venues") {
-      conflictQuery.venueId = toId(venueId || packageId);
+      const vId = toId(venueId || packageId);
+      conflictQuery.$or = [
+        { venueId: vId },
+        { packageId: vId }
+      ];
     } else if (makeupId || title === "Makeup" || title === "Makeup Artist") {
-      conflictQuery.makeupId = toId(makeupId || packageId);
+      const mId = toId(makeupId || packageId);
+      conflictQuery.$or = [
+        { makeupId: mId },
+        { packageId: mId }
+      ];
     } else if (photographyId || title === "Photography") {
-      conflictQuery.photographyId = toId(photographyId || packageId);
+      const pId = toId(photographyId || packageId);
+      conflictQuery.$or = [
+        { photographyId: pId },
+        { packageId: pId }
+      ];
     } else if (cateringId || title === "Catering") {
-      conflictQuery.cateringId = toId(cateringId || packageId);
+      const cId = toId(cateringId || packageId);
+      conflictQuery.$or = [
+        { cateringId: cId },
+        { packageId: cId }
+      ];
     } else {
-      conflictQuery.packageId = toId(packageId);
+      conflictQuery.packageId = pkgId;
     }
+
+    console.log("🔍 Availability Check Query:", JSON.stringify(conflictQuery, null, 2));
 
     // Exclude current booking (edit case)
     if (bookingId) {
@@ -129,6 +167,8 @@ exports.checkAvailability = async (req, res) => {
       ...conflictQuery,
       status: "Accepted"
     }).select("_id bookingDate status").lean();
+
+    console.log("📊 Accepted Conflict:", acceptedConflict ? "FOUND" : "NONE");
 
     if (acceptedConflict) {
       return res.json({
@@ -145,6 +185,8 @@ exports.checkAvailability = async (req, res) => {
       ...conflictQuery,
       status: "Pending"
     }).select("_id bookingDate status createdAt").sort({ createdAt: -1 }).lean();
+
+    console.log("📊 Pending Conflict:", pendingConflict ? "FOUND" : "NONE");
 
     if (pendingConflict) {
       return res.json({
