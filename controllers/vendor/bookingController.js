@@ -762,13 +762,22 @@ exports.createBooking = async (req, res) => {
     endOfDay.setUTCHours(23, 59, 59, 999);
 
     const title = (moduleData.title || "").trim();
-    const conflictQuery = {
-      moduleId: new mongoose.Types.ObjectId(moduleId),
-      bookingDate: { $gte: startOfDay, $lte: endOfDay },
-      status: { $in: ["Pending", "Accepted"] }
-    };
+   const conflictQuery = {
+  moduleId: mongoose.Types.ObjectId.isValid(moduleId)
+    ? new mongoose.Types.ObjectId(moduleId)
+    : moduleId,
+  bookingDate: { $gte: startOfDay, $lte: endOfDay },
+  status: { $in: ["Pending", "Accepted"] }
+};
 
-    const toId = (val) => (mongoose.Types.ObjectId.isValid(val) ? new mongoose.Types.ObjectId(val) : val);
+
+const toId = (val) => {
+  if (!val) return undefined;
+  if (mongoose.Types.ObjectId.isValid(val)) {
+    return new mongoose.Types.ObjectId(val);
+  }
+  return undefined;
+};
 
     // ID MAPPING (MATCHES checkAvailabilityController)
     if (vehicleId || title === "Transport") {
@@ -780,7 +789,10 @@ exports.createBooking = async (req, res) => {
     } else if (cakeId || title === "Cake") {
       conflictQuery.cakeId = toId(cakeId || packageId);
     } else if (venueId || title === "Venues") {
-      conflictQuery.venueId = toId(venueId || packageId);
+const resolvedVenueId = toId(venueId || packageId);
+if (resolvedVenueId) {
+  conflictQuery.venueId = resolvedVenueId;
+}
     } else if (makeupId || title === "Makeup" || title === "Makeup Artist") {
       conflictQuery.makeupId = toId(makeupId || packageId);
     } else if (photographyId || title === "Photography") {
