@@ -28,27 +28,51 @@
 // =================================================================================================
 
 
+// const express = require('express');
+// const router = express.Router();
+// const {
+//   getMe,
+//   getAllUsers,
+//   getUserById,
+//   updateUser,
+//   deleteUser,
+//   blockUser,
+//   reactivateUser
+// } = require('../controllers/userController');
+
+// // ----------------------
+// // User routes (no auth)
+// // ----------------------
+// router.get('/me', getMe);
+// router.get('/', getAllUsers);                // Get all users
+// router.get('/:id', getUserById);             // Get user by ID
+// router.put('/:id', updateUser);              // Update user
+// router.delete('/:id', deleteUser);           // Delete user
+// router.patch('/:id/block', blockUser);       // Block user
+// router.patch('/:id/reactivate', reactivateUser); // Reactivate user
+
+// module.exports = router;
+
+
 const express = require('express');
 const router = express.Router();
-const {
-  getMe,
-  getAllUsers,
-  getUserById,
-  updateUser,
-  deleteUser,
-  blockUser,
-  reactivateUser
-} = require('../controllers/userController');
+const createUpload = require('../middlewares/upload');
+const controller = require('../controllers/userController');
 
-// ----------------------
-// User routes (no auth)
-// ----------------------
-router.get('/me', getMe);
-router.get('/', getAllUsers);                // Get all users
-router.get('/:id', getUserById);             // Get user by ID
-router.put('/:id', updateUser);              // Update user
-router.delete('/:id', deleteUser);           // Delete user
-router.patch('/:id/block', blockUser);       // Block user
-router.patch('/:id/reactivate', reactivateUser); // Reactivate user
+const upload = createUpload('profile', {
+  fileSizeMB: 5,
+  allowedTypes: ['image/png', 'image/jpeg', 'image/webp']
+});
+
+router.get('/me', controller.getMe);
+router.get('/', controller.getAllUsers);
+router.get('/:id', controller.getUserById);
+
+// 🔥 update user + photo
+router.put('/:id', upload.single("profilePhoto"), controller.updateUser);
+
+router.delete('/:id', controller.deleteUser);
+router.patch('/:id/block', controller.blockUser);
+router.patch('/:id/reactivate', controller.reactivateUser);
 
 module.exports = router;
