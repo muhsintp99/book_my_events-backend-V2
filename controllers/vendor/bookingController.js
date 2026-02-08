@@ -1,3 +1,4 @@
+const mongoose = require("mongoose"); 
 const axios = require("axios");
 const Booking = require("../../models/vendor/Booking");
 const User = require("../../models/User");
@@ -736,6 +737,10 @@ exports.createBooking = async (req, res) => {
     console.log("✅ NORMALIZED TIMESLOT:", JSON.stringify(normalizedTimeSlot));
     console.log("=".repeat(60));
 
+    // DATE NORMALIZATION
+    const normalizedDate = new Date(bookingDate);
+    normalizedDate.setUTCHours(0, 0, 0, 0);
+
     // MODULE
     const moduleData = await Module.findById(moduleId);
     if (!moduleData) {
@@ -747,6 +752,93 @@ exports.createBooking = async (req, res) => {
 
     const moduleType = (moduleData.title || "").trim();
     const moduleKey = moduleType.toLowerCase();
+
+    // -------------------------------------------------------
+    // 🔥 AVAILABILITY & DUPLICATE CHECK
+    // -------------------------------------------------------
+    const startOfDay = new Date(normalizedDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(normalizedDate);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
+    const title = (moduleData.title || "").trim();
+   const conflictQuery = {
+  moduleId: mongoose.Types.ObjectId.isValid(moduleId)
+    ? new mongoose.Types.ObjectId(moduleId)
+    : moduleId,
+  bookingDate: { $gte: startOfDay, $lte: endOfDay },
+  status: { $in: ["Pending", "Accepted"] }
+};
+
+
+const toId = (val) => {
+  if (!val) return undefined;
+  if (mongoose.Types.ObjectId.isValid(val)) {
+    return new mongoose.Types.ObjectId(val);
+  }
+  return undefined;
+};
+
+    // ID MAPPING (MATCHES checkAvailabilityController)
+    if (vehicleId || title === "Transport") {
+      conflictQuery.vehicleId = toId(vehicleId || packageId);
+    } else if (req.body.boutiqueId || title === "Boutique" || title === "Boutiques") {
+      conflictQuery.boutiqueId = toId(req.body.boutiqueId || packageId);
+    } else if (ornamentId || title === "Ornaments" || title === "Ornament") {
+      conflictQuery.ornamentId = toId(ornamentId || packageId);
+    } else if (cakeId || title === "Cake") {
+      conflictQuery.cakeId = toId(cakeId || packageId);
+    } else if (venueId || title === "Venues") {
+const resolvedVenueId = toId(venueId || packageId);
+if (resolvedVenueId) {
+  conflictQuery.venueId = resolvedVenueId;
+}
+    } else if (makeupId || title === "Makeup" || title === "Makeup Artist") {
+      conflictQuery.makeupId = toId(makeupId || packageId);
+    } else if (photographyId || title === "Photography") {
+      conflictQuery.photographyId = toId(photographyId || packageId);
+    } else if (cateringId || title === "Catering") {
+      conflictQuery.cateringId = toId(cateringId || packageId);
+    } else if (packageId) {
+      conflictQuery.packageId = toId(packageId);
+    }
+
+    // 1. Check if SAME user already has a pending or accepted booking for this item/date
+    if (userId || (bookingType === "Direct" && emailAddress)) {
+      const userQuery = {
+        ...conflictQuery,
+        $or: [
+          { userId: mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : undefined },
+          { emailAddress: emailAddress || undefined }
+        ].filter(v => v.userId || v.emailAddress)
+      };
+      const userConflict = await Booking.findOne(userQuery);
+
+      if (userConflict) {
+        return res.status(400).json({
+          success: false,
+          message: `You already have a ${userConflict.status.toLowerCase()} booking request for this date. Please check your bookings.`,
+        });
+      }
+    }
+
+    // 2. Check for conflicts by OTHER users
+    const acceptedConflict = await Booking.findOne({
+      ...conflictQuery,
+      status: "Accepted"
+    });
+
+    const pendingConflict = await Booking.findOne({
+      ...conflictQuery,
+      status: "Pending"
+    });
+
+    let successMessage = "Booking created successfully";
+    if (acceptedConflict) {
+      successMessage = "Your waitlist request has been submitted. This date is already booked, but we will notify you if it becomes available due to a cancellation or vendor confirmation.";
+    } else if (pendingConflict) {
+      successMessage = "Your request has been submitted. This date already has a pending request; the vendor will review all interests and confirm based on availability.";
+    }
 
     console.log("🔥 BOOKING DEBUG:", {
       moduleTitle: moduleData.title,
@@ -1262,7 +1354,7 @@ exports.createBooking = async (req, res) => {
       providerId: serviceProvider.provider || serviceProvider.createdBy,
       userId: user._id,
 
-      bookingDate,
+      bookingDate: normalizedDate,
       timeSlot: normalizedTimeSlot,
 
       ...userDetails,
@@ -1370,7 +1462,7 @@ exports.createBooking = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Booking created successfully",
+      message: successMessage,
       data: booking,
       token,
     });

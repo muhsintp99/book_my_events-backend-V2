@@ -70,20 +70,89 @@ exports.checkAvailability = async (req, res) => {
 
     /* =========================
        NORMALIZE DATE (IMPORTANT)
-       Ensures date-only comparison
+       Ensures date-only comparison via UTC range
     ========================= */
-    const normalizedDate = new Date(bookingDate);
-    normalizedDate.setHours(0, 0, 0, 0);
+    const startOfDay = new Date(bookingDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(bookingDate);
+    endOfDay.setUTCHours(23, 59, 59, 999);
 
     /* =========================
        BUILD CONFLICT QUERY
     ========================= */
+    const { vehicleId, boutiqueId, ornamentId, cakeId, venueId, makeupId, photographyId, cateringId } = req.body;
+
     const conflictQuery = {
-      moduleId,
-      packageId,
-      bookingDate: normalizedDate,
+      moduleId: new mongoose.Types.ObjectId(moduleId),
+      bookingDate: { $gte: startOfDay, $lte: endOfDay },
       status: { $in: ["Pending", "Accepted"] }
     };
+
+    const title = (moduleExists.title || "").trim();
+
+    /* =========================
+       ID MAPPING (UNIVERSAL)
+       Maps provided IDs to correct Booking fields
+    ========================= */
+    const toId = (val) => (mongoose.Types.ObjectId.isValid(val) ? new mongoose.Types.ObjectId(val) : val);
+
+    // 🔥 ROBUST QUERY: Check BOTH module-specific field AND packageId
+    // This handles cases where bookings might have either field populated
+    const pkgId = toId(packageId);
+
+    if (vehicleId || title === "Transport") {
+      const vId = toId(vehicleId || packageId);
+      conflictQuery.$or = [
+        { vehicleId: vId },
+        { packageId: vId }
+      ];
+    } else if (boutiqueId || title === "Boutique" || title === "Boutiques") {
+      const bId = toId(boutiqueId || packageId);
+      conflictQuery.$or = [
+        { boutiqueId: bId },
+        { packageId: bId }
+      ];
+    } else if (ornamentId || title === "Ornaments" || title === "Ornament") {
+      const oId = toId(ornamentId || packageId);
+      conflictQuery.$or = [
+        { ornamentId: oId },
+        { packageId: oId }
+      ];
+    } else if (cakeId || title === "Cake") {
+      const cId = toId(cakeId || packageId);
+      conflictQuery.$or = [
+        { cakeId: cId },
+        { packageId: cId }
+      ];
+    } else if (venueId || title === "Venues") {
+      const vId = toId(venueId || packageId);
+      conflictQuery.$or = [
+        { venueId: vId },
+        { packageId: vId }
+      ];
+    } else if (makeupId || title === "Makeup" || title === "Makeup Artist") {
+      const mId = toId(makeupId || packageId);
+      conflictQuery.$or = [
+        { makeupId: mId },
+        { packageId: mId }
+      ];
+    } else if (photographyId || title === "Photography") {
+      const pId = toId(photographyId || packageId);
+      conflictQuery.$or = [
+        { photographyId: pId },
+        { packageId: pId }
+      ];
+    } else if (cateringId || title === "Catering") {
+      const cId = toId(cateringId || packageId);
+      conflictQuery.$or = [
+        { cateringId: cId },
+        { packageId: cId }
+      ];
+    } else {
+      conflictQuery.packageId = pkgId;
+    }
+
+    console.log("🔍 Availability Check Query:", JSON.stringify(conflictQuery, null, 2));
 
     // Exclude current booking (edit case)
     if (bookingId) {
@@ -91,28 +160,52 @@ exports.checkAvailability = async (req, res) => {
     }
 
     /* =========================
-       CHECK EXISTING BOOKINGS
+       CHECK EXISTING BOOKINGS (Soft-Available)
     ========================= */
-    const conflict = await Booking.findOne(conflictQuery)
-      .select("_id bookingDate status")
-      .lean();
+    // 1. Check for Accepted bookings
+    const acceptedConflict = await Booking.findOne({
+      ...conflictQuery,
+      status: "Accepted"
+    }).select("_id bookingDate status").lean();
 
-    if (conflict) {
+    console.log("📊 Accepted Conflict:", acceptedConflict ? "FOUND" : "NONE");
+
+    if (acceptedConflict) {
       return res.json({
         success: true,
-        available: false,
-        message: "Not available for the selected date",
-        conflict
+        available: true, // Still allow booking (Request List model)
+        availabilityStatus: "Pending",
+        message: "This date is already booked by another customer. You can still submit a waitlist request, and you will be informed if it becomes available due to a cancellation or vendor confirmation.",
+        conflict: acceptedConflict
+      });
+    }
+
+    // 2. Check for Pending bookings
+    const pendingConflict = await Booking.findOne({
+      ...conflictQuery,
+      status: "Pending"
+    }).select("_id bookingDate status createdAt").sort({ createdAt: -1 }).lean();
+
+    console.log("📊 Pending Conflict:", pendingConflict ? "FOUND" : "NONE");
+
+    if (pendingConflict) {
+      return res.json({
+        success: true,
+        available: true, // Still allow booking
+        availabilityStatus: "Pending",
+        message: "This date has a pending request. You can still submit your request, and the vendor will review all interests.",
+        conflict: pendingConflict
       });
     }
 
     /* =========================
-       AVAILABLE
+       COMPLETELY AVAILABLE
     ========================= */
     return res.json({
       success: true,
       available: true,
-      message: "Available for booking"
+      availabilityStatus: "Available",
+      message: "This date is fully available for booking."
     });
 
   } catch (error) {
