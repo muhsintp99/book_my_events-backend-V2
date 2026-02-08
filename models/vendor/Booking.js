@@ -519,6 +519,16 @@ const bookingSchema = new mongoose.Schema(
     advanceAmount: { type: Number, default: 0 },
     remainingAmount: { type: Number, default: 0 },
 
+    /* ================= CAKE ADDONS ================= */
+    addons: [
+      {
+        title: { type: String },
+        price: { type: Number },
+        icon: { type: String }
+      }
+    ],
+    addonTotal: { type: Number, default: 0 },
+
     securityDeposit: { type: Number, default: 0 },
   },
   { timestamps: true }
