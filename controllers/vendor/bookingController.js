@@ -1,4 +1,4 @@
-const mongoose = require("mongoose"); 
+const mongoose = require("mongoose");
 const axios = require("axios");
 const Booking = require("../../models/vendor/Booking");
 const User = require("../../models/User");
@@ -590,6 +590,7 @@ exports.createBooking = async (req, res) => {
       deliveryType,
       customerMessage,
       variations,
+      addons,
       decorationIncluded,
       ornamentId,
       bookingMode, // purchase | rental
@@ -762,22 +763,22 @@ exports.createBooking = async (req, res) => {
     endOfDay.setUTCHours(23, 59, 59, 999);
 
     const title = (moduleData.title || "").trim();
-   const conflictQuery = {
-  moduleId: mongoose.Types.ObjectId.isValid(moduleId)
-    ? new mongoose.Types.ObjectId(moduleId)
-    : moduleId,
-  bookingDate: { $gte: startOfDay, $lte: endOfDay },
-  status: { $in: ["Pending", "Accepted"] }
-};
+    const conflictQuery = {
+      moduleId: mongoose.Types.ObjectId.isValid(moduleId)
+        ? new mongoose.Types.ObjectId(moduleId)
+        : moduleId,
+      bookingDate: { $gte: startOfDay, $lte: endOfDay },
+      status: { $in: ["Pending", "Accepted"] }
+    };
 
 
-const toId = (val) => {
-  if (!val) return undefined;
-  if (mongoose.Types.ObjectId.isValid(val)) {
-    return new mongoose.Types.ObjectId(val);
-  }
-  return undefined;
-};
+    const toId = (val) => {
+      if (!val) return undefined;
+      if (mongoose.Types.ObjectId.isValid(val)) {
+        return new mongoose.Types.ObjectId(val);
+      }
+      return undefined;
+    };
 
     // ID MAPPING (MATCHES checkAvailabilityController)
     if (vehicleId || title === "Transport") {
@@ -789,10 +790,10 @@ const toId = (val) => {
     } else if (cakeId || title === "Cake") {
       conflictQuery.cakeId = toId(cakeId || packageId);
     } else if (venueId || title === "Venues") {
-const resolvedVenueId = toId(venueId || packageId);
-if (resolvedVenueId) {
-  conflictQuery.venueId = resolvedVenueId;
-}
+      const resolvedVenueId = toId(venueId || packageId);
+      if (resolvedVenueId) {
+        conflictQuery.venueId = resolvedVenueId;
+      }
     } else if (makeupId || title === "Makeup" || title === "Makeup Artist") {
       conflictQuery.makeupId = toId(makeupId || packageId);
     } else if (photographyId || title === "Photography") {
@@ -995,6 +996,14 @@ if (resolvedVenueId) {
         }
 
         pricing.basePrice = basePrice;
+
+        /* ✅ CALCULATE ADDON TOTAL */
+        let addonTotal = 0;
+        if (Array.isArray(addons)) {
+          addonTotal = addons.reduce((sum, a) => sum + Number(a.price || 0), 0);
+        }
+        pricing.addonTotal = addonTotal;
+
         pricing.discount = Number(serviceProvider.priceInfo?.discount) || 0;
         break;
 
@@ -1290,7 +1299,7 @@ if (resolvedVenueId) {
 
     // TOTAL CALCULATION
     let totalBeforeDiscount =
-      pricing.basePrice + (moduleType === "Venues" ? packagePrice : 0);
+      pricing.basePrice + (moduleType === "Venues" ? packagePrice : 0) + (pricing.addonTotal || 0);
 
     let afterDiscount = Math.max(
       totalBeforeDiscount - (pricing.discount || 0),
@@ -1363,6 +1372,8 @@ if (resolvedVenueId) {
       ...(moduleType === "Cake" && {
         cakeId,
         cakeVariations: calculatedVariations,
+        addons: addons || [],
+        addonTotal: pricing.addonTotal || 0,
         deliveryType,
         customerMessage,
       }),
