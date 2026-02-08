@@ -121,12 +121,15 @@ const populateAddon = (addon, req) => {
   const baseUrl = `${req.protocol}://${req.get("host")}`;
   const result = addon.toObject();
 
-  result.image = result.image.startsWith("http")
-    ? result.image
-    : `${baseUrl}${normalizeUploadPath(result.image)}`;
+  if (result.image) {
+    result.image = result.image.startsWith("http")
+      ? result.image
+      : `${baseUrl}${normalizeUploadPath(result.image)}`;
+  }
 
   return result;
 };
+
 
 
 exports.createAddon = async (req, res) => {
