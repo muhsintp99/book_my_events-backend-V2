@@ -5,9 +5,9 @@ const createUpload = require("../../middlewares/upload");
 const upload = createUpload("cake-addons");
 
 // CRUD for Addons
-router.post("/", upload.single("icon"), addonController.createAddon);
+router.post("/", upload.single("image"), addonController.createAddon);
 router.get("/provider/:providerId", addonController.getAddonsByProvider);
-router.put("/:id", upload.single("icon"), addonController.updateAddon);
+router.put("/:id", upload.single("image"), addonController.updateAddon);
 router.delete("/:id", addonController.deleteAddon);
 
 // CRUD for Templates

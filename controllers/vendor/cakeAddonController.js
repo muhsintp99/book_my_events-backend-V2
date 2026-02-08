@@ -118,46 +118,43 @@ const deleteFiles = async (files = []) => {
 };
 
 const populateAddon = (addon, req) => {
-    const baseUrl = req ? `${req.protocol}://${req.get("host")}` : "";
-    const result = addon.toObject ? addon.toObject() : addon;
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  const result = addon.toObject();
 
-    if (result.icon) {
-        result.icon = result.icon.startsWith("http")
-            ? result.icon
-            : `${baseUrl}${normalizeUploadPath(result.icon)}`;
-    }
-    return result;
+  result.image = result.image.startsWith("http")
+    ? result.image
+    : `${baseUrl}${normalizeUploadPath(result.image)}`;
+
+  return result;
 };
 
+
 exports.createAddon = async (req, res) => {
-    try {
-        const { title, description, priceList, provider } = req.body;
-        const vendorId = provider || req.user?._id;
+  try {
+    const { title, price, provider } = req.body;
+    const vendorId = provider || req.user?._id;
 
-        if (!vendorId) {
-            return sendResponse(res, 400, false, "Provider is required");
-        }
-
-        const parsedPriceList = typeof priceList === "string" ? JSON.parse(priceList) : priceList;
-
-        const addonData = {
-            title,
-            description,
-            priceList: parsedPriceList || [],
-            provider: vendorId,
-        };
-
-        if (req.file) {
-            addonData.icon = req.file.path;
-        }
-
-        const addon = await CakeAddon.create(addonData);
-        sendResponse(res, 201, true, "Addon created successfully", populateAddon(addon, req));
-    } catch (error) {
-        if (req.file) await deleteFiles([req.file.path]);
-        console.error("CREATE ADDON ERROR:", error);
-        sendResponse(res, 500, false, error.message);
+    if (!vendorId) {
+      return sendResponse(res, 400, false, "Provider is required");
     }
+
+    if (!req.file) {
+      return sendResponse(res, 400, false, "Addon image is required");
+    }
+
+    const addon = await CakeAddon.create({
+      title,
+      price,
+      provider: vendorId,
+      image: req.file.path,
+    });
+
+    sendResponse(res, 201, true, "Addon created successfully", populateAddon(addon, req));
+  } catch (error) {
+    if (req.file) await deleteFiles([req.file.path]);
+    console.error("CREATE ADDON ERROR:", error);
+    sendResponse(res, 500, false, error.message);
+  }
 };
 
 exports.getAddonsByProvider = async (req, res) => {
@@ -178,33 +175,30 @@ exports.getAddonsByProvider = async (req, res) => {
 };
 
 exports.updateAddon = async (req, res) => {
-    try {
-        const addon = await CakeAddon.findById(req.params.id);
-        if (!addon) {
-            return sendResponse(res, 404, false, "Addon not found");
-        }
-
-        if (req.user?.role === "vendor" && addon.provider.toString() !== req.user._id.toString()) {
-            return sendResponse(res, 403, false, "Unauthorized");
-        }
-
-        const { title, description, priceList } = req.body;
-        if (title) addon.title = title;
-        if (description) addon.description = description;
-        if (priceList) addon.priceList = typeof priceList === "string" ? JSON.parse(priceList) : priceList;
-
-        if (req.file) {
-            if (addon.icon) await deleteFiles([addon.icon]);
-            addon.icon = req.file.path;
-        }
-
-        await addon.save();
-        sendResponse(res, 200, true, "Addon updated successfully", populateAddon(addon, req));
-    } catch (error) {
-        console.error("UPDATE ADDON ERROR:", error);
-        sendResponse(res, 500, false, error.message);
+  try {
+    const addon = await CakeAddon.findById(req.params.id);
+    if (!addon) {
+      return sendResponse(res, 404, false, "Addon not found");
     }
+
+    const { title, price } = req.body;
+
+    if (title) addon.title = title;
+    if (price !== undefined) addon.price = price;
+
+    if (req.file) {
+      if (addon.image) await deleteFiles([addon.image]);
+      addon.image = req.file.path;
+    }
+
+    await addon.save();
+    sendResponse(res, 200, true, "Addon updated successfully", populateAddon(addon, req));
+  } catch (error) {
+    console.error("UPDATE ADDON ERROR:", error);
+    sendResponse(res, 500, false, error.message);
+  }
 };
+
 
 exports.deleteAddon = async (req, res) => {
     try {
@@ -217,7 +211,7 @@ exports.deleteAddon = async (req, res) => {
             return sendResponse(res, 403, false, "Unauthorized");
         }
 
-        if (addon.icon) await deleteFiles([addon.icon]);
+if (addon.image) await deleteFiles([addon.image]);
         await addon.deleteOne();
 
         sendResponse(res, 200, true, "Addon deleted successfully");
