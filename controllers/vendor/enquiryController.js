@@ -6,49 +6,31 @@ const Makeup = require("../../models/admin/makeupPackageModel");
 const Photography = require("../../models/vendor/PhotographyPackage");
 
 /* ======================================================
-   🔥 UNIVERSAL PACKAGE RESOLVER (CORE FIX)
+   UNIVERSAL PACKAGE RESOLVER (FIXED)
 ====================================================== */
 const resolvePackageDetails = async (moduleTitle, packageId) => {
   if (!moduleTitle || !packageId) return null;
 
-  // -------- VENUES --------
   if (moduleTitle === "Venues") {
     return await Venue.findById(packageId)
-      .populate({
-        path: "categories",
-        select: "title image categoryId isActive",
-        populate: { path: "module", select: "title moduleId" },
-      })
-      .populate({
-        path: "packages",
-        select:
-          "packageId title subtitle description packageType includes price images thumbnail provider isActive createdAt updatedAt",
-      })
-      .populate("provider", "userId firstName lastName email profile")
-      .populate("createdBy", "email");
+      .populate("provider", "userId firstName lastName email profile");
   }
 
-  // -------- TRANSPORT --------
   if (moduleTitle === "Transport") {
     return await Transport.findById(packageId)
-      .populate("provider", "userId firstName lastName email profile")
-      .populate("createdBy", "email");
+      .populate("provider", "userId firstName lastName email profile");
   }
 
-  // -------- CATERING --------
   if (moduleTitle === "Catering") {
     return await Catering.findById(packageId)
-      .populate("provider", "userId firstName lastName email profile")
-      .populate("createdBy", "email");
+      .populate("provider", "userId firstName lastName email profile");
   }
 
-  // -------- MAKEUP --------
   if (moduleTitle === "Makeup Artist") {
     return await Makeup.findById(packageId)
       .populate("provider", "userId firstName lastName email profile");
   }
 
-  // -------- PHOTOGRAPHY --------
   if (moduleTitle === "Photography") {
     return await Photography.findById(packageId)
       .populate("provider", "userId firstName lastName email profile");
@@ -58,11 +40,20 @@ const resolvePackageDetails = async (moduleTitle, packageId) => {
 };
 
 /* ======================================================
-   CREATE ENQUIRY
+   CREATE ENQUIRY (GUEST + USER SAFE)
 ====================================================== */
 exports.createEnquiry = async (req, res) => {
   try {
-    const enquiry = await Enquiry.create(req.body);
+    const enquiryData = {
+      ...req.body,
+    };
+
+    // ✅ attach logged-in user if available
+    if (req.user?._id) {
+      enquiryData.userId = req.user._id;
+    }
+
+    const enquiry = await Enquiry.create(enquiryData);
 
     const populated = await Enquiry.findById(enquiry._id)
       .populate("moduleId", "title icon")
@@ -84,7 +75,10 @@ exports.createEnquiry = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(400).json({ success: false, message: error.message });
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
@@ -100,17 +94,13 @@ exports.getAllEnquiries = async (req, res) => {
       .sort({ createdAt: -1 });
 
     const data = await Promise.all(
-      enquiries.map(async (enquiry) => {
-        const packageDetails = await resolvePackageDetails(
+      enquiries.map(async (enquiry) => ({
+        ...enquiry.toObject(),
+        packageDetails: await resolvePackageDetails(
           enquiry.moduleId?.title,
           enquiry.packageId
-        );
-
-        return {
-          ...enquiry.toObject(),
-          packageDetails,
-        };
-      })
+        ),
+      }))
     );
 
     res.json({ success: true, count: data.length, data });
@@ -130,8 +120,9 @@ exports.getEnquiryById = async (req, res) => {
       .populate("vendorId", "firstName lastName email")
       .populate("userId", "firstName lastName email");
 
-    if (!enquiry)
+    if (!enquiry) {
       return res.status(404).json({ success: false, message: "Not found" });
+    }
 
     const packageDetails = await resolvePackageDetails(
       enquiry.moduleId?.title,
@@ -152,7 +143,7 @@ exports.getEnquiryById = async (req, res) => {
 };
 
 /* ======================================================
-   GET BY MODULE
+   GET ENQUIRIES BY MODULE
 ====================================================== */
 exports.getEnquiriesByModule = async (req, res) => {
   try {
@@ -179,7 +170,7 @@ exports.getEnquiriesByModule = async (req, res) => {
 };
 
 /* ======================================================
-   GET BY PROVIDER
+   GET ENQUIRIES BY PROVIDER
 ====================================================== */
 exports.getEnquiriesByProvider = async (req, res) => {
   try {

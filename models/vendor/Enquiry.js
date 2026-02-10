@@ -2,12 +2,12 @@ const mongoose = require("mongoose");
 
 const enquirySchema = new mongoose.Schema(
   {
+    // ✅ OPTIONAL for guest enquiries
     userId: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "User",
-  default: null,
-},
-
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
 
     vendorId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -23,7 +23,7 @@ const enquirySchema = new mongoose.Schema(
 
     packageId: {
       type: mongoose.Schema.Types.ObjectId,
-      required: true, // generic package id
+      required: true,
     },
 
     bookingDate: Date,
