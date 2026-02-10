@@ -1829,9 +1829,22 @@ exports.updateVenue = async (req, res) => {
       }
     }
 
-    // Handle file uploads
+    // Handle file uploads and merge with existing images
     if (req.files?.thumbnail) data.thumbnail = req.files.thumbnail[0].path;
-    if (req.files?.images) data.images = req.files.images.map((f) => f.path);
+
+    let imagesData = [];
+    if (req.body.images) {
+      imagesData = Array.isArray(req.body.images) ? req.body.images : [req.body.images];
+    }
+
+    if (req.files?.images) {
+      const newImages = req.files.images.map((f) => f.path);
+      imagesData = [...imagesData, ...newImages];
+    }
+
+    if (imagesData.length > 0) {
+      data.images = imagesData;
+    }
 
     const venue = await Venue.findByIdAndUpdate(venueId, data, {
       new: true,
