@@ -1715,7 +1715,7 @@ exports.getBookingsByProvider = async (req, res) => {
     console.log("📌 Booking Filter:", filter);
 
     const bookings = await Booking.find({ providerId })
-      .sort({ bookingDate: 1 })
+      .sort({ createdAt: -1 })
       .populate("venueId")
       .populate("vehicleId")
 
