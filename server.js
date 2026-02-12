@@ -654,9 +654,8 @@ io.on("connection", (socket) => {
       await newMessage.save();
 
       // Emit to room (including sender)
-      io.to(enquiryId).emit("receive_message", {
+      io.to(String(enquiryId)).emit("receive_message", {
         ...newMessage.toObject(),
-        // Add human-readable time for immediate display
         time: new Date().toLocaleTimeString(),
       });
     } catch (err) {
