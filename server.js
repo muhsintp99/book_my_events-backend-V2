@@ -423,16 +423,12 @@
 
 
 
-/**********************************************************
- * IMPORTS
- **********************************************************/
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 require("dotenv").config();
 const path = require("path");
-const subscriptionRoutes = require("./routes/admin/subscriptionRoutes");
 
 /**********************************************************
  * DB CONNECTION
@@ -456,39 +452,28 @@ const server = http.createServer(app);
  * CORS CONFIGURATION
  **********************************************************/
 const allowedOrigins = [
-  // Local
   "http://localhost:5000",
   "http://localhost:5001",
   "http://localhost:5002",
   "http://localhost:5173",
   "http://127.0.0.1:5500",
   "http://127.0.0.1:5501",
-
-  // Dashboards
   "https://vendor.bookmyevent.ae",
   "https://dashboard.bookmyevent.ae",
-
-  // Website
   "https://www.bookmyevent.ae",
   "https://bookmyevent.ae",
-
-  // API
   "https://api.bookmyevent.ae",
-
-  // Payments
   "https://smartgateway.hdfcuat.bank.in",
   "https://securepayments.hdfcbank.com",
-  "https://paynetzuat.hdfcbank.com",
+  "https://paynetzuat.hdfcbank.in",
   "https://paynet.hdfcbank.com"
 ];
 
 const originCheck = (origin, callback) => {
   if (!origin) return callback(null, true);
-
   const allowed =
     allowedOrigins.includes(origin) ||
     /\.bookmyevent\.ae$/.test(origin);
-
   allowed
     ? callback(null, true)
     : callback(new Error("CORS not allowed"));
@@ -523,12 +508,9 @@ app.get("/", (req, res) => {
   res.send("BookMyEvent API Running 🚀");
 });
 
-// ===== Public =====
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/delete-user", require("./routes/userDeleteRoutes"));
-
-// ===== Admin =====
 app.use("/api/modules", require("./routes/admin/moduleRoutes"));
 app.use("/api/secondary-modules", require("./routes/admin/secondaryModuleRoutes"));
 app.use("/api/vehicle-categories", require("./routes/admin/vehiclecategoryRoutes"));
@@ -544,8 +526,6 @@ app.use("/api/makeup-packages", require("./routes/admin/makeupPackageRoutes"));
 app.use("/api/makeup-types", require("./routes/admin/makeupTypeRoutes"));
 app.use("/api/packages", require("./routes/admin/packageRoutes"));
 app.use("/api/admin/kyc", require("./routes/admin/kycRoutes"));
-
-// ===== Vendor =====
 app.use("/api/vendorprofiles", require("./routes/vendor/vendorProfileRoutes"));
 app.use("/api/reviews", require("./routes/vendor/reviewRouters"));
 app.use("/api/venues", require("./routes/vendor/venueRoutes"));
@@ -564,41 +544,30 @@ app.use("/api/cakes", require("./routes/vendor/cakePackageRoutes"));
 app.use("/api/cake-addons", require("./routes/vendor/cakeAddonRoutes"));
 app.use("/api/ornaments", require("./routes/vendor/ornamentPackageRoutes"));
 app.use("/api/boutiques", require("./routes/vendor/boutiqueRoutes"));
-
-
-app.use(
-  "/api/razorpay/subscription",
-  require("./routes/vendor/razorpaySubscription.routes")
-);
-
-
-app.use(
-  "/api/brand-platform",
-  require("./routes/admin/brandPlatformRoutes")
-);
-
-
+app.use("/api/razorpay/subscription", require("./routes/vendor/razorpaySubscription.routes"));
+app.use("/api/brand-platform", require("./routes/admin/brandPlatformRoutes"));
 app.use("/api/vendor/subscription", require("./routes/vendor/subscriptionRequest.routes"));
 app.use("/api/admin/subscription", require("./routes/admin/subscriptionRoutes"));
-
-// PhonePe payment routes (COMMENTED OUT - USING HDFC INSTEAD)
-// app.use("/api/admin/subscription/payment", require("./routes/admin/phonepe.routes"));
-
-// HDFC Subscription Request Payment Routes
 app.use("/api/admin/subscription-request/payment", require("./routes/admin/subscriptionRequestPayment.routes"));
 
-
 /**********************************************************
- * SOCKET.IO (LIVE CHAT)
+ * SOCKET.IO (LIVE CHAT) - FIXED VERSION
  **********************************************************/
 const io = new Server(server, {
   cors: {
     origin: originCheck,
     credentials: true
-  }
+  },
+  reconnection: true,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+  reconnectionAttempts: 5
 });
 
 const ChatMessage = require("./models/chat/ChatMessage");
+
+// Track active users in enquiry rooms
+const activeUsers = new Map();
 
 io.on("connection", (socket) => {
   console.log("🟢 Socket connected:", socket.id);
@@ -613,7 +582,7 @@ io.on("connection", (socket) => {
         return socket.emit("error", "Enquiry not found");
       }
 
-      // 🔐 Authorization: Only the customer or the assigned vendor can join
+      // 🔐 Authorization
       const isCustomer = userId && String(enquiry.userId) === String(userId);
       const isVendor = vendorId && String(enquiry.vendorId) === String(vendorId);
 
@@ -622,12 +591,35 @@ io.on("connection", (socket) => {
         return socket.emit("error", "Unauthorized access to this chat");
       }
 
+      // Join the room
       socket.join(enquiryId);
-      console.log(`✅ ${isVendor ? "Vendor" : "Customer"} joined enquiry room: ${enquiryId}`);
+      
+      // Track active user
+      if (!activeUsers.has(enquiryId)) {
+        activeUsers.set(enquiryId, []);
+      }
+      const users = activeUsers.get(enquiryId);
+      if (!users.find(u => u.id === socket.id)) {
+        users.push({ id: socket.id, role: isVendor ? "vendor" : "customer" });
+      }
+
+      console.log(
+        `✅ ${isVendor ? "Vendor" : "Customer"} joined enquiry room: ${enquiryId}`
+      );
 
       // 📜 Fetch and send message history
-      const history = await ChatMessage.find({ enquiryId }).sort({ createdAt: 1 });
+      const history = await ChatMessage.find({ enquiryId })
+        .sort({ createdAt: 1 })
+        .lean();
+
+      console.log(`📨 Sending ${history.length} messages to user`);
       socket.emit("message_history", history);
+
+      // Notify others that user joined
+      socket.broadcast.to(enquiryId).emit("user_joined", {
+        role: isVendor ? "vendor" : "customer",
+        timestamp: new Date().toISOString(),
+      });
     } catch (err) {
       console.error("Socket join error:", err);
       socket.emit("error", "Failed to join chat room");
@@ -639,32 +631,63 @@ io.on("connection", (socket) => {
     try {
       const { enquiryId, senderId, receiverId, text, senderRole } = data;
 
-      if (!enquiryId || !senderId || !receiverId || !text || !senderRole) {
-        return console.warn("Missing message data:", data);
+      // Validate required fields
+      if (!enquiryId || !senderId || !text || !senderRole) {
+        console.warn("❌ Missing required message data:", {
+          enquiryId,
+          senderId,
+          senderRole,
+          hasText: !!text,
+        });
+        return socket.emit("error", "Invalid message data");
       }
+
+      console.log("💾 Saving message to database...");
 
       // Save to database
       const newMessage = new ChatMessage({
         enquiryId,
         senderId,
-        receiverId,
+        receiverId: receiverId || null,
         message: text,
         senderRole,
       });
-      await newMessage.save();
 
-      // Emit to room (including sender)
+      const savedMessage = await newMessage.save();
+      const messageObj = savedMessage.toObject();
+
+      console.log("✅ Message saved:", messageObj._id);
+
+      // Emit to ALL users in the room (sender + receiver)
       io.to(String(enquiryId)).emit("receive_message", {
-        ...newMessage.toObject(),
-        time: new Date().toLocaleTimeString(),
+        ...messageObj,
+        timestamp: messageObj.createdAt,
+        time: new Date(messageObj.createdAt).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
       });
+
+      console.log(`📤 Broadcasted message to room: ${enquiryId}`);
     } catch (err) {
-      console.error("Socket message error:", err);
+      console.error("❌ Socket message error:", err);
+      socket.emit("error", "Failed to send message");
     }
   });
 
+  // --- DISCONNECT ---
   socket.on("disconnect", () => {
     console.log("🔴 Socket disconnected:", socket.id);
+    
+    // Clean up active users
+    for (const [enquiryId, users] of activeUsers.entries()) {
+      const remaining = users.filter(u => u.id !== socket.id);
+      if (remaining.length > 0) {
+        activeUsers.set(enquiryId, remaining);
+      } else {
+        activeUsers.delete(enquiryId);
+      }
+    }
   });
 });
 
@@ -686,3 +709,5 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`✅ Server + Socket.IO running on port ${PORT}`);
 });
+
+module.exports = { io };
