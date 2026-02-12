@@ -8,8 +8,8 @@ const {
   getEnquiryById,          // ✅ ADD THIS
   getEnquiriesByModule,
   getEnquiriesByProvider,
-    getAllEnquiries,
-
+  getEnquiriesByUser,      // ✅ ADD THIS
+  getAllEnquiries,
 } = require("../../controllers/vendor/enquiryController");
 
 // CREATE
@@ -29,6 +29,9 @@ router.get("/module/:moduleId", getEnquiriesByModule);
 
 // GET BY PROVIDER
 router.get("/provider/:providerId", getEnquiriesByProvider);
+
+// GET BY USER
+router.get("/user/:userId", getEnquiriesByUser);
 
 // GET SINGLE ENQUIRY (KEEP THIS LAST)
 router.get("/:id", getEnquiryById);

@@ -598,44 +598,67 @@ const io = new Server(server, {
   }
 });
 
+const ChatMessage = require("./models/chat/ChatMessage");
+
 io.on("connection", (socket) => {
   console.log("🟢 Socket connected:", socket.id);
 
-  socket.on("join_enquiry", async ({ enquiryId, vendorId }) => {
+  // --- JOIN ROOM ---
+  socket.on("join_enquiry", async ({ enquiryId, userId, vendorId }) => {
     try {
       const Enquiry = require("./models/vendor/Enquiry");
-
-      const enquiry = await Enquiry.findById(enquiryId).select("vendorId");
+      const enquiry = await Enquiry.findById(enquiryId);
 
       if (!enquiry) {
         return socket.emit("error", "Enquiry not found");
       }
 
-      // 🔐 Allow only owner vendor
-      if (String(enquiry.vendorId) !== String(vendorId)) {
-        console.log("❌ Unauthorized vendor tried to join chat");
-        return socket.emit("error", "Unauthorized");
+      // 🔐 Authorization: Only the customer or the assigned vendor can join
+      const isCustomer = userId && String(enquiry.userId) === String(userId);
+      const isVendor = vendorId && String(enquiry.vendorId) === String(vendorId);
+
+      if (!isCustomer && !isVendor) {
+        console.log("❌ Unauthorized join attempt for enquiry:", enquiryId);
+        return socket.emit("error", "Unauthorized access to this chat");
       }
 
       socket.join(enquiryId);
-      console.log("✅ Vendor joined enquiry room:", enquiryId);
+      console.log(`✅ ${isVendor ? "Vendor" : "Customer"} joined enquiry room: ${enquiryId}`);
+
+      // 📜 Fetch and send message history
+      const history = await ChatMessage.find({ enquiryId }).sort({ createdAt: 1 });
+      socket.emit("message_history", history);
     } catch (err) {
       console.error("Socket join error:", err);
+      socket.emit("error", "Failed to join chat room");
     }
   });
 
+  // --- SEND MESSAGE ---
   socket.on("send_message", async (data) => {
     try {
-      const Enquiry = require("./models/vendor/Enquiry");
+      const { enquiryId, senderId, receiverId, text, senderRole } = data;
 
-      const enquiry = await Enquiry.findById(data.enquiryId).select("vendorId");
+      if (!enquiryId || !senderId || !receiverId || !text || !senderRole) {
+        return console.warn("Missing message data:", data);
+      }
 
-      if (!enquiry) return;
+      // Save to database
+      const newMessage = new ChatMessage({
+        enquiryId,
+        senderId,
+        receiverId,
+        message: text,
+        senderRole,
+      });
+      await newMessage.save();
 
-      // 🔐 Ensure only owner vendor sends messages
-      if (String(enquiry.vendorId) !== String(data.senderId)) return;
-
-      io.to(data.enquiryId).emit("receive_message", data);
+      // Emit to room (including sender)
+      io.to(enquiryId).emit("receive_message", {
+        ...newMessage.toObject(),
+        // Add human-readable time for immediate display
+        time: new Date().toLocaleTimeString(),
+      });
     } catch (err) {
       console.error("Socket message error:", err);
     }
