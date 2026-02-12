@@ -4,19 +4,17 @@ const Transport = require("../../models/vendor/Vehicle");
 const Catering = require("../../models/vendor/Catering");
 const Makeup = require("../../models/admin/makeupPackageModel");
 const Photography = require("../../models/vendor/PhotographyPackage");
+const Cake = require("../../models/vendor/cakePackageModel");
+const Ornament = require("../../models/vendor/ornamentPackageModel");
+const Boutique = require("../../models/vendor/boutiquePackageModel");
 
 /* ======================================================
-   RESOLVE PACKAGE DETAILS - WITH FALLBACK
+   🔥 UNIVERSAL PACKAGE RESOLVER (CORE FIX)
 ====================================================== */
 const resolvePackageDetails = async (moduleTitle, packageId) => {
-  if (!moduleTitle || !packageId) {
-    console.log("⚠️ Skip package resolve - missing moduleTitle or packageId");
-    return null;
-  }
+  if (!moduleTitle || !packageId) return null;
 
   try {
-    console.log(`📦 Resolving package: ${moduleTitle} / ${packageId}`);
-
     // -------- VENUES --------
     if (moduleTitle === "Venues") {
       return await Venue.findById(packageId)
@@ -60,11 +58,29 @@ const resolvePackageDetails = async (moduleTitle, packageId) => {
         .populate("provider", "userId firstName lastName email profile");
     }
 
-    console.log("⚠️ Unknown module:", moduleTitle);
+    // -------- CAKE --------
+    if (moduleTitle === "Cakes" || moduleTitle === "Cake") {
+      return await Cake.findById(packageId)
+        .populate("provider", "userId firstName lastName email profile");
+    }
+
+    // -------- ORNAMENT --------
+    if (moduleTitle === "Ornaments" || moduleTitle === "Ornament") {
+      return await Ornament.findById(packageId)
+        .populate("provider", "userId firstName lastName email profile");
+    }
+
+    // -------- BOUTIQUE --------
+    if (moduleTitle === "Boutique") {
+      return await Boutique.findById(packageId)
+        .populate("provider", "userId firstName lastName email profile");
+    }
+
+    console.log(`⚠️ Unhandled module context: ${moduleTitle}`);
     return null;
   } catch (err) {
-    console.error("❌ Error resolving package:", err.message);
-    return null; // Don't fail entire request if package lookup fails
+    console.error(`❌ resolvePackageDetails error for module ${moduleTitle}:`, err.message);
+    return null;
   }
 };
 
@@ -73,21 +89,17 @@ const resolvePackageDetails = async (moduleTitle, packageId) => {
 ====================================================== */
 exports.createEnquiry = async (req, res) => {
   try {
-    console.log("📝 Creating enquiry:", req.body);
-
     const enquiry = await Enquiry.create(req.body);
 
     const populated = await Enquiry.findById(enquiry._id)
       .populate("moduleId", "title icon")
-      .populate("vendorId", "firstName lastName email businessName")
+      .populate("vendorId", "firstName lastName email")
       .populate("userId", "firstName lastName email");
 
     const packageDetails = await resolvePackageDetails(
       populated.moduleId?.title,
       populated.packageId
     );
-
-    console.log("✅ Enquiry created:", enquiry._id);
 
     res.status(201).json({
       success: true,
@@ -112,23 +124,24 @@ exports.getAllEnquiries = async (req, res) => {
 
     const enquiries = await Enquiry.find()
       .populate("moduleId", "title icon")
-      .populate("vendorId", "firstName lastName email businessName")
+      .populate("vendorId", "firstName lastName email businessName profile")
       .populate("userId", "firstName lastName email")
       .sort({ createdAt: -1 });
 
-    console.log(`✅ Found ${enquiries.length} enquiries`);
-
     const data = await Promise.all(
-      enquiries.map(async (enquiry) => {
-        const packageDetails = await resolvePackageDetails(
-          enquiry.moduleId?.title,
-          enquiry.packageId
-        );
-
-        return {
-          ...enquiry.toObject(),
-          packageDetails,
-        };
+      enquiries.map(async (e) => {
+        try {
+          return {
+            ...e.toObject(),
+            packageDetails: await resolvePackageDetails(
+              e.moduleId?.title,
+              e.packageId
+            ),
+          };
+        } catch (innerErr) {
+          console.error(`❌ Error resolving enquiry ${e._id}:`, innerErr.message);
+          return { ...e.toObject(), packageDetails: null };
+        }
       })
     );
 
@@ -149,11 +162,10 @@ exports.getEnquiryById = async (req, res) => {
 
     const enquiry = await Enquiry.findById(id)
       .populate("moduleId", "title icon")
-      .populate("vendorId", "firstName lastName email businessName")
+      .populate("vendorId", "firstName lastName email businessName profile")
       .populate("userId", "firstName lastName email");
 
     if (!enquiry) {
-      console.log("❌ Enquiry not found:", id);
       return res.status(404).json({ success: false, message: "Enquiry not found" });
     }
 
@@ -161,8 +173,6 @@ exports.getEnquiryById = async (req, res) => {
       enquiry.moduleId?.title,
       enquiry.packageId
     );
-
-    console.log("✅ Enquiry found:", id);
 
     res.json({
       success: true,
@@ -187,20 +197,24 @@ exports.getEnquiriesByModule = async (req, res) => {
 
     const enquiries = await Enquiry.find({ moduleId })
       .populate("moduleId", "title icon")
-      .populate("vendorId", "firstName lastName email businessName")
+      .populate("vendorId", "firstName lastName email businessName profile")
       .populate("userId", "firstName lastName email")
       .sort({ createdAt: -1 });
 
-    console.log(`✅ Found ${enquiries.length} enquiries for module: ${moduleId}`);
-
     const data = await Promise.all(
-      enquiries.map(async (e) => ({
-        ...e.toObject(),
-        packageDetails: await resolvePackageDetails(
-          e.moduleId?.title,
-          e.packageId
-        ),
-      }))
+      enquiries.map(async (e) => {
+        try {
+          return {
+            ...e.toObject(),
+            packageDetails: await resolvePackageDetails(
+              e.moduleId?.title,
+              e.packageId
+            ),
+          };
+        } catch (innerErr) {
+          return { ...e.toObject(), packageDetails: null };
+        }
+      })
     );
 
     res.json({ success: true, count: data.length, data });
@@ -222,20 +236,24 @@ exports.getEnquiriesByProvider = async (req, res) => {
       vendorId: providerId,
     })
       .populate("moduleId", "title icon")
-      .populate("vendorId", "firstName lastName email businessName")
+      .populate("vendorId", "firstName lastName email businessName profile")
       .populate("userId", "firstName lastName email")
       .sort({ createdAt: -1 });
 
-    console.log(`✅ Found ${enquiries.length} enquiries for provider: ${providerId}`);
-
     const data = await Promise.all(
-      enquiries.map(async (e) => ({
-        ...e.toObject(),
-        packageDetails: await resolvePackageDetails(
-          e.moduleId?.title,
-          e.packageId
-        ),
-      }))
+      enquiries.map(async (e) => {
+        try {
+          return {
+            ...e.toObject(),
+            packageDetails: await resolvePackageDetails(
+              e.moduleId?.title,
+              e.packageId
+            ),
+          };
+        } catch (innerErr) {
+          return { ...e.toObject(), packageDetails: null };
+        }
+      })
     );
 
     res.json({ success: true, count: data.length, data });
@@ -246,53 +264,45 @@ exports.getEnquiriesByProvider = async (req, res) => {
 };
 
 /* ======================================================
-   GET BY USER (CUSTOMER) - THIS IS THE KEY ONE
+   GET BY USER (CUSTOMER)
 ====================================================== */
 exports.getEnquiriesByUser = async (req, res) => {
   try {
     const { userId } = req.params;
     console.log("👥 Fetching enquiries for user:", userId);
 
-    // ✅ IMPORTANT: Handle both userId AND vendorId filters
-    // Some users might be vendors asking about their own enquiries
     const enquiries = await Enquiry.find({
       $or: [
-        { userId: userId },  // Customer's enquiries
-        { vendorId: userId }, // Vendor's incoming enquiries
+        { userId: userId },
+        { vendorId: userId },
       ]
     })
       .populate("moduleId", "title icon")
-      .populate({
-        path: "vendorId",
-        select: "firstName lastName email businessName profile"
-      })
-      .populate({
-        path: "userId",
-        select: "firstName lastName email"
-      })
+      .populate("vendorId", "firstName lastName email businessName profile")
+      .populate("userId", "firstName lastName email")
       .sort({ createdAt: -1 });
 
-    console.log(`✅ Found ${enquiries.length} enquiries for user: ${userId}`);
-
-    // Log each enquiry for debugging
-    enquiries.forEach(enq => {
-      console.log(`  - Enquiry: ${enq._id} | User: ${enq.userId?._id} | Vendor: ${enq.vendorId?._id}`);
-    });
-
     const data = await Promise.all(
-      enquiries.map(async (e) => ({
-        ...e.toObject(),
-        packageDetails: await resolvePackageDetails(
-          e.moduleId?.title,
-          e.packageId
-        ),
-      }))
+      enquiries.map(async (e) => {
+        try {
+          return {
+            ...e.toObject(),
+            packageDetails: await resolvePackageDetails(
+              e.moduleId?.title,
+              e.packageId
+            ),
+          };
+        } catch (innerErr) {
+          console.error(`❌ resolvePackageDetails failed for ${e._id}:`, innerErr.message);
+          return { ...e.toObject(), packageDetails: null };
+        }
+      })
     );
 
     res.json({ success: true, count: data.length, data });
   } catch (error) {
     console.error("❌ Get by user error:", error.message);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: "Server error", detail: error.message });
   }
 };
 
@@ -302,7 +312,7 @@ exports.getEnquiriesByUser = async (req, res) => {
 exports.updateEnquiry = async (req, res) => {
   try {
     const { enquiryId } = req.params;
-    console.log("✏️ Updating enquiry:", enquiryId, "with", req.body);
+    console.log("✏️ Updating enquiry:", enquiryId);
 
     const updated = await Enquiry.findByIdAndUpdate(
       enquiryId,
@@ -312,8 +322,6 @@ exports.updateEnquiry = async (req, res) => {
       .populate("moduleId", "title icon")
       .populate("vendorId", "firstName lastName email businessName")
       .populate("userId", "firstName lastName email");
-
-    console.log("✅ Enquiry updated:", enquiryId);
 
     res.json({ success: true, data: updated });
   } catch (error) {
@@ -331,8 +339,6 @@ exports.deleteEnquiry = async (req, res) => {
     console.log("🗑️ Deleting enquiry:", enquiryId);
 
     await Enquiry.findByIdAndDelete(enquiryId);
-
-    console.log("✅ Enquiry deleted:", enquiryId);
 
     res.json({ success: true, message: "Enquiry deleted" });
   } catch (error) {
