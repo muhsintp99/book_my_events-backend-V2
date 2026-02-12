@@ -671,6 +671,27 @@ io.on("connection", (socket) => {
     }
   });
 
+  // --- DELETE MESSAGE (UNSEND) ---
+  socket.on("delete_message", async (data) => {
+    try {
+      const { messageId, enquiryId } = data;
+      if (!messageId || !enquiryId) return;
+
+      console.log(`🗑️ Deleting message: ${messageId} in enquiry: ${enquiryId}`);
+
+      const deletedMessage = await ChatMessage.findByIdAndDelete(messageId);
+
+      if (deletedMessage) {
+        // Broadcast deletion to everyone in the room
+        io.to(String(enquiryId)).emit("message_deleted", { messageId });
+        console.log(`✅ Message ${messageId} deleted and broadcasted`);
+      }
+    } catch (err) {
+      console.error("❌ Delete message error:", err);
+      socket.emit("error", "Failed to delete message");
+    }
+  });
+
   // --- DISCONNECT ---
   socket.on("disconnect", () => {
     console.log("🔴 Socket disconnected:", socket.id);
