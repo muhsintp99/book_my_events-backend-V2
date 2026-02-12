@@ -629,50 +629,39 @@ io.on("connection", (socket) => {
   // --- SEND MESSAGE ---
   socket.on("send_message", async (data) => {
     try {
-      const { enquiryId, senderId, receiverId, text, senderRole } = data;
+      const { enquiryId, senderId, receiverId, text, message, senderRole } = data;
+      const content = text || message;
 
       // Validate required fields
-      if (!enquiryId || !senderId || !text || !senderRole) {
-        console.warn("❌ Missing required message data:", {
-          enquiryId,
-          senderId,
-          senderRole,
-          hasText: !!text,
-        });
+      if (!enquiryId || !senderId || !content || !senderRole) {
+        console.warn("❌ Missing required message data:", { enquiryId, senderId, senderRole });
         return socket.emit("error", "Invalid message data");
       }
 
       console.log(`💾 Saving message for enquiry: ${enquiryId}`);
 
-      // Save to database
       const newMessage = new ChatMessage({
         enquiryId,
         senderId,
         receiverId: receiverId || null,
-        message: text,
+        message: content,
         senderRole,
         timestamp: data.timestamp || new Date().toISOString()
       });
 
-      // If receiverId is missing, try to find it from the enquiry if possible, 
-      // but ChatMessage requires it. We should probably make it optional in schema 
-      // or ensure it's always sent. For now, let's fix the schema to make it optional 
-      // to avoid crashes, OR find it here.
-
       await newMessage.save();
-
       const msgObj = newMessage.toObject();
 
-      console.log("✅ Message saved:", messageObj._id);
+      console.log("✅ Message saved:", msgObj._id);
 
-      // Emit to ALL users in the room (sender + receiver)
+      // Emit to ALL users in the room
       io.to(String(enquiryId)).emit("receive_message", {
-        ...messageObj,
-        timestamp: messageObj.createdAt,
-        time: new Date(messageObj.createdAt).toLocaleTimeString([], {
+        ...msgObj,
+        timestamp: data.timestamp || msgObj.createdAt,
+        time: new Date(msgObj.createdAt).toLocaleTimeString([], {
           hour: "2-digit",
-          minute: "2-digit",
-        }),
+          minute: "2-digit"
+        })
       });
 
       console.log(`📤 Broadcasted message to room: ${enquiryId}`);

@@ -246,3 +246,27 @@ exports.deleteEnquiry = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+/* ======================================================
+   GET ENQUIRY MESSAGES (CHAT HISTORY)
+====================================================== */
+exports.getEnquiryMessages = async (req, res) => {
+  try {
+    const { enquiryId } = req.params;
+    const ChatMessage = require("../../models/chat/ChatMessage");
+
+    console.log("📜 Fetching messages for enquiry:", enquiryId);
+
+    const messages = await ChatMessage.find({ enquiryId })
+      .sort({ createdAt: 1 });
+
+    res.json({
+      success: true,
+      count: messages.length,
+      data: messages
+    });
+  } catch (error) {
+    console.error("❌ Get messages error:", error.message);
+    res.status(500).json({ success: false, message: "Failed to fetch messages" });
+  }
+};

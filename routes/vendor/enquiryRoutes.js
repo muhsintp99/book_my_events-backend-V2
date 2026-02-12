@@ -10,7 +10,12 @@ const {
   getEnquiriesByProvider,
   getEnquiriesByUser,      // ✅ ADD THIS
   getAllEnquiries,
+  getEnquiryMessages,
 } = require("../../controllers/vendor/enquiryController");
+
+// ...
+router.get("/:enquiryId/messages", getEnquiryMessages);
+
 
 // CREATE
 
