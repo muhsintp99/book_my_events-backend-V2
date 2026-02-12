@@ -593,7 +593,7 @@ io.on("connection", (socket) => {
 
       // Join the room
       socket.join(enquiryId);
-      
+
       // Track active user
       if (!activeUsers.has(enquiryId)) {
         activeUsers.set(enquiryId, []);
@@ -642,7 +642,7 @@ io.on("connection", (socket) => {
         return socket.emit("error", "Invalid message data");
       }
 
-      console.log("💾 Saving message to database...");
+      console.log(`💾 Saving message for enquiry: ${enquiryId}`);
 
       // Save to database
       const newMessage = new ChatMessage({
@@ -651,10 +651,17 @@ io.on("connection", (socket) => {
         receiverId: receiverId || null,
         message: text,
         senderRole,
+        timestamp: data.timestamp || new Date().toISOString()
       });
 
-      const savedMessage = await newMessage.save();
-      const messageObj = savedMessage.toObject();
+      // If receiverId is missing, try to find it from the enquiry if possible, 
+      // but ChatMessage requires it. We should probably make it optional in schema 
+      // or ensure it's always sent. For now, let's fix the schema to make it optional 
+      // to avoid crashes, OR find it here.
+
+      await newMessage.save();
+
+      const msgObj = newMessage.toObject();
 
       console.log("✅ Message saved:", messageObj._id);
 
@@ -678,7 +685,7 @@ io.on("connection", (socket) => {
   // --- DISCONNECT ---
   socket.on("disconnect", () => {
     console.log("🔴 Socket disconnected:", socket.id);
-    
+
     // Clean up active users
     for (const [enquiryId, users] of activeUsers.entries()) {
       const remaining = users.filter(u => u.id !== socket.id);
