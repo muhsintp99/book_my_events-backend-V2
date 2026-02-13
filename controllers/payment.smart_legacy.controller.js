@@ -420,9 +420,9 @@ exports.createSmartGatewayPayment = async (req, res) => {
 
     // 🎂 CAKE → FULL PAYMENT
     // 💍 ORNAMENTS → FULL PAYMENT
-  if (FULL_PAYMENT_MODULES.includes(booking.moduleType)) {
-  amountToPay = Number(booking.finalPrice);
-}
+    if (FULL_PAYMENT_MODULES.includes(booking.moduleType)) {
+      amountToPay = Number(booking.finalPrice);
+    }
 
 
     // 🧾 OTHER MODULES → ADVANCE PAYMENT
@@ -469,9 +469,9 @@ exports.createSmartGatewayPayment = async (req, res) => {
       customer_id: booking.userId._id.toString(),
       customer_email: booking.userId.email,
       customer_phone: booking.userId.mobile || "9999999999",
-description: FULL_PAYMENT_MODULES.includes(booking.moduleType)
-  ? `Full Payment ₹${amount}`
-  : `Advance Payment ₹${amount}`,
+      description: FULL_PAYMENT_MODULES.includes(booking.moduleType)
+        ? `Full Payment ₹${amount}`
+        : `Advance Payment ₹${amount}`,
 
       return_url: returnUrl,
 
@@ -500,14 +500,14 @@ description: FULL_PAYMENT_MODULES.includes(booking.moduleType)
     booking.paymentOrderId = orderId;
 
     // Full payment modules → remaining = finalPrice
-booking.paidAmount = 0;
+    booking.paidAmount = 0;
 
-if (FULL_PAYMENT_MODULES.includes(booking.moduleType)) {
-  booking.remainingAmount = 0;
-} else {
-  booking.remainingAmount =
-    Number(booking.finalPrice) - Number(amount);
-}
+    if (FULL_PAYMENT_MODULES.includes(booking.moduleType)) {
+      booking.remainingAmount = 0;
+    } else {
+      booking.remainingAmount =
+        Number(booking.finalPrice) - Number(amount);
+    }
 
 
     await booking.save();
@@ -542,19 +542,21 @@ exports.juspayWebhook = async (req, res) => {
     /* ================= UPDATE BOOKING ================= */
     const booking = await Booking.findOne({ paymentOrderId: order_id });
 
-  if (booking) {
-  if (status === "CHARGED") {
-    booking.paymentStatus = "completed";
+    if (booking) {
+      if (status === "CHARGED") {
+        booking.paymentStatus = "completed";
 
-    if (FULL_PAYMENT_MODULES.includes(booking.moduleType)) {
-      booking.paidAmount = booking.finalPrice;
-      booking.remainingAmount = 0;
+        if (FULL_PAYMENT_MODULES.includes(booking.moduleType)) {
+          booking.paidAmount = booking.finalPrice;
+          booking.remainingAmount = 0;
+        }
+      } else if (["AUTHENTICATION_FAILED", "AUTHORIZATION_FAILED", "JUSPAY_DECLINED", "AUTO_REFUNDED"].includes(status)) {
+        booking.paymentStatus = "cancelled";
+      } else if (status === "FAILED") {
+        booking.paymentStatus = "failed";
+      }
+      await booking.save();
     }
-  } else if (status === "FAILED") {
-    booking.paymentStatus = "failed";
-  }
-  await booking.save();
-}
 
 
     return res.sendStatus(200);
@@ -653,10 +655,13 @@ exports.verifyBookingPayment = async (req, res) => {
 
     const order = await juspay.order.status(orderId);
 
+    console.log("🔎 Juspay order status:", order.status, "for orderId:", orderId);
+
     const booking = await Booking.findOne({
       paymentOrderId: orderId,
     });
 
+    // ✅ SUCCESS
     if (order.status === "CHARGED") {
       if (booking) {
         booking.paymentStatus = "completed";
@@ -672,18 +677,71 @@ exports.verifyBookingPayment = async (req, res) => {
       });
     }
 
+    // 🔴 CANCELLED / USER-ABORTED STATUSES
+    const CANCELLED_STATUSES = [
+      "AUTHENTICATION_FAILED",
+      "AUTHORIZATION_FAILED",
+      "JUSPAY_DECLINED",
+      "AUTO_REFUNDED",
+      "CAPTURE_FAILED",
+      "VOID_FAILED",
+      "NOT_FOUND",
+    ];
+
+    if (CANCELLED_STATUSES.includes(order.status)) {
+      if (booking) {
+        booking.paymentStatus = "cancelled";
+        await booking.save();
+      }
+
+      return res.json({
+        status: "cancelled",
+        message: "Payment was cancelled. No amount has been deducted.",
+      });
+    }
+
+    // ⏳ GENUINELY PENDING (still processing)
     if (
-      ["PENDING", "AUTHORIZING", "NEW", "PENDING_VBV"].includes(order.status)
+      ["PENDING", "AUTHORIZING", "PENDING_VBV"].includes(order.status)
     ) {
       return res.json({ status: "pending" });
     }
 
+    // 🟡 NEW status — could be cancelled or genuinely new
+    // If the order is still NEW after the user was redirected back,
+    // it likely means they cancelled before even attempting payment.
+    if (order.status === "NEW") {
+      // Check if the booking was initiated more than 30 seconds ago
+      // If so, treat it as cancelled
+      if (booking) {
+        const initiatedAt = new Date(booking.updatedAt || booking.createdAt);
+        const secondsSinceInit = (Date.now() - initiatedAt.getTime()) / 1000;
+
+        if (secondsSinceInit > 30) {
+          booking.paymentStatus = "cancelled";
+          await booking.save();
+
+          return res.json({
+            status: "cancelled",
+            message: "Payment was cancelled. No amount has been deducted.",
+          });
+        }
+      }
+
+      // Otherwise, still treat as pending (fresh order)
+      return res.json({ status: "pending" });
+    }
+
+    // ❌ ALL OTHER STATUSES → FAILED
     if (booking) {
       booking.paymentStatus = "failed";
       await booking.save();
     }
 
-    return res.json({ status: "failed" });
+    return res.json({
+      status: "failed",
+      message: "Payment failed. Please try again.",
+    });
   } catch (err) {
     console.error("❌ verifyBookingPayment error:", err);
     return res.json({
