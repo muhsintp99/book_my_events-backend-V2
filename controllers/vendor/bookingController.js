@@ -587,6 +587,7 @@ exports.createBooking = async (req, res) => {
       couponId,
       paymentType,
       cakeId,
+      cakeCart,  // ✅ NEW: Multi-cake cart support
       deliveryType,
       customerMessage,
       variations,
@@ -605,6 +606,7 @@ exports.createBooking = async (req, res) => {
     console.log("📌 Type of timeSlot:", typeof timeSlot);
     console.log("📌 Is Array:", Array.isArray(timeSlot));
     console.log("📌 Boutique ID:", req.body.boutiqueId);
+    console.log("📌 Cake Cart:", cakeCart ? `${cakeCart.length} items` : "N/A");
 
     // BASIC VALIDATION
     if (!moduleId || !bookingDate || !bookingType) {
@@ -936,75 +938,127 @@ exports.createBooking = async (req, res) => {
 
     switch (moduleType) {
       case "Cake":
-        if (!cakeId) {
-          return res.status(400).json({
-            success: false,
-            message: "cakeId is required for Cake booking",
-          });
-        }
+        // ===============================
+        // 🛒 CAKE CART VALIDATION
+        // ===============================
+        if (cakeCart && Array.isArray(cakeCart) && cakeCart.length > 0) {
+          console.log("🛒 Processing Cake Cart with", cakeCart.length, "items");
 
-        if (!Array.isArray(variations) || variations.length === 0) {
-          return res.status(400).json({
-            success: false,
-            message: "At least one cake variation must be selected",
-          });
-        }
+          // Validate each cart item
+          for (let i = 0; i < cakeCart.length; i++) {
+            const item = cakeCart[i];
 
-        serviceProvider = await Cake.findById(cakeId).lean();
-        if (!serviceProvider) {
-          return res.status(404).json({
-            success: false,
-            message: "Cake not found",
-          });
-        }
+            if (!item.cakeId || !item.name || !item.quantity || item.totalPrice === undefined) {
+              return res.status(400).json({
+                success: false,
+                message: `Cart item ${i + 1} is missing required fields (cakeId, name, quantity, totalPrice)`,
+              });
+            }
 
-        let basePrice = 0;
-        calculatedVariations = [];
+            if (item.quantity < 1) {
+              return res.status(400).json({
+                success: false,
+                message: `Cart item ${i + 1} must have quantity >= 1`,
+              });
+            }
+          }
 
-        for (const selected of variations) {
-          if (!selected._id) {
-            return res.status(400).json({
+          // Calculate total from cart
+          const cartTotal = cakeCart.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+          pricing.basePrice = cartTotal;
+
+          console.log("✅ Cake Cart validated. Total:", cartTotal);
+
+          // Use first cake as primary reference for provider
+          serviceProvider = await Cake.findById(cakeCart[0].cakeId).lean();
+          if (!serviceProvider) {
+            return res.status(404).json({
               success: false,
-              message: "Invalid variation payload",
+              message: "Primary cake not found",
             });
           }
 
-          const cakeVar = serviceProvider.variations.find(
-            (v) => v._id.toString() === selected._id.toString()
-          );
-
-          if (!cakeVar) {
+          pricing.discount = Number(serviceProvider.priceInfo?.discount) || 0;
+        }
+        // ===============================
+        // SINGLE CAKE (LEGACY SUPPORT)
+        // ===============================
+        else if (cakeId) {
+          if (!cakeId) {
             return res.status(400).json({
               success: false,
-              message: `Invalid cake variation selected: ${selected._id}`,
+              message: "cakeId is required for Cake booking",
             });
           }
 
-          const qty =
-            Number(selected.quantity) > 0 ? Number(selected.quantity) : 1;
-          const total = cakeVar.price * qty;
+          if (!Array.isArray(variations) || variations.length === 0) {
+            return res.status(400).json({
+              success: false,
+              message: "At least one cake variation must be selected",
+            });
+          }
 
-          calculatedVariations.push({
-            variationId: cakeVar._id,
-            name: cakeVar.name,
-            price: cakeVar.price,
-            quantity: qty,
-            totalPrice: total,
+          serviceProvider = await Cake.findById(cakeId).lean();
+          if (!serviceProvider) {
+            return res.status(404).json({
+              success: false,
+              message: "Cake not found",
+            });
+          }
+
+          let basePrice = 0;
+          calculatedVariations = [];
+
+          for (const selected of variations) {
+            if (!selected._id) {
+              return res.status(400).json({
+                success: false,
+                message: "Invalid variation payload",
+              });
+            }
+
+            const cakeVar = serviceProvider.variations.find(
+              (v) => v._id.toString() === selected._id.toString()
+            );
+
+            if (!cakeVar) {
+              return res.status(400).json({
+                success: false,
+                message: `Invalid cake variation selected: ${selected._id}`,
+              });
+            }
+
+            const qty =
+              Number(selected.quantity) > 0 ? Number(selected.quantity) : 1;
+            const total = cakeVar.price * qty;
+
+            calculatedVariations.push({
+              variationId: cakeVar._id,
+              name: cakeVar.name,
+              price: cakeVar.price,
+              quantity: qty,
+              totalPrice: total,
+            });
+
+            basePrice += total;
+          }
+
+          pricing.basePrice = basePrice;
+
+          /* ✅ CALCULATE ADDON TOTAL */
+          let addonTotal = 0;
+          if (Array.isArray(addons)) {
+            addonTotal = addons.reduce((sum, a) => sum + Number(a.price || 0), 0);
+          }
+          pricing.addonTotal = addonTotal;
+
+          pricing.discount = Number(serviceProvider.priceInfo?.discount) || 0;
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: "Either cakeCart or cakeId is required for Cake booking",
           });
-
-          basePrice += total;
         }
-
-        pricing.basePrice = basePrice;
-
-        /* ✅ CALCULATE ADDON TOTAL */
-        let addonTotal = 0;
-        if (Array.isArray(addons)) {
-          addonTotal = addons.reduce((sum, a) => sum + Number(a.price || 0), 0);
-        }
-        pricing.addonTotal = addonTotal;
-
-        pricing.discount = Number(serviceProvider.priceInfo?.discount) || 0;
         break;
 
       case "Transport": {
@@ -1371,6 +1425,7 @@ exports.createBooking = async (req, res) => {
       // ================= CAKE =================
       ...(moduleType === "Cake" && {
         cakeId,
+        cakeCart: cakeCart || [],  // ✅ NEW: Multi-cake cart support
         cakeVariations: calculatedVariations,
         addons: addons || [],
         addonTotal: pricing.addonTotal || 0,
@@ -1470,6 +1525,24 @@ exports.createBooking = async (req, res) => {
     console.log("💾 Creating booking...");
     const booking = await Booking.create(bookingData);
     console.log("✅ Booking created:", booking._id);
+
+    // ===============================
+    // 🛒 CLEAR CART AFTER BOOKING (CAKE MODULE)
+    // ===============================
+    if (moduleType === "Cake" && userId) {
+      try {
+        const Cart = require('../../models/vendor/Cart');
+        const cart = await Cart.findOne({ userId });
+        if (cart && cart.items.length > 0) {
+          cart.items = [];
+          await cart.save();
+          console.log("✅ Cart cleared after successful booking");
+        }
+      } catch (cartError) {
+        console.error("⚠️ Failed to clear cart:", cartError.message);
+        // Don't fail the booking if cart clearing fails
+      }
+    }
 
     return res.status(201).json({
       success: true,

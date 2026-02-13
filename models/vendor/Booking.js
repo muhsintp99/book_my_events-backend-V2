@@ -254,7 +254,7 @@ const bookingSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Cake",
       required: function () {
-        return this.moduleType === "Cake";
+        return this.moduleType === "Cake" && (!this.cakeCart || this.cakeCart.length === 0);
       },
       default: null,
     },
@@ -394,6 +394,56 @@ const bookingSchema = new mongoose.Schema(
         totalPrice: {
           type: Number,
           required: true,
+        },
+      },
+    ],
+
+    // ===============================
+    // CAKE CART (MULTI-CAKE SUPPORT)
+    // ===============================
+    cakeCart: [
+      {
+        cakeId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Cake",
+          required: true,
+        },
+        name: {
+          type: String,
+          required: true,
+        },
+        image: {
+          type: String,
+          default: "",
+        },
+        quantity: {
+          type: Number,
+          required: true,
+          min: 1,
+          default: 1,
+        },
+        message: {
+          type: String,
+          default: "N/A",
+        },
+        variations: [
+          {
+            variationId: mongoose.Schema.Types.ObjectId,
+            name: String,
+            price: Number,
+          },
+        ],
+        addons: [
+          {
+            title: String,
+            price: Number,
+            icon: String,
+          },
+        ],
+        totalPrice: {
+          type: Number,
+          required: true,
+          default: 0,
         },
       },
     ],
