@@ -110,11 +110,11 @@ const ctrl = require("../../controllers/vendor/bookingController");
    FORCE TRIM URL AND PARAMS (Fix all trailing space issues)
 ======================================================== */
 router.use((req, res, next) => {
-  req.url = req.url.trim();
-  Object.keys(req.params).forEach(key => {
-    req.params[key] = req.params[key]?.trim();
-  });
-  next();
+   req.url = req.url.trim();
+   Object.keys(req.params).forEach(key => {
+      req.params[key] = req.params[key]?.trim();
+   });
+   next();
 });
 
 /* ========================================================
@@ -146,6 +146,7 @@ router.get("/provider/:providerId/past", ctrl.getPastBookings);
 ======================================================== */
 router.patch("/:id/accept", ctrl.acceptBooking);
 router.patch("/:id/reject", ctrl.rejectBooking);
+router.patch("/:id/cancel", ctrl.cancelBooking);  // ✅ NEW: Cancel booking
 router.patch("/:id/payment", ctrl.updatePaymentStatus);
 router.patch("/:id/chat", ctrl.addChatConversation);
 

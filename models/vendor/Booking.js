@@ -431,8 +431,25 @@ const bookingSchema = new mongoose.Schema(
     // ===============================
     status: {
       type: String,
-      enum: ["Pending", "Accepted", "Rejected"],
+      enum: ["Pending", "Accepted", "Rejected", "Cancelled"],
       default: "Pending",
+    },
+
+    // ===============================
+    // CANCELLATION TRACKING
+    // ===============================
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
+    cancellationReason: {
+      type: String,
+      default: null,
+    },
+    refundStatus: {
+      type: String,
+      enum: ["not_applicable", "pending", "processing", "completed", "failed"],
+      default: "not_applicable",
     },
     paymentOrderId: {
       type: String,

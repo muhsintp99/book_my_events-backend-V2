@@ -2209,6 +2209,96 @@ exports.getBookingsByPaymentStatus = async (req, res) => {
 };
 
 // =======================================================
+// CANCEL BOOKING (SOFT DELETE)
+// =======================================================
+exports.cancelBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId, cancellationReason } = req.body;
+
+    // Validate required fields
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId is required to cancel booking",
+      });
+    }
+
+    // Find the booking
+    const booking = await Booking.findById(id);
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
+      });
+    }
+
+    // Authorization: Check if user owns this booking
+    if (booking.userId.toString() !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to cancel this booking",
+      });
+    }
+
+    // Validate booking status - can only cancel Pending or Accepted bookings
+    if (!["Pending", "Accepted"].includes(booking.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot cancel booking with status: ${booking.status}. Only Pending or Accepted bookings can be cancelled.`,
+      });
+    }
+
+    // Check if already cancelled
+    if (booking.status === "Cancelled") {
+      return res.status(400).json({
+        success: false,
+        message: "This booking is already cancelled",
+      });
+    }
+
+    // Update booking to cancelled status
+    booking.status = "Cancelled";
+    booking.cancelledAt = new Date();
+    booking.cancellationReason = cancellationReason || "No reason provided";
+
+    // Set refund status based on payment status
+    if (booking.paymentStatus === "completed" || booking.paidAmount > 0) {
+      booking.refundStatus = "pending";
+    } else {
+      booking.refundStatus = "not_applicable";
+    }
+
+    await booking.save();
+
+    // Populate booking details for response
+    const populatedBooking = await Booking.findById(booking._id)
+      .populate("userId", "firstName lastName email")
+      .populate("moduleId", "title")
+      .lean();
+
+    // Add timeline info
+    const timeline = calculateTimeline(booking.bookingDate);
+
+    res.json({
+      success: true,
+      message: "Booking cancelled successfully",
+      data: {
+        ...populatedBooking,
+        timeline,
+      },
+    });
+  } catch (error) {
+    console.error("Cancel booking error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// =======================================================
 // DELETE BOOKING
 // =======================================================
 exports.deleteBooking = async (req, res) => {
@@ -2247,6 +2337,7 @@ exports.deleteBooking = async (req, res) => {
     });
   }
 };
+
 
 // =======================================================
 // CHECK BOOKING TIMELINE STATUS
