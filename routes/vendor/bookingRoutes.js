@@ -153,7 +153,10 @@ router.patch("/:id/chat", ctrl.addChatConversation);
 /* ========================================================
    DYNAMIC ROUTE — MUST BE LAST
 ======================================================== */
+// ✅ CHECK AVAILABILITY (MUST BE BEFORE /:id)
+router.get("/check-availability", ctrl.checkAvailability);
+
 router.get("/:id", ctrl.getBookingById);
-router.delete("/:id", ctrl.deleteBooking);  // ✅ ADD THIS LINE
+router.delete("/:id", ctrl.deleteBooking);
 
 module.exports = router;
