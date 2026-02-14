@@ -85,10 +85,27 @@ exports.checkAvailability = async (req, res) => {
     const conflictQuery = {
       moduleId: new mongoose.Types.ObjectId(moduleId),
       bookingDate: { $gte: startOfDay, $lte: endOfDay },
-      status: { $in: ["Pending", "Accepted"] },
+      status: { $in: ["Pending", "Accepted", "Confirmed", "Booked"] },
       // Exclude bookings where payment failed/cancelled/was never completed
       paymentStatus: { $nin: ["failed", "cancelled", "initiated"] }
     };
+
+    // 🔥 SESSION-AWARE FILTERING
+    const { timeSlot } = req.body;
+    if (timeSlot && timeSlot !== "Full Day") {
+      // If requesting Morning/Evening, conflict only with same slot OR Full Day OR legacy (no slot)
+      conflictQuery.$and = conflictQuery.$and || [];
+      conflictQuery.$and.push({
+        $or: [
+          { "timeSlot.label": { $in: [timeSlot, "Full Day"] } },
+          { "timeSlot.label": { $exists: false } }, // Legacy structure
+          { timeSlot: { $exists: false } },         // Alternate legacy structure
+          { timeSlot: { $size: 0 } }                // Empty array (Full Day by default)
+        ]
+      });
+    }
+    // If timeSlot is "Full Day" (or not provided), it conflicts with EVERYTHING on that day (default behavior)
+
 
     const title = (moduleExists.title || "").trim();
 
@@ -167,7 +184,7 @@ exports.checkAvailability = async (req, res) => {
     // 1. Check for Accepted bookings
     const acceptedConflict = await Booking.findOne({
       ...conflictQuery,
-      status: "Accepted"
+      status: { $in: ["Accepted", "Confirmed", "Booked"] }
     }).select("_id bookingDate status").lean();
 
     console.log("📊 Accepted Conflict:", acceptedConflict ? "FOUND" : "NONE");
