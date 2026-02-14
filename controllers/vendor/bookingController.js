@@ -770,7 +770,9 @@ exports.createBooking = async (req, res) => {
         ? new mongoose.Types.ObjectId(moduleId)
         : moduleId,
       bookingDate: { $gte: startOfDay, $lte: endOfDay },
-      status: { $in: ["Pending", "Accepted"] }
+      status: { $in: ["Pending", "Accepted"] },
+      // Only block if the previous booking's payment was NOT failed/cancelled/stuck-initiated
+      paymentStatus: { $nin: ["failed", "cancelled", "initiated"] }
     };
 
 

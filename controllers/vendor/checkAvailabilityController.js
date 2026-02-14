@@ -85,7 +85,9 @@ exports.checkAvailability = async (req, res) => {
     const conflictQuery = {
       moduleId: new mongoose.Types.ObjectId(moduleId),
       bookingDate: { $gte: startOfDay, $lte: endOfDay },
-      status: { $in: ["Pending", "Accepted"] }
+      status: { $in: ["Pending", "Accepted"] },
+      // Exclude bookings where payment failed/cancelled/was never completed
+      paymentStatus: { $nin: ["failed", "cancelled", "initiated"] }
     };
 
     const title = (moduleExists.title || "").trim();

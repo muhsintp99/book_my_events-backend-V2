@@ -552,8 +552,10 @@ exports.juspayWebhook = async (req, res) => {
         }
       } else if (["AUTHENTICATION_FAILED", "AUTHORIZATION_FAILED", "JUSPAY_DECLINED", "AUTO_REFUNDED"].includes(status)) {
         booking.paymentStatus = "cancelled";
+        booking.status = "Cancelled";
       } else if (status === "FAILED") {
         booking.paymentStatus = "failed";
+        booking.status = "Cancelled";
       }
       await booking.save();
     }
@@ -691,6 +693,7 @@ exports.verifyBookingPayment = async (req, res) => {
     if (CANCELLED_STATUSES.includes(order.status)) {
       if (booking) {
         booking.paymentStatus = "cancelled";
+        booking.status = "Cancelled";
         await booking.save();
       }
 
@@ -719,6 +722,7 @@ exports.verifyBookingPayment = async (req, res) => {
 
         if (secondsSinceInit > 30) {
           booking.paymentStatus = "cancelled";
+          booking.status = "Cancelled";
           await booking.save();
 
           return res.json({
@@ -735,6 +739,7 @@ exports.verifyBookingPayment = async (req, res) => {
     // ❌ ALL OTHER STATUSES → FAILED
     if (booking) {
       booking.paymentStatus = "failed";
+      booking.status = "Cancelled";
       await booking.save();
     }
 
