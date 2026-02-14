@@ -808,22 +808,53 @@ exports.createBooking = async (req, res) => {
       conflictQuery.packageId = toId(packageId);
     }
 
-    // 1. Check if SAME user already has a pending or accepted booking for this item/date
-    if (userId || (bookingType === "Direct" && emailAddress)) {
-      const userQuery = {
-        ...conflictQuery,
-        $or: [
-          { userId: mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : undefined },
-          { emailAddress: emailAddress || undefined }
-        ].filter(v => v.userId || v.emailAddress)
-      };
-      const userConflict = await Booking.findOne(userQuery);
+    // -------------------------------------------------------
+    // ⏰ TIME SLOT CONFLICT CHECK
+    // -------------------------------------------------------
+    if (normalizedTimeSlot && normalizedTimeSlot.length > 0) {
+      const labels = normalizedTimeSlot.map((s) => s.label).filter((l) => l);
 
-      if (userConflict) {
-        return res.status(400).json({
-          success: false,
-          message: `You already have a ${userConflict.status.toLowerCase()} booking request for this date. Please check your bookings.`,
-        });
+      if (labels.length > 0) {
+        const regexList = labels.map((l) => new RegExp(`^${l}$`, "i"));
+
+        // Add to conflictQuery
+        conflictQuery.$or = [
+          // Legacy String
+          { timeSlot: { $in: regexList } },
+          // Nested Label (Object or Array)
+          { "timeSlot.label": { $in: regexList } }
+        ];
+      }
+    }
+
+    // 1. Check if SAME user already has a pending or accepted booking for this item/date/session
+    if (userId || (bookingType === "Direct" && emailAddress)) {
+      const userCheckOr = [];
+
+      if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+        userCheckOr.push({ userId: new mongoose.Types.ObjectId(userId) });
+      }
+      if (emailAddress) {
+        userCheckOr.push({ emailAddress });
+      }
+
+      if (userCheckOr.length > 0) {
+        // Use $and to safely combine conflictQuery (which might have its own $or) with user identity check
+        const userQuery = {
+          $and: [
+            conflictQuery,
+            { $or: userCheckOr }
+          ]
+        };
+
+        const userConflict = await Booking.findOne(userQuery);
+
+        if (userConflict) {
+          return res.status(400).json({
+            success: false,
+            message: `You already have a ${userConflict.status.toLowerCase()} booking request for this slot (${normalizedTimeSlot[0]?.label || 'date'}). Please check your bookings.`,
+          });
+        }
       }
     }
 
