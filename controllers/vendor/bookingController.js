@@ -2445,3 +2445,72 @@ exports.checkBookingTimeline = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+/* =======================================================
+   CHECK AVAILABILITY (Venue Sessions)
+======================================================= */
+exports.checkAvailability = async (req, res) => {
+  try {
+    const { venueId, date } = req.query;
+
+    if (!venueId || !date) {
+      return res.status(400).json({
+        success: false,
+        message: "venueId and date are required",
+      });
+    }
+
+    // Parse date
+    const bookingDate = new Date(date);
+    if (isNaN(bookingDate.getTime())) {
+      return res.status(400).json({ success: false, message: "Invalid date format" });
+    }
+
+    const startOfDay = new Date(bookingDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(bookingDate);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
+    const bookings = await Booking.find({
+      venueId,
+      bookingDate: { $gte: startOfDay, $lte: endOfDay },
+      status: { $in: ["Pending", "Accepted"] },
+      // Only block if the previous booking's payment was NOT failed/cancelled/stuck-initiated
+      paymentStatus: { $nin: ["failed", "cancelled", "initiated"] },
+    }).select("bookingDate timeSlot status paymentStatus");
+
+    let bookedSessions = [];
+
+    bookings.forEach((b) => {
+      // 1. Array of slots [{label: "Morning"}, {label: "Evening"}]
+      if (Array.isArray(b.timeSlot)) {
+        b.timeSlot.forEach((slot) => {
+          if (slot && slot.label) bookedSessions.push(slot.label);
+        });
+      }
+      // 2. Single object {label: "Morning"}
+      else if (b.timeSlot && typeof b.timeSlot === "object" && b.timeSlot.label) {
+        bookedSessions.push(b.timeSlot.label);
+      }
+      // 3. String "Morning" (Legacy)
+      else if (typeof b.timeSlot === "string") {
+        bookedSessions.push(b.timeSlot);
+      }
+    });
+
+    // Normalize & unique
+    bookedSessions = [...new Set(bookedSessions.map((s) => s.trim()))];
+
+    return res.json({
+      success: true,
+      data: {
+        bookedSessions, // ["Morning", "Evening"]
+        date,
+        venueId,
+      },
+    });
+  } catch (error) {
+    console.error("Check availability error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

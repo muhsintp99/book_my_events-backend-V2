@@ -13,7 +13,8 @@ exports.checkAvailability = async (req, res) => {
       bookingId,     // optional (edit / reschedule)
       moduleId,
       packageId,
-      bookingDate
+      bookingDate,
+      timeSlot
     } = req.body;
 
     /* =========================
@@ -152,6 +153,28 @@ exports.checkAvailability = async (req, res) => {
       ];
     } else {
       conflictQuery.packageId = pkgId;
+    }
+
+    /* =========================
+       TIME SLOT CHECK (If Provided)
+    ========================= */
+    if (timeSlot) {
+      const slotRegex = new RegExp(`^${timeSlot}$`, "i");
+      const timeQuery = {
+        $or: [
+          { timeSlot: slotRegex },
+          { "timeSlot.label": slotRegex },
+          { "timeSlot": { $elemMatch: { label: slotRegex } } },
+        ],
+      };
+
+      // Merge into conflictQuery
+      if (conflictQuery.$or) {
+        conflictQuery.$and = [{ $or: conflictQuery.$or }, timeQuery];
+        delete conflictQuery.$or;
+      } else {
+        Object.assign(conflictQuery, timeQuery);
+      }
     }
 
     console.log("🔍 Availability Check Query:", JSON.stringify(conflictQuery, null, 2));

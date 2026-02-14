@@ -120,6 +120,7 @@ router.use((req, res, next) => {
 /* ========================================================
    STATIC ROUTES — MUST ALWAYS COME FIRST
 ======================================================== */
+router.get("/check-availability", ctrl.checkAvailability); // ✅ NEW: Check Availability
 router.get("/pending", ctrl.getPendingBookings);
 router.get("/accepted", ctrl.getAcceptedBookings);
 router.get("/completed", ctrl.getCompletedBookings);
