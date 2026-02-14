@@ -165,11 +165,10 @@ exports.checkAvailability = async (req, res) => {
         { packageId: cId }
       ];
     } else if (venueId || title === "Venues") {
-      // ✅ FIX: Prioritize venueId
-      const vId = toId(venueId);
+      const vId = toId(venueId || packageId);
       conflictQuery.$or = [
         { venueId: vId },
-        { packageId: vId } // Keep this for legacy or if packageId was wrongly used
+        { packageId: vId }
       ];
     } else if (makeupId || title === "Makeup" || title === "Makeup Artist") {
       const mId = toId(makeupId || packageId);
