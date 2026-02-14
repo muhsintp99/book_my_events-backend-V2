@@ -92,17 +92,38 @@ exports.checkAvailability = async (req, res) => {
 
     // 🔥 SESSION-AWARE FILTERING
     const { timeSlot } = req.body;
-    if (timeSlot && timeSlot !== "Full Day") {
-      // If requesting Morning/Evening, conflict only with same slot OR Full Day OR legacy (no slot)
+
+    // Add timeSlot filtering only if timeSlot is provided
+    if (timeSlot) {
       conflictQuery.$and = conflictQuery.$and || [];
-      conflictQuery.$and.push({
-        $or: [
-          { "timeSlot.label": { $in: [timeSlot, "Full Day"] } },
-          { "timeSlot.label": { $exists: false } }, // Legacy structure
-          { timeSlot: { $exists: false } },         // Alternate legacy structure
-          { timeSlot: { $size: 0 } }                // Empty array (Full Day by default)
-        ]
-      });
+
+      if (timeSlot === "Full Day") {
+        // If requesting Full Day, it conflicts with ANY booking on that day (Morning, Evening, or Full Day)
+        // No additional filter needed because the base query already checks for any booking on that date
+        // However, to be explicit and safe against potential future changes where we might have non-blocking slots
+        conflictQuery.$and.push({
+          $or: [
+            { "timeSlot.label": { $in: ["Morning", "Evening", "Full Day"] } },
+            { "timeSlot.label": { $exists: false } },
+            { timeSlot: { $exists: false } }, // Legacy: string or missing
+            { timeSlot: "Full Day" }, // Legacy string match
+            { timeSlot: "Morning" },
+            { timeSlot: "Evening" }
+          ]
+        });
+
+      } else {
+        // If requesting Morning or Evening
+        conflictQuery.$and.push({
+          $or: [
+            { "timeSlot.label": { $in: [timeSlot, "Full Day"] } }, // Conflict with same slot OR Full Day
+            { "timeSlot.label": { $exists: false } }, // Legacy assumed Full Day
+            { timeSlot: { $exists: false } },          // Legacy assumed Full Day
+            { timeSlot: timeSlot },                    // Legacy string match
+            { timeSlot: "Full Day" }                   // Legacy string match
+          ]
+        });
+      }
     }
     // If timeSlot is "Full Day" (or not provided), it conflicts with EVERYTHING on that day (default behavior)
 
@@ -144,10 +165,11 @@ exports.checkAvailability = async (req, res) => {
         { packageId: cId }
       ];
     } else if (venueId || title === "Venues") {
-      const vId = toId(venueId || packageId);
+      // ✅ FIX: Prioritize venueId
+      const vId = toId(venueId);
       conflictQuery.$or = [
         { venueId: vId },
-        { packageId: vId }
+        { packageId: vId } // Keep this for legacy or if packageId was wrongly used
       ];
     } else if (makeupId || title === "Makeup" || title === "Makeup Artist") {
       const mId = toId(makeupId || packageId);
