@@ -816,7 +816,7 @@ exports.createBooking = async (req, res) => {
     const queryConditions = [
       { moduleId: mongoose.Types.ObjectId.isValid(moduleId) ? new mongoose.Types.ObjectId(moduleId) : moduleId },
       { status: { $in: ["Pending", "Accepted"] } },
-      { paymentStatus: { $nin: ["failed", "cancelled", "initiated", "pending", "Pending", "Initiated"] } }
+      { paymentStatus: { $nin: ["failed", "cancelled", "initiated"] } }
     ];
 
     // 2. Add Item ID (Venue, Vehicle, etc.)
@@ -1650,10 +1650,7 @@ exports.getBookingsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const bookings = await Booking.find({
-      userId,
-      paymentStatus: { $nin: ["pending", "initiated", "Pending", "Initiated"] }
-    })
+    const bookings = await Booking.find({ userId })
       .sort({ bookingDate: -1 })
       .populate("venueId")
       .populate("vehicleId")
@@ -2572,7 +2569,7 @@ exports.checkAvailability = async (req, res) => {
       bookingDate: { $gte: startOfDay, $lte: endOfDay },
       status: { $in: ["Pending", "Accepted"] },
       // Only block if the previous booking's payment was NOT failed/cancelled/stuck-initiated
-      paymentStatus: { $nin: ["failed", "cancelled", "initiated", "pending", "Pending", "Initiated"] },
+      paymentStatus: { $nin: ["failed", "cancelled", "initiated"] },
     }).select("bookingDate timeSlot status paymentStatus");
 
     let bookedSessions = [];

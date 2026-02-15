@@ -87,7 +87,7 @@ exports.checkAvailability = async (req, res) => {
       bookingDate: { $gte: startOfDay, $lte: endOfDay },
       status: { $in: ["Pending", "Accepted"] },
       // Exclude bookings where payment failed/cancelled
-      paymentStatus: { $nin: ["failed", "cancelled", "initiated", "pending", "Pending", "Initiated"] }
+      paymentStatus: { $nin: ["failed", "cancelled"] }
     };
 
     // 🔥 RELAXED MODULE ID: 
