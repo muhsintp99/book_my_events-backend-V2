@@ -845,34 +845,22 @@ exports.createBooking = async (req, res) => {
       }
 
       if (userCheckOr.length > 0) {
-        const userConflict = await Booking.findOne({
-          ...finalConflictQuery,
-          $or: userCheckOr
-        });
+        // ✅ FIX: Use $and to combine session-aware conflictQuery and userCheckOr
+        // This prevents the session $or check from being overwritten by userCheckOr
+        const combinedUserQuery = {
+          $and: [
+            finalConflictQuery,
+            { $or: userCheckOr }
+          ]
+        };
+
+        const userConflict = await Booking.findOne(combinedUserQuery);
 
         if (userConflict) {
-          // ✅ FIX: Only block if the sessions actually overlap
-          // userConflict.timeSlot can be a string, object, or array of objects
-          let conflictLabels = [];
-          if (Array.isArray(userConflict.timeSlot)) {
-            conflictLabels = userConflict.timeSlot.map(s => (s.label || s).toString().toLowerCase());
-          } else if (userConflict.timeSlot && typeof userConflict.timeSlot === 'object') {
-            conflictLabels = [userConflict.timeSlot.label?.toString().toLowerCase()];
-          } else if (typeof userConflict.timeSlot === 'string') {
-            conflictLabels = [userConflict.timeSlot.toLowerCase()];
-          }
-
-          const requestedLabels = normalizedTimeSlot.map(s => s.label?.toString().toLowerCase());
-          const hasOverlap = requestedLabels.some(label => conflictLabels.includes(label));
-
-          if (hasOverlap) {
-            return res.status(400).json({
-              success: false,
-              message: `You already have a ${userConflict.status.toLowerCase()} booking request for this slot (${normalizedTimeSlot[0]?.label || 'date'}). Please check your bookings.`,
-            });
-          }
-
-          console.log("ℹ️ User has an existing booking on this date, but for a different slot. Allowing...");
+          return res.status(400).json({
+            success: false,
+            message: `You already have a ${userConflict.status.toLowerCase()} booking request for this slot (${normalizedTimeSlot[0]?.label || 'date'}). Please check your bookings.`,
+          });
         }
       }
     }
