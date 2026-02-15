@@ -809,34 +809,67 @@ exports.createBooking = async (req, res) => {
     }
 
     // -------------------------------------------------------
-    // 🔥 AVAILABILITY & DUPLICATE CHECK (SYCED WITH checkAvailabilityController)
+    // 🔥 AVAILABILITY & DUPLICATE CHECK (ROBUST SESSION-AWARE)
     // -------------------------------------------------------
+
+    // 1. Build core conditions
+    const queryConditions = [
+      { moduleId: mongoose.Types.ObjectId.isValid(moduleId) ? new mongoose.Types.ObjectId(moduleId) : moduleId },
+      { status: { $in: ["Pending", "Accepted"] } },
+      { paymentStatus: { $nin: ["failed", "cancelled", "initiated"] } }
+    ];
+
+    // 2. Add Item ID (Venue, Vehicle, etc.)
+    const itemIds = {};
+    if (conflictQuery.venueId) itemIds.venueId = conflictQuery.venueId;
+    if (conflictQuery.vehicleId) itemIds.vehicleId = conflictQuery.vehicleId;
+    if (conflictQuery.boutiqueId) itemIds.boutiqueId = conflictQuery.boutiqueId;
+    if (conflictQuery.ornamentId) itemIds.ornamentId = conflictQuery.ornamentId;
+    if (conflictQuery.cakeId) itemIds.cakeId = conflictQuery.cakeId;
+    if (conflictQuery.makeupId) itemIds.makeupId = conflictQuery.makeupId;
+    if (conflictQuery.photographyId) itemIds.photographyId = conflictQuery.photographyId;
+    if (conflictQuery.cateringId) itemIds.cateringId = conflictQuery.cateringId;
+    if (conflictQuery.packageId) itemIds.packageId = conflictQuery.packageId;
+
+    if (Object.keys(itemIds).length > 0) {
+      queryConditions.push(itemIds);
+    }
+
+    // 3. Add Date / Rental Overlap logic
     const isRentalModule = ["Boutique", "Boutiques", "Ornaments", "Ornament"].includes(title);
+    if (isRentalModule) {
+      queryConditions.push({
+        $or: [
+          { "rentalPeriod.from": { $lte: endOfDay }, "rentalPeriod.to": { $gte: startOfDay } },
+          { bookingDate: { $gte: startOfDay, $lte: endOfDay } }
+        ]
+      });
+    } else {
+      queryConditions.push({ bookingDate: { $gte: startOfDay, $lte: endOfDay } });
+    }
 
-    // BUILD RENTAL OVERLAP QUERY (If it's a rental item)
-    const rentalOverlapQuery = {
-      $or: [
-        {
-          "rentalPeriod.from": { $lte: endOfDay },
-          "rentalPeriod.to": { $gte: startOfDay }
-        },
-        {
-          bookingDate: { $gte: startOfDay, $lte: endOfDay }
-        }
-      ]
-    };
+    // 4. Add Time Slot logic (Session Aware)
+    if (normalizedTimeSlot && normalizedTimeSlot.length > 0) {
+      const labels = normalizedTimeSlot.map((s) => s.label).filter((l) => l);
+      if (labels.length > 0) {
+        const regexList = labels.map((l) => new RegExp(`^${l}$`, "i"));
+        queryConditions.push({
+          $or: [
+            { timeSlot: { $in: regexList } },
+            { "timeSlot.label": { $in: regexList } },
+            { timeSlot: { $elemMatch: { label: { $in: regexList } } } }
+          ]
+        });
+      }
+    }
 
-    const baseConflictQuery = { ...conflictQuery };
-    delete baseConflictQuery.bookingDate;
+    const finalConflictQuery = { $and: queryConditions };
 
-    const finalConflictQuery = isRentalModule
-      ? { ...baseConflictQuery, ...rentalOverlapQuery }
-      : conflictQuery;
-
-    // 1. Check if SAME user already has a pending or accepted booking for this item/date/session
+    // -------------------------------------------------------
+    // CHECK 1: SAME USER DUPLICATE (Strict Block)
+    // -------------------------------------------------------
     if (userId || (bookingType === "Direct" && emailAddress)) {
       const userCheckOr = [];
-
       if (userId && mongoose.Types.ObjectId.isValid(userId)) {
         userCheckOr.push({ userId: new mongoose.Types.ObjectId(userId) });
       }
@@ -845,16 +878,9 @@ exports.createBooking = async (req, res) => {
       }
 
       if (userCheckOr.length > 0) {
-        // ✅ FIX: Use $and to combine session-aware conflictQuery and userCheckOr
-        // This prevents the session $or check from being overwritten by userCheckOr
-        const combinedUserQuery = {
-          $and: [
-            finalConflictQuery,
-            { $or: userCheckOr }
-          ]
-        };
-
-        const userConflict = await Booking.findOne(combinedUserQuery);
+        const userConflict = await Booking.findOne({
+          $and: [finalConflictQuery, { $or: userCheckOr }]
+        });
 
         if (userConflict) {
           return res.status(400).json({
