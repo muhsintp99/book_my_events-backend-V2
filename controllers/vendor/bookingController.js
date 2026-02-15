@@ -2541,35 +2541,42 @@ exports.checkAvailability = async (req, res) => {
     }).select("bookingDate timeSlot status paymentStatus");
 
     let bookedSessions = [];
+    let pendingSessions = [];
 
     bookings.forEach((b) => {
+      const status = b.status; // "Pending" or "Accepted"
+      const targetList = status === "Accepted" ? bookedSessions : pendingSessions;
+
       // 1. Array of slots [{label: "Morning"}, {label: "Evening"}]
       if (Array.isArray(b.timeSlot)) {
         b.timeSlot.forEach((slot) => {
-          if (slot && slot.label) bookedSessions.push(slot.label);
+          if (slot && slot.label) targetList.push(slot.label);
         });
       }
       // 2. Single object {label: "Morning"}
       else if (b.timeSlot && typeof b.timeSlot === "object" && b.timeSlot.label) {
-        bookedSessions.push(b.timeSlot.label);
+        targetList.push(b.timeSlot.label);
       }
       // 3. String "Morning" (Legacy)
       else if (typeof b.timeSlot === "string") {
-        bookedSessions.push(b.timeSlot);
+        targetList.push(b.timeSlot);
       }
     });
 
     // Normalize & unique
     bookedSessions = [...new Set(bookedSessions.map((s) => s.trim()))];
+    pendingSessions = [...new Set(pendingSessions.map((s) => s.trim()))];
 
     return res.json({
       success: true,
       data: {
-        bookedSessions, // ["Morning", "Evening"]
+        bookedSessions, // ONLY Accepted bookings (STRICTLY BLOCKED)
+        pendingSessions, // ONLY Pending bookings (WISHLIST ALLOWED)
         date,
         venueId,
       },
     });
+
   } catch (error) {
     console.error("Check availability error:", error);
     res.status(500).json({ success: false, message: error.message });

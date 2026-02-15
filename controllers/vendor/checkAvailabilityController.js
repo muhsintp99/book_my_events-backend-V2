@@ -84,12 +84,19 @@ exports.checkAvailability = async (req, res) => {
     const { vehicleId, boutiqueId, ornamentId, cakeId, venueId, makeupId, photographyId, cateringId } = req.body;
 
     const conflictQuery = {
-      moduleId: new mongoose.Types.ObjectId(moduleId),
       bookingDate: { $gte: startOfDay, $lte: endOfDay },
       status: { $in: ["Pending", "Accepted"] },
-      // Exclude bookings where payment failed/cancelled/was never completed
-      paymentStatus: { $nin: ["failed", "cancelled", "initiated"] }
+      // Exclude bookings where payment failed/cancelled
+      paymentStatus: { $nin: ["failed", "cancelled"] }
     };
+
+    // 🔥 RELAXED MODULE ID: 
+    // Only strictly require it if we don't have a more specific ID (like cateringId etc)
+    // This prevents missing bookings due to moduleId mismatch across environments
+    const hasSpecificId = !!(vehicleId || boutiqueId || ornamentId || cakeId || venueId || makeupId || photographyId || cateringId || packageId);
+    if (moduleId && !hasSpecificId) {
+      conflictQuery.moduleId = new mongoose.Types.ObjectId(moduleId);
+    }
 
     const title = (moduleExists.title || "").trim();
 
