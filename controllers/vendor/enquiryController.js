@@ -197,9 +197,23 @@ exports.getEnquiriesByProvider = async (req, res) => {
 
 exports.getEnquiriesByUser = async (req, res) => {
   try {
-    const enquiries = await Enquiry.find({
+    const filter = {
       $or: [{ userId: req.params.userId }, { vendorId: req.params.userId }]
-    })
+    };
+
+    // Support filtering by enquiryType (e.g. ?enquiryType=enquiry or ?enquiryType=customization)
+    if (req.query.enquiryType) {
+      if (req.query.enquiryType === "enquiry") {
+        // For "enquiry" type, also include documents where enquiryType is not set (legacy data)
+        filter.$and = [
+          { $or: [{ enquiryType: "enquiry" }, { enquiryType: { $exists: false } }, { enquiryType: null }] }
+        ];
+      } else {
+        filter.enquiryType = req.query.enquiryType;
+      }
+    }
+
+    const enquiries = await Enquiry.find(filter)
       .populate("moduleId", "title icon")
       .populate(VENDOR_POPULATION)
       .populate("userId", "firstName lastName email")
