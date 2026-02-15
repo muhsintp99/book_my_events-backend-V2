@@ -159,20 +159,27 @@ exports.checkAvailability = async (req, res) => {
        TIME SLOT CHECK (If Provided)
     ========================= */
     if (timeSlot) {
-      const slotRegex = new RegExp(`^${timeSlot}$`, "i");
+      // 🔥 ROBUST TIME SLOT QUERY
+      // Handles both legacy string format ("Morning") and new array format ([{label: "Morning"}])
+      // Uses $or to check both possibilities without causing schema validation errors
+
       const timeQuery = {
         $or: [
-          { timeSlot: slotRegex },
-          { "timeSlot.label": slotRegex },
-          { "timeSlot": { $elemMatch: { label: slotRegex } } },
-        ],
+          // Legacy format: timeSlot is a plain string
+          { timeSlot: { $regex: `^${timeSlot}$`, $options: "i" } },
+          // New format: timeSlot is an array of objects with label field
+          { "timeSlot.label": { $regex: `^${timeSlot}$`, $options: "i" } }
+        ]
       };
 
       // Merge into conflictQuery
       if (conflictQuery.$or) {
+        // If conflictQuery already has $or (from module-specific ID matching),
+        // wrap both in $and to combine them properly
         conflictQuery.$and = [{ $or: conflictQuery.$or }, timeQuery];
         delete conflictQuery.$or;
       } else {
+        // Otherwise, just add the time query directly
         Object.assign(conflictQuery, timeQuery);
       }
     }
@@ -205,17 +212,48 @@ exports.checkAvailability = async (req, res) => {
     };
 
     const baseConflictQuery = { ...conflictQuery };
-    delete baseConflictQuery.bookingDate; // We'll use the overlap query instead for rentals
+
+    // Only delete bookingDate for rental modules
+    if (isRentalModule) {
+      delete baseConflictQuery.bookingDate;
+    }
 
     const finalConflictQuery = isRentalModule
       ? { ...baseConflictQuery, ...rentalOverlapQuery }
       : conflictQuery;
 
     // 1. Check for Accepted bookings (FULLY BOOKED)
-    const acceptedConflict = await Booking.findOne({
-      ...finalConflictQuery,
-      status: "Accepted"
-    }).select("_id bookingDate status rentalPeriod").lean();
+    let acceptedConflict = null;
+    try {
+      acceptedConflict = await Booking.findOne({
+        ...finalConflictQuery,
+        status: "Accepted"
+      }).select("_id bookingDate status rentalPeriod timeSlot").lean();
+    } catch (queryError) {
+      // Handle Mongoose validation errors gracefully
+      console.warn("⚠️ Query error (likely schema mismatch):", queryError.message);
+      // Fall back to simpler query without timeSlot if error occurs
+      if (timeSlot) {
+        const fallbackQuery = { ...finalConflictQuery };
+        delete fallbackQuery.$or;
+        delete fallbackQuery.$and;
+        acceptedConflict = await Booking.findOne({
+          ...fallbackQuery,
+          status: "Accepted"
+        }).select("_id bookingDate status rentalPeriod timeSlot").lean();
+
+        // Manually check timeSlot match
+        if (acceptedConflict) {
+          const bookingTimeSlot = Array.isArray(acceptedConflict.timeSlot)
+            ? acceptedConflict.timeSlot[0]?.label
+            : acceptedConflict.timeSlot;
+
+          if (bookingTimeSlot?.toLowerCase() !== timeSlot.toLowerCase()) {
+            acceptedConflict = null; // Not a match
+          }
+        }
+      }
+    }
 
     console.log("📊 Accepted Conflict:", acceptedConflict ? "FOUND" : "NONE");
 
@@ -230,10 +268,36 @@ exports.checkAvailability = async (req, res) => {
     }
 
     // 2. Check for Pending bookings (SOFT-AVAILABLE / WISHLIST)
-    const pendingConflict = await Booking.findOne({
-      ...finalConflictQuery,
-      status: "Pending"
-    }).select("_id bookingDate status createdAt").sort({ createdAt: -1 }).lean();
+    let pendingConflict = null;
+    try {
+      pendingConflict = await Booking.findOne({
+        ...finalConflictQuery,
+        status: "Pending"
+      }).select("_id bookingDate status createdAt timeSlot").sort({ createdAt: -1 }).lean();
+    } catch (queryError) {
+      console.warn("⚠️ Query error for pending bookings:", queryError.message);
+      // Fall back to simpler query
+      if (timeSlot) {
+        const fallbackQuery = { ...finalConflictQuery };
+        delete fallbackQuery.$or;
+        delete fallbackQuery.$and;
+        pendingConflict = await Booking.findOne({
+          ...fallbackQuery,
+          status: "Pending"
+        }).select("_id bookingDate status createdAt timeSlot").sort({ createdAt: -1 }).lean();
+
+        // Manually check timeSlot match
+        if (pendingConflict) {
+          const bookingTimeSlot = Array.isArray(pendingConflict.timeSlot)
+            ? pendingConflict.timeSlot[0]?.label
+            : pendingConflict.timeSlot;
+
+          if (bookingTimeSlot?.toLowerCase() !== timeSlot.toLowerCase()) {
+            pendingConflict = null;
+          }
+        }
+      }
+    }
 
     console.log("📊 Pending Conflict:", pendingConflict ? "FOUND" : "NONE");
 
