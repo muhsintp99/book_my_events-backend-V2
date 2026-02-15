@@ -1831,6 +1831,9 @@ exports.getBookingsByProvider = async (req, res) => {
       .populate("moduleId")
       .populate("ornamentId")
       .populate("boutiqueId")
+      .populate("cakeId")
+      .populate("photographyId")
+      .populate("cateringId")
       .select(
         "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount +discountValue +couponDiscountValue"
       )
@@ -1880,6 +1883,10 @@ exports.getBookingById = async (req, res) => {
       .populate("userId")
       .populate("moduleId")
       .populate("boutiqueId")
+      .populate("ornamentId")
+      .populate("cakeId")
+      .populate("photographyId")
+      .populate("cateringId")
       .select(
         "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount +discountValue +couponDiscountValue"
       )
@@ -1945,6 +1952,9 @@ exports.getUpcomingBookings = async (req, res) => {
       .populate("userId")
       .populate("moduleId")
       .populate("ornamentId")
+      .populate("cakeId")
+      .populate("photographyId")
+      .populate("cateringId")
       .select("+paymentStatus +paymentType +status +bookingType +finalPrice")
       .lean();
 
@@ -2016,6 +2026,10 @@ exports.getPastBookings = async (req, res) => {
       .populate("userId")
       .populate("moduleId")
       .populate("ornamentId")
+      .populate("boutiqueId")
+      .populate("cakeId")
+      .populate("photographyId")
+      .populate("cateringId")
       .select("+paymentStatus +paymentType +status +bookingType +finalPrice")
       .lean();
 

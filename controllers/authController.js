@@ -2250,7 +2250,11 @@ exports.register = async (req, res) => {
         );
       }
     } catch (e) {
-      console.error("Email sending failed:", e.message);
+      console.error("❌ Registration email sending failed:");
+      console.error(`   Recipient: ${user[0].email}`);
+      console.error(`   Role: ${role}`);
+      console.error(`   Error: ${e.message}`);
+      if (e.response) console.error(`   SMTP Response: ${e.response}`);
     }
 
     const token = generateJwtToken({ id: user[0]._id });
