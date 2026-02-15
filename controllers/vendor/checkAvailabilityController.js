@@ -185,29 +185,53 @@ exports.checkAvailability = async (req, res) => {
     }
 
     /* =========================
-       CHECK EXISTING BOOKINGS (Soft-Available)
+       CHECK EXISTING BOOKINGS
     ========================= */
-    // 1. Check for Accepted bookings
+    // BUILD RENTAL OVERLAP QUERY (If it's a rental item)
+    const isRentalModule = ["Boutique", "Boutiques", "Ornaments", "Ornament"].includes(title);
+
+    // We check for overlap: (RequestedDate BETWEEN ExistingFrom AND ExistingTo)
+    // OR (ExistingFrom BETWEEN RequestedStartOfDay AND RequestedEndOfDay)
+    const rentalOverlapQuery = {
+      $or: [
+        {
+          "rentalPeriod.from": { $lte: endOfDay },
+          "rentalPeriod.to": { $gte: startOfDay }
+        },
+        {
+          bookingDate: { $gte: startOfDay, $lte: endOfDay }
+        }
+      ]
+    };
+
+    const baseConflictQuery = { ...conflictQuery };
+    delete baseConflictQuery.bookingDate; // We'll use the overlap query instead for rentals
+
+    const finalConflictQuery = isRentalModule
+      ? { ...baseConflictQuery, ...rentalOverlapQuery }
+      : conflictQuery;
+
+    // 1. Check for Accepted bookings (FULLY BOOKED)
     const acceptedConflict = await Booking.findOne({
-      ...conflictQuery,
+      ...finalConflictQuery,
       status: "Accepted"
-    }).select("_id bookingDate status").lean();
+    }).select("_id bookingDate status rentalPeriod").lean();
 
     console.log("📊 Accepted Conflict:", acceptedConflict ? "FOUND" : "NONE");
 
     if (acceptedConflict) {
       return res.json({
         success: true,
-        available: true, // Still allow booking (Request List model)
-        availabilityStatus: "Pending",
-        message: "This date is already booked by another customer. You can still submit a waitlist request, and you will be informed if it becomes available due to a cancellation or vendor confirmation.",
+        available: false, // ❌ BLOCK BOOKING
+        availabilityStatus: "Booked",
+        message: "This date is already booked and unavailable. Please try another date.",
         conflict: acceptedConflict
       });
     }
 
-    // 2. Check for Pending bookings
+    // 2. Check for Pending bookings (SOFT-AVAILABLE / WISHLIST)
     const pendingConflict = await Booking.findOne({
-      ...conflictQuery,
+      ...finalConflictQuery,
       status: "Pending"
     }).select("_id bookingDate status createdAt").sort({ createdAt: -1 }).lean();
 
@@ -216,9 +240,9 @@ exports.checkAvailability = async (req, res) => {
     if (pendingConflict) {
       return res.json({
         success: true,
-        available: true, // Still allow booking
+        available: true, // ✅ ALLOW WISHLIST
         availabilityStatus: "Pending",
-        message: "This date has a pending request. You can still submit your request, and the vendor will review all interests.",
+        message: "This date has a pending request. You can still submit your interest/enquiry, and the vendor will review all requests.",
         conflict: pendingConflict
       });
     }

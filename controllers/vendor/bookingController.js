@@ -809,23 +809,29 @@ exports.createBooking = async (req, res) => {
     }
 
     // -------------------------------------------------------
-    // ⏰ TIME SLOT CONFLICT CHECK
+    // 🔥 AVAILABILITY & DUPLICATE CHECK (SYCED WITH checkAvailabilityController)
     // -------------------------------------------------------
-    if (normalizedTimeSlot && normalizedTimeSlot.length > 0) {
-      const labels = normalizedTimeSlot.map((s) => s.label).filter((l) => l);
+    const isRentalModule = ["Boutique", "Boutiques", "Ornaments", "Ornament"].includes(title);
 
-      if (labels.length > 0) {
-        const regexList = labels.map((l) => new RegExp(`^${l}$`, "i"));
+    // BUILD RENTAL OVERLAP QUERY (If it's a rental item)
+    const rentalOverlapQuery = {
+      $or: [
+        {
+          "rentalPeriod.from": { $lte: endOfDay },
+          "rentalPeriod.to": { $gte: startOfDay }
+        },
+        {
+          bookingDate: { $gte: startOfDay, $lte: endOfDay }
+        }
+      ]
+    };
 
-        // Add to conflictQuery
-        conflictQuery.$or = [
-          // Legacy String
-          { timeSlot: { $in: regexList } },
-          // Nested Label (Object or Array)
-          { "timeSlot.label": { $in: regexList } }
-        ];
-      }
-    }
+    const baseConflictQuery = { ...conflictQuery };
+    delete baseConflictQuery.bookingDate;
+
+    const finalConflictQuery = isRentalModule
+      ? { ...baseConflictQuery, ...rentalOverlapQuery }
+      : conflictQuery;
 
     // 1. Check if SAME user already has a pending or accepted booking for this item/date/session
     if (userId || (bookingType === "Direct" && emailAddress)) {
@@ -839,15 +845,10 @@ exports.createBooking = async (req, res) => {
       }
 
       if (userCheckOr.length > 0) {
-        // Use $and to safely combine conflictQuery (which might have its own $or) with user identity check
-        const userQuery = {
-          $and: [
-            conflictQuery,
-            { $or: userCheckOr }
-          ]
-        };
-
-        const userConflict = await Booking.findOne(userQuery);
+        const userConflict = await Booking.findOne({
+          ...finalConflictQuery,
+          $or: userCheckOr
+        });
 
         if (userConflict) {
           return res.status(400).json({
@@ -860,19 +861,34 @@ exports.createBooking = async (req, res) => {
 
     // 2. Check for conflicts by OTHER users
     const acceptedConflict = await Booking.findOne({
-      ...conflictQuery,
+      ...finalConflictQuery,
       status: "Accepted"
     });
 
+    if (acceptedConflict) {
+      // Current behavior allows booking even if accepted? 
+      // User said: "if vendor confirmed same package with same date range ... show like this alrady booked or anavalable"
+      // So if it's already booked, we should probably BLOCK it if it's a hard booking?
+      // But the user also said "enqury sending option" for pending.
+      // Let's re-read: "if vendor appect / confirmed any package with same date then upcoming users they to check avalabiy then need to show like this alrady booked or anavalable"
+
+      // If the user is trying to CREATE a booking and it's already confirmed for another user, 
+      // we should probably allow them to submit a "Waitlist" request IF the site allows multiple pending requests.
+      // However, the user said "show like this alrady booked or anavalable".
+
+      return res.status(400).json({
+        success: false,
+        message: "This date is already booked and unavailable. Please try another date or package.",
+      });
+    }
+
     const pendingConflict = await Booking.findOne({
-      ...conflictQuery,
+      ...finalConflictQuery,
       status: "Pending"
     });
 
     let successMessage = "Booking created successfully";
-    if (acceptedConflict) {
-      successMessage = "Your waitlist request has been submitted. This date is already booked, but we will notify you if it becomes available due to a cancellation or vendor confirmation.";
-    } else if (pendingConflict) {
+    if (pendingConflict) {
       successMessage = "Your request has been submitted. This date already has a pending request; the vendor will review all interests and confirm based on availability.";
     }
 
