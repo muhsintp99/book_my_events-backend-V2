@@ -85,7 +85,7 @@ exports.checkAvailability = async (req, res) => {
 
     const conflictQuery = {
       bookingDate: { $gte: startOfDay, $lte: endOfDay },
-      status: { $in: ["Pending", "Accepted"] },
+      status: { $in: ["Pending", "Accepted", "Confirmed"] },
       // Exclude bookings where payment failed/cancelled
       paymentStatus: { $nin: ["failed", "cancelled"] }
     };
@@ -140,12 +140,18 @@ exports.checkAvailability = async (req, res) => {
         { venueId: vId },
         { packageId: vId }
       ];
+      if (req.body.providerId) {
+        conflictQuery.$or.push({ providerId: toId(req.body.providerId) });
+      }
     } else if (makeupId || title === "Makeup" || title === "Makeup Artist") {
       const mId = toId(makeupId || packageId);
       conflictQuery.$or = [
         { makeupId: mId },
         { packageId: mId }
       ];
+      if (req.body.providerId) {
+        conflictQuery.$or.push({ providerId: toId(req.body.providerId) });
+      }
     } else if (photographyId || title === "Photography") {
       const pId = toId(photographyId || packageId);
       conflictQuery.$or = [
@@ -229,24 +235,34 @@ exports.checkAvailability = async (req, res) => {
       ? { ...baseConflictQuery, ...rentalOverlapQuery }
       : conflictQuery;
 
-    // 1. Check for Accepted bookings (FULLY BOOKED)
+    // 1. Check for Accepted/Confirmed bookings (FULLY BOOKED)
     let acceptedConflict = null;
     try {
       acceptedConflict = await Booking.findOne({
         ...finalConflictQuery,
-        status: "Accepted"
+        status: { $in: ["Accepted", "Confirmed"] }
       }).select("_id bookingDate status rentalPeriod timeSlot").lean();
     } catch (queryError) {
-      // Handle Mongoose validation errors gracefully
-      console.warn("⚠️ Query error (likely schema mismatch):", queryError.message);
-      // Fall back to simpler query without timeSlot if error occurs
+      // Handle Mongoose validation errors gracefully (timeSlot array issue)
+      console.warn("⚠️ Query error (likely timeSlot array schema mismatch):", queryError.message);
+
+      // Fall back to query without timeSlot filter, then manually check timeSlot
       if (timeSlot) {
+        // Build fallback query preserving venue/package ID matching
         const fallbackQuery = { ...finalConflictQuery };
-        delete fallbackQuery.$or;
-        delete fallbackQuery.$and;
+
+        // Remove only the timeSlot part of the query
+        if (fallbackQuery.$and) {
+          // Keep the first part (venue/package ID matching), remove timeSlot part
+          fallbackQuery.$or = fallbackQuery.$and[0].$or;
+          delete fallbackQuery.$and;
+        }
+
+        console.log("🔄 Using fallback query:", JSON.stringify(fallbackQuery, null, 2));
+
         acceptedConflict = await Booking.findOne({
           ...fallbackQuery,
-          status: "Accepted"
+          status: { $in: ["Accepted", "Confirmed"] }
         }).select("_id bookingDate status rentalPeriod timeSlot").lean();
 
         // Manually check timeSlot match
@@ -254,6 +270,12 @@ exports.checkAvailability = async (req, res) => {
           const bookingTimeSlot = Array.isArray(acceptedConflict.timeSlot)
             ? acceptedConflict.timeSlot[0]?.label
             : acceptedConflict.timeSlot;
+
+          console.log("🔍 Manual timeSlot check:", {
+            requested: timeSlot,
+            booking: bookingTimeSlot,
+            match: bookingTimeSlot?.toLowerCase() === timeSlot.toLowerCase()
+          });
 
           if (bookingTimeSlot?.toLowerCase() !== timeSlot.toLowerCase()) {
             acceptedConflict = null; // Not a match
@@ -263,6 +285,15 @@ exports.checkAvailability = async (req, res) => {
     }
 
     console.log("📊 Accepted Conflict:", acceptedConflict ? "FOUND" : "NONE");
+    if (acceptedConflict) {
+      console.log("🔥 CONFLICT DETAILS:", {
+        id: acceptedConflict._id,
+        status: acceptedConflict.status,
+        date: acceptedConflict.bookingDate,
+        timeSlot: acceptedConflict.timeSlot,
+        timeSlotType: typeof acceptedConflict.timeSlot
+      });
+    }
 
     if (acceptedConflict) {
       return res.json({
