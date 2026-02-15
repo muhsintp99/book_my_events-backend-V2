@@ -1260,7 +1260,8 @@ exports.createBooking = async (req, res) => {
         serviceProvider = await Catering.findById(cateringId).lean();
         if (!serviceProvider) throw new Error("Catering service not found");
 
-        pricing.basePrice = Number(serviceProvider.price) || 0;
+        // 🔥 Fix: Catering Price = Price Per Plate * Guests
+        pricing.basePrice = (Number(serviceProvider.price) || 0) * (Number(numberOfGuests) || 0);
         break;
 
       case "Ornament":
@@ -1462,22 +1463,30 @@ exports.createBooking = async (req, res) => {
     }
 
     // ADVANCE PAYMENT
-    let advanceAmount =
-      Number(
-        moduleType === "Venues"
-          ? serviceProvider.advanceDeposit
-          : moduleType === "Cake"
-            ? serviceProvider.priceInfo?.advanceBookingAmount
-            : (moduleKey === "ornament" || moduleKey === "ornaments")
-              ? ((bookingMode || serviceProvider.availabilityMode || "purchase").toLowerCase() === "rental"
-                ? serviceProvider.rentalPricing?.advanceForBooking
-                : 0)
-              : (moduleType === "Boutique" || moduleType === "Boutiques")
+    let advanceAmount = 0;
+
+    if (moduleType === "Catering") {
+      // 🔥 CATERING: 10% of Final Price
+      const totalForAdvance = finalPrice; // Use finalPrice as base for 10%
+      advanceAmount = Math.round(totalForAdvance * 0.10);
+    } else {
+      advanceAmount =
+        Number(
+          moduleType === "Venues"
+            ? serviceProvider.advanceDeposit
+            : moduleType === "Cake"
+              ? serviceProvider.priceInfo?.advanceBookingAmount
+              : (moduleKey === "ornament" || moduleKey === "ornaments")
                 ? ((bookingMode || serviceProvider.availabilityMode || "purchase").toLowerCase() === "rental"
                   ? serviceProvider.rentalPricing?.advanceForBooking
                   : 0)
-                : serviceProvider.advanceBookingAmount
-      ) || 0;
+                : (moduleType === "Boutique" || moduleType === "Boutiques")
+                  ? ((bookingMode || serviceProvider.availabilityMode || "purchase").toLowerCase() === "rental"
+                    ? serviceProvider.rentalPricing?.advanceForBooking
+                    : 0)
+                  : serviceProvider.advanceBookingAmount
+        ) || 0;
+    }
 
     // [REAL WORLD RENTAL UPGRADE]
     // Initial Payment (Advance) must include the full Security Deposit
