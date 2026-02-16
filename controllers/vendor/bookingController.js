@@ -1014,6 +1014,7 @@ exports.createBooking = async (req, res) => {
       perDayPrice: 0,
       perPersonCharge: 0,
       perHourCharge: 0,
+      taxRate: 0,
     };
     let calculatedVariations = []; // ✅ FIX: declare in function scope
 
@@ -1304,7 +1305,8 @@ exports.createBooking = async (req, res) => {
         } else {
           // Default to purchase
           const buy = serviceProvider.buyPricing || {};
-          pricing.basePrice = Number(buy.totalPrice) || Number(buy.unitPrice) || 0;
+          pricing.basePrice = Number(buy.unitPrice) || Number(buy.totalPrice) || 0;
+          pricing.taxRate = Number(buy.tax) || 0;
 
           // Re-calculate discount if necessary or at least snapshot it
           if (buy.discountType === "flat") {
@@ -1407,6 +1409,7 @@ exports.createBooking = async (req, res) => {
           pricing.discount = 0;
         } else {
           const buy = serviceProvider.buyPricing || {};
+          pricing.taxRate = Number(buy.tax) || 0;
           if (buy.discountType === "flat") {
             pricing.discount = Number(buy.discountValue) || 0;
           } else if (buy.discountType === "percentage") {
@@ -1453,7 +1456,8 @@ exports.createBooking = async (req, res) => {
       }
     }
 
-    let finalPrice = Math.max(afterDiscount - couponDiscountValue, 0);
+    let taxAmount = (afterDiscount * (pricing.taxRate || 0)) / 100;
+    let finalPrice = Math.max(afterDiscount - couponDiscountValue + taxAmount, 0);
 
     // [REAL WORLD RENTAL UPGRADE] 
     // Add refundable security deposit to total finalPrice for rentals
