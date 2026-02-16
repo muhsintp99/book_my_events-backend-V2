@@ -868,7 +868,9 @@ exports.createBooking = async (req, res) => {
     // -------------------------------------------------------
     // CHECK 1: SAME USER DUPLICATE (Strict Block)
     // -------------------------------------------------------
-    if (userId || (bookingType === "Direct" && emailAddress)) {
+    const isExcludedFromUserConflict = ["Ornaments", "Ornament", "Boutique", "Boutiques", "Cake"].includes(title);
+
+    if (!isExcludedFromUserConflict && (userId || (bookingType === "Direct" && emailAddress))) {
       const userCheckOr = [];
       if (userId && mongoose.Types.ObjectId.isValid(userId)) {
         userCheckOr.push({ userId: new mongoose.Types.ObjectId(userId) });
