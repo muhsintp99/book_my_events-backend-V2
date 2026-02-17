@@ -701,22 +701,26 @@ exports.createBooking = async (req, res) => {
         TIME_SLOT_MAP[trimmed.toLowerCase()] ||
         TIME_SLOT_MAP[trimmed.toUpperCase()];
 
+      // ✅ FIX: If no mapping found (e.g. "12:00 PM"), treat as direct time
+      // This allows Transport to send specific times like "10:00 AM"
       if (!mappedTime) {
-        console.error(`❌ No mapping for: "${trimmed}"`);
-        console.error(`Available keys:`, Object.keys(TIME_SLOT_MAP));
-        return res.status(400).json({
-          success: false,
-          message: `Invalid timeSlot: "${trimmed}". Use "Morning" or "Evening"`,
-        });
-      }
+        console.warn(`⚠️ No standard mapping for: "${trimmed}". Using as direct time.`);
 
-      console.log(`✅ Mapped "${trimmed}" → "${mappedTime}"`);
-      normalizedTimeSlot = [
-        {
-          label: trimmed,
-          time: mappedTime,
-        },
-      ];
+        normalizedTimeSlot = [
+          {
+            label: "Selected Time",
+            time: trimmed,
+          },
+        ];
+      } else {
+        console.log(`✅ Mapped "${trimmed}" → "${mappedTime}"`);
+        normalizedTimeSlot = [
+          {
+            label: trimmed,
+            time: mappedTime,
+          },
+        ];
+      }
     }
     // Handle object {label, time}
     else if (
