@@ -1305,7 +1305,7 @@ exports.createBooking = async (req, res) => {
           pricing.securityDeposit = Number(rental.securityDeposit) || 0;
           pricing.discount = 0;
         } else {
-          // Default to purchase
+          // PURCHASE MODE - Check and validate stock
           const buy = serviceProvider.buyPricing || {};
           pricing.basePrice = Number(buy.unitPrice) || Number(buy.totalPrice) || 0;
           pricing.taxRate = Number(buy.tax) || 0;
@@ -1317,6 +1317,20 @@ exports.createBooking = async (req, res) => {
             pricing.discount = (Number(buy.unitPrice || 0) * Number(buy.discountValue || 0)) / 100;
           } else {
             pricing.discount = 0;
+          }
+
+          // ✅ STOCK VALIDATION FOR PURCHASE
+          const requestedQty = Number(req.body.quantity) || 1;
+          const availableStock = Number(serviceProvider.stock?.quantity) || 0;
+
+          console.log(`💍 Stock Check: Requested=${requestedQty}, Available=${availableStock}`);
+
+          if (availableStock < requestedQty) {
+            return res.status(400).json({
+              success: false,
+              message: `Insufficient stock. Only ${availableStock} items available.`,
+              availableStock
+            });
           }
         }
         break;
@@ -1410,6 +1424,20 @@ exports.createBooking = async (req, res) => {
           pricing.securityDeposit = Number(rental.securityDeposit) || 0;
           pricing.discount = 0;
         } else {
+          // PURCHASE MODE - Check and validate stock for boutique
+          const requestedQty = calculatedVariations.reduce((sum, v) => sum + v.quantity, 0);
+          const availableStock = Number(serviceProvider.stock?.quantity) || 0;
+
+          console.log(`👗 Stock Check: Requested=${requestedQty}, Available=${availableStock}`);
+
+          if (availableStock < requestedQty) {
+            return res.status(400).json({
+              success: false,
+              message: `Insufficient stock. Only ${availableStock} items available.`,
+              availableStock
+            });
+          }
+
           const buy = serviceProvider.buyPricing || {};
           pricing.taxRate = Number(buy.tax) || 0;
           if (buy.discountType === "flat") {
@@ -1621,6 +1649,31 @@ exports.createBooking = async (req, res) => {
     console.log("💾 Creating booking...");
     const booking = await Booking.create(bookingData);
     console.log("✅ Booking created:", booking._id);
+
+    // ✅ DECREMENT STOCK FOR PURCHASE BOOKINGS
+    if (moduleType === "Ornament" || moduleType === "Ornaments") {
+      if ((bookingMode || serviceProvider.availabilityMode || "purchase").toLowerCase() === "purchase") {
+        const qtyToDecrement = Number(req.body.quantity) || 1;
+        console.log(`💍 Decrementing ornament stock by ${qtyToDecrement}`);
+
+        await Ornament.findByIdAndUpdate(
+          ornamentId,
+          { $inc: { "stock.quantity": -qtyToDecrement } },
+          { new: true }
+        );
+      }
+    } else if (moduleType === "Boutique" || moduleType === "Boutiques") {
+      if ((bookingMode || serviceProvider.availabilityMode || "purchase").toLowerCase() === "purchase") {
+        const qtyToDecrement = calculatedVariations.reduce((sum, v) => sum + v.quantity, 0);
+        console.log(`👗 Decrementing boutique stock by ${qtyToDecrement}`);
+
+        await Boutique.findByIdAndUpdate(
+          req.body.boutiqueId,
+          { $inc: { "stock.quantity": -qtyToDecrement } },
+          { new: true }
+        );
+      }
+    }
 
     // ===============================
     // 🛒 CLEAR CART AFTER BOOKING (CAKE MODULE)
