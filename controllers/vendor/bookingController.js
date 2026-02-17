@@ -1491,9 +1491,26 @@ exports.createBooking = async (req, res) => {
           if (availableStock < requestedQty) {
             return res.status(400).json({
               success: false,
-              message: `Insufficient stock. Only ${availableStock} items available.`,
+              message: `Insufficient total stock. Only ${availableStock} items available.`,
               availableStock
             });
+          }
+
+          // Check individual variation stock
+          for (const v of calculatedVariations) {
+            if (v.variationId) {
+              const boutiqueVar = serviceProvider.variations?.find(
+                (bv) => bv._id.toString() === v.variationId.toString()
+              );
+              const varStock = Number(boutiqueVar?.stockQuantity) || 0;
+              if (varStock < v.quantity) {
+                return res.status(400).json({
+                  success: false,
+                  message: `Insufficient stock for variation "${v.name}". Only ${varStock} available.`,
+                  availableStock: varStock
+                });
+              }
+            }
           }
 
           const buy = serviceProvider.buyPricing || {};
@@ -1730,14 +1747,26 @@ exports.createBooking = async (req, res) => {
       }
     } else if (moduleType === "Boutique" || moduleType === "Boutiques") {
       if ((bookingMode || serviceProvider.availabilityMode || "purchase").toLowerCase() === "purchase") {
-        const qtyToDecrement = calculatedVariations.reduce((sum, v) => sum + v.quantity, 0);
-        console.log(`👗 Decrementing boutique stock by ${qtyToDecrement}`);
+        const totalQtyToDecrement = calculatedVariations.reduce((sum, v) => sum + v.quantity, 0);
+        console.log(`👗 Decrementing boutique TOTAL stock by ${totalQtyToDecrement}`);
 
+        // 1. Decrement Global Stock
         await Boutique.findByIdAndUpdate(
           req.body.boutiqueId,
-          { $inc: { "stock.quantity": -qtyToDecrement } },
+          { $inc: { "stock.quantity": -totalQtyToDecrement } },
           { new: true }
         );
+
+        // 2. Decrement Variation Stock
+        for (const v of calculatedVariations) {
+          if (v.variationId) {
+            console.log(`📦 Decrementing boutique variation ${v.variationId} stock by ${v.quantity}`);
+            await Boutique.updateOne(
+              { _id: req.body.boutiqueId, "variations._id": v.variationId },
+              { $inc: { "variations.$.stockQuantity": -v.quantity } }
+            );
+          }
+        }
       }
     }
 
