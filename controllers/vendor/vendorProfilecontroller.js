@@ -55,16 +55,26 @@ exports.getVendor = async (req, res) => {
     }
 };
 
-// ➤ Get Vendor Profile by User ID
-exports.getVendorByUser = async (req, res) => {
+// ➤ Find Vendor Profile (tries by user ID first, then by profile ID)
+exports.findVendorProfile = async (req, res) => {
     try {
-        const vendor = await VendorProfile.findOne({ user: req.params.userId }).populate(populateFields);
+        const id = req.params.id;
+
+        // 1. Try finding by the 'user' field reference
+        let vendor = await VendorProfile.findOne({ user: id }).populate(populateFields);
+
+        // 2. Fallback: Try finding by the vendor profile's own _id
         if (!vendor) {
-            return res.status(404).json({ success: false, message: "Vendor profile not found for this user" });
+            vendor = await VendorProfile.findById(id).populate(populateFields);
         }
+
+        if (!vendor) {
+            return res.status(404).json({ success: false, message: "Vendor profile not found" });
+        }
+
         res.status(200).json({ success: true, data: vendor });
     } catch (error) {
-        console.error("Error fetching vendor by user:", error);
+        console.error("Error finding vendor profile:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
