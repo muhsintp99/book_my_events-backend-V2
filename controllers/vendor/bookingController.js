@@ -1143,6 +1143,60 @@ exports.createBooking = async (req, res) => {
             message: "Either cakeCart or cakeId is required for Cake booking",
           });
         }
+
+        // ========================================================
+        // 🔥 DYNAMIC ZONE RESTRICTION (Auto-detect district)
+        // ========================================================
+        if (deliveryType === "Home Delivery") {
+          const pickupLoc = (serviceProvider.shipping?.takeawayLocation || "").toLowerCase();
+
+          // List of Kerala districts/major cities to check against
+          const districts = [
+            "kasargod", "kannur", "wayanad", "kozhikode", "calicut", "malappuram",
+            "palakkad", "thrissur", "trichur", "ernakulam", "kochi", "cochin",
+            "idukki", "kottayam", "alappuzha", "alleppey", "pathanamthitta",
+            "kollam", "quilon", "thiruvananthapuram", "trivandrum"
+          ];
+
+          let vendorDistrict = null;
+          for (const d of districts) {
+            if (pickupLoc.includes(d)) {
+              vendorDistrict = d;
+              break;
+            }
+          }
+
+          if (vendorDistrict) {
+            console.log(`📍 Vendor is in detected zone: ${vendorDistrict}`);
+
+            // Check both deliveryAddress object and top-level address
+            const delHomeAddr = (req.body.deliveryAddress?.address || req.body.address || "").toLowerCase();
+            const isInZone = delHomeAddr.includes(vendorDistrict);
+
+            // Edge case: Handle Calicut/Kozhikode and Trivandrum/Thiruvananthapuram aliases
+            const isCalicutMatch = (vendorDistrict === "kozhikode" || vendorDistrict === "calicut") &&
+              (delHomeAddr.includes("kozhikode") || delHomeAddr.includes("calicut") || delHomeAddr.includes("kozhikdoe"));
+
+            const isCochinMatch = (vendorDistrict === "kochi" || vendorDistrict === "cochin" || vendorDistrict === "ernakulam") &&
+              (delHomeAddr.includes("kochi") || delHomeAddr.includes("cochin") || delHomeAddr.includes("ernakulam"));
+
+            const isTrivandrumMatch = (vendorDistrict === "thiruvananthapuram" || vendorDistrict === "trivandrum") &&
+              (delHomeAddr.includes("thiruvananthapuram") || delHomeAddr.includes("trivandrum"));
+
+            const isThrissurMatch = (vendorDistrict === "thrissur" || vendorDistrict === "trichur") &&
+              (delHomeAddr.includes("thrissur") || delHomeAddr.includes("trichur"));
+
+            if (!isInZone && !isCalicutMatch && !isCochinMatch && !isTrivandrumMatch && !isThrissurMatch) {
+              console.log(`❌ DELIVERY BLOCKED: Vendor is in ${vendorDistrict} but delivery address is not.`);
+              const districtCap = vendorDistrict.charAt(0).toUpperCase() + vendorDistrict.slice(1);
+              return res.status(400).json({
+                success: false,
+                message: `This vendor only delivers inside ${districtCap} zone. Please select a delivery address in ${districtCap}.`,
+              });
+            }
+          }
+        }
+
         break;
 
       case "Transport": {
@@ -1530,6 +1584,14 @@ exports.createBooking = async (req, res) => {
 
     advanceAmount = Math.max(advanceAmount, 0);
     const remainingAmount = Math.max(finalPrice - advanceAmount, 0);
+
+    // 🔥 CAKE DELIVERY ADDRESS FIX (Map structured deliveryAddress to flat address field)
+    if (moduleType === "Cake" && deliveryType === "Home Delivery") {
+      const delAddr = req.body.deliveryAddress?.address || req.body.address;
+      if (delAddr) {
+        userDetails.address = delAddr;
+      }
+    }
 
     // CREATE BOOKING
     const bookingData = {
