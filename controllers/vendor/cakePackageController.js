@@ -180,6 +180,7 @@ const sanitizeCakeData = (body) => {
     takeawayLocation: shippingData.takeawayLocation || "",
     pickupLatitude: shippingData.pickupLatitude || "",
     pickupLongitude: shippingData.pickupLongitude || "",
+    deliveryRadius: Number(shippingData.deliveryRadius || 26),
     price: Number(shippingData.price || 0),
   };
 

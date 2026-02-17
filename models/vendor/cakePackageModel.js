@@ -164,6 +164,7 @@ const CakeSchema = new mongoose.Schema(
       takeawayLocation: { type: String, default: "" },
       pickupLatitude: { type: String, default: "" },
       pickupLongitude: { type: String, default: "" },
+      deliveryRadius: { type: Number, default: 26 },
       price: { type: Number, default: 0 },
     },
 
