@@ -41,7 +41,7 @@ exports.getVendors = async (req, res) => {
     }
 };
 
-// ➤ Get Single Vendor
+// ➤ Get Single Vendor (by vendor profile _id)
 exports.getVendor = async (req, res) => {
     try {
         const vendor = await VendorProfile.findById(req.params.id).populate(populateFields);
@@ -51,6 +51,20 @@ exports.getVendor = async (req, res) => {
         res.status(200).json({ success: true, data: vendor });
     } catch (error) {
         console.error("Error fetching vendor:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// ➤ Get Vendor Profile by User ID
+exports.getVendorByUser = async (req, res) => {
+    try {
+        const vendor = await VendorProfile.findOne({ user: req.params.userId }).populate(populateFields);
+        if (!vendor) {
+            return res.status(404).json({ success: false, message: "Vendor profile not found for this user" });
+        }
+        res.status(200).json({ success: true, data: vendor });
+    } catch (error) {
+        console.error("Error fetching vendor by user:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };

@@ -5,6 +5,7 @@ const {
   createVendorProfile,
   getVendors,
   getVendor,
+  getVendorByUser,
   updateVendorProfile,
   deleteVendorProfile,
   approveVendor,
@@ -15,6 +16,9 @@ const {
 router.route("/")
   .get(getVendors)
   .post(createVendorProfile);
+
+// ✅ Get vendor profile by USER ID (must be before /:id to avoid conflict)
+router.get("/user/:userId", getVendorByUser);
 
 router.route("/:id")
   .get(getVendor)
