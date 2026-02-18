@@ -8,21 +8,22 @@ const mongoose = require('mongoose');
 // ➤ Get All Pincodes (Admin)
 exports.getAllPincodes = async (req, res) => {
     try {
-        const pincodes = await Pincode.find().sort({ createdAt: -1 });
+        const { search } = req.query;
+        let query = {};
 
-        res.status(200).json({
-            success: true,
-            count: pincodes.length,
-            data: pincodes
-        });
+        if (search) {
+            query.$or = [
+                { code: { $regex: search, $options: 'i' } },
+                { city: { $regex: search, $options: 'i' } },
+                { state: { $regex: search, $options: 'i' } }
+            ];
+        }
 
+        const pincodes = await Pincode.find(query).sort({ createdAt: -1 });
+        res.status(200).json({ success: true, count: pincodes.length, data: pincodes });
     } catch (error) {
         console.error('Error fetching pincodes:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
     }
 };
 
@@ -32,10 +33,7 @@ exports.getPincodesInRadius = async (req, res) => {
         const { lat, lng, radius } = req.query;
 
         if (!lat || !lng || !radius) {
-            return res.status(400).json({
-                success: false,
-                message: 'Latitude, longitude, and radius are required'
-            });
+            return res.status(400).json({ success: false, message: 'Latitude, longitude, and radius are required' });
         }
 
         const radiusInMeters = parseFloat(radius) * 1000;
@@ -52,81 +50,54 @@ exports.getPincodesInRadius = async (req, res) => {
             }
         });
 
-        res.status(200).json({
-            success: true,
-            count: pincodes.length,
-            data: pincodes
-        });
-
+        res.status(200).json({ success: true, count: pincodes.length, data: pincodes });
     } catch (error) {
         console.error('Error fetching pincodes:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
     }
 };
-
 
 // ➤ Create Pincode (Admin)
 exports.createPincode = async (req, res) => {
     try {
-        let { code, city, state, country, lat, lng } = req.body;
+        const { code, city, state, country, lat, lng, pincode, area_name, latitude, longitude } = req.body;
 
-        if (!code || !lat || !lng) {
-            return res.status(400).json({
-                success: false,
-                message: 'Code, Latitude and Longitude are required'
-            });
+        // Handle both field name sets for compatibility
+        const finalCode = code || pincode;
+        const finalCity = city || area_name;
+        const finalLat = lat || latitude;
+        const finalLng = lng || longitude;
+
+        if (!finalCode || !finalLat || !finalLng) {
+            return res.status(400).json({ success: false, message: 'Code, Latitude and Longitude are required' });
         }
 
         const pincodeDoc = await Pincode.create({
-            code,
-            city,
+            code: finalCode,
+            city: finalCity,
             state,
             country: country || 'India',
             location: {
                 type: 'Point',
-                coordinates: [parseFloat(lng), parseFloat(lat)]
+                coordinates: [parseFloat(finalLng), parseFloat(finalLat)]
             }
         });
 
-        res.status(201).json({
-            success: true,
-            message: 'Pincode created successfully',
-            data: pincodeDoc
-        });
-
+        res.status(201).json({ success: true, message: 'Pincode created successfully', data: pincodeDoc });
     } catch (error) {
         console.error('Error creating pincode:', error);
-
         if (error.code === 11000) {
-            return res.status(400).json({
-                success: false,
-                message: 'Pincode already exists'
-            });
+            return res.status(400).json({ success: false, message: 'Pincode already exists' });
         }
-
-        res.status(500).json({
-            success: false,
-            message: 'Server error',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
     }
 };
 
 // ➤ Update Pincode (Admin)
 exports.updatePincode = async (req, res) => {
     try {
-        let { code, city, state, country, lat, lng } = req.body;
-
-        const updateData = {
-            code,
-            city,
-            state,
-            country
-        };
+        const { code, city, state, country, lat, lng } = req.body;
+        const updateData = { code, city, state, country };
 
         if (lat && lng) {
             updateData.location = {
@@ -135,31 +106,16 @@ exports.updatePincode = async (req, res) => {
             };
         }
 
-        const pincode = await Pincode.findByIdAndUpdate(
-            req.params.id,
-            updateData,
-            { new: true, runValidators: true }
-        );
+        const pincode = await Pincode.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
 
         if (!pincode) {
-            return res.status(404).json({
-                success: false,
-                message: 'Pincode not found'
-            });
+            return res.status(404).json({ success: false, message: 'Pincode not found' });
         }
 
-        res.status(200).json({
-            success: true,
-            data: pincode
-        });
-
+        res.status(200).json({ success: true, data: pincode });
     } catch (error) {
         console.error('Error updating pincode:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error',
-            error: error.message
-        });
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
     }
 };
 
@@ -186,86 +142,63 @@ exports.checkDeliveryAvailability = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Pincode and providerId are required' });
         }
 
-        // 1. Fetch pincode coordinates
-const pincodeDoc = await Pincode.findOne({ code: pincodeStr });
+        const pincodeDoc = await Pincode.findOne({ code: pincodeStr, status: 'Active' });
         if (!pincodeDoc) {
-            return res.status(404).json({ success: false, message: 'Pincode not serviceable or disabled by admin' });
+            return res.status(404).json({ success: false, message: 'Pincode not serviceable' });
         }
 
-        // 2. Fetch vendor delivery profile
         const vendorProfile = await VendorProfile.findOne({ user: providerId });
         if (!vendorProfile || !vendorProfile.deliveryProfile) {
             return res.status(404).json({ success: false, message: 'Vendor delivery profile not found' });
         }
 
-        // 3. Fetch all active packages for this vendor
         const packages = await Cake.find({ provider: providerId, isActive: true });
-
         const deliverablePackages = [];
 
-        // 4. Map delivery configurations by mode for fast lookup
         const configsByMode = {};
-        if (vendorProfile.deliveryProfile && vendorProfile.deliveryProfile.deliveryConfigurations) {
+        if (vendorProfile.deliveryProfile.deliveryConfigurations) {
             vendorProfile.deliveryProfile.deliveryConfigurations.forEach(config => {
-                if (config.status) {
-                    configsByMode[config.mode] = config;
-                }
+                if (config.status) configsByMode[config.mode] = config;
             });
         }
 
-        // 5. Apply coverage logic for each package
         for (const pkg of packages) {
             const mode = pkg.deliveryMode || 'standard';
             const config = configsByMode[mode];
-
-            if (!config) continue; // This specific mode is not enabled/configured for the vendor
+            if (!config) continue;
 
             let isPackageDeliverable = false;
 
             switch (config.coverageType) {
                 case 'entire_zone':
-                    // Zone match logic: compare pincode's zone with vendor's zone
-                    if (vendorProfile.zone && pincodeDoc.zone_id &&
-                        pincodeDoc.zone_id.toString() === vendorProfile.zone.toString()) {
+                    // Map-based zone matching or state/city matching as a fallback
+                    if (vendorProfile.zone && (pincodeDoc.state === vendorProfile.zone || pincodeDoc.city === vendorProfile.zone)) {
                         isPackageDeliverable = true;
                     }
                     break;
 
                 case 'radius_based':
-                    // Radius distance check using Haversine formula
                     if (vendorProfile.latitude && vendorProfile.longitude) {
                         const distance = calculateDistance(
                             parseFloat(vendorProfile.latitude),
                             parseFloat(vendorProfile.longitude),
-                            pincodeDoc.latitude,
-                            pincodeDoc.longitude
+                            pincodeDoc.location.coordinates[1],
+                            pincodeDoc.location.coordinates[0]
                         );
-                        if (distance <= config.radius) {
-                            isPackageDeliverable = true;
-                        }
+                        if (distance <= config.radius) isPackageDeliverable = true;
                     }
                     break;
 
                 case 'selected_pincodes':
-                    // Selected pincode match logic
                     if (config.selectedPincodes && config.selectedPincodes.includes(pincodeStr)) {
                         isPackageDeliverable = true;
                     }
                     break;
-
-                default:
-                    // If no valid coverage type, assume not deliverable for this mode
-                    break;
             }
 
             if (isPackageDeliverable) {
-                // Add shipping detail to package object for the response
                 const pkgObj = pkg.toObject();
-                pkgObj.calculatedShipping = {
-                    mode: config.mode,
-                    price: config.shippingPrice,
-                    coverageType: config.coverageType
-                };
+                pkgObj.calculatedShipping = { mode: config.mode, price: config.shippingPrice, coverageType: config.coverageType };
                 deliverablePackages.push(pkgObj);
             }
         }
@@ -274,19 +207,16 @@ const pincodeDoc = await Pincode.findOne({ code: pincodeStr });
             success: true,
             isDeliverable: deliverablePackages.length > 0,
             pincodeData: {
-                pincode: pincodeDoc.pincode,
-                district: pincodeDoc.district_name,
+                pincode: pincodeDoc.code,
+                district: pincodeDoc.state,
                 state: pincodeDoc.state,
-                lat: pincodeDoc.latitude,
-                lng: pincodeDoc.longitude,
-                zone: pincodeDoc.zone_id
+                lat: pincodeDoc.location.coordinates[1],
+                lng: pincodeDoc.location.coordinates[0]
             },
             data: deliverablePackages
         });
-
     } catch (error) {
         console.error('Error checking delivery availability:', error);
         res.status(500).json({ success: false, message: 'Server error', error: error.message });
     }
 };
-

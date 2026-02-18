@@ -10,13 +10,11 @@ const PincodeSchema = new mongoose.Schema({
     city: { type: String },
     state: { type: String },
     country: { type: String, default: 'India' },
-
     status: {
         type: String,
         enum: ['Active', 'Inactive'],
         default: 'Active'
     },
-
     location: {
         type: {
             type: String,
@@ -29,7 +27,6 @@ const PincodeSchema = new mongoose.Schema({
         }
     }
 }, { timestamps: true });
-
 
 // 2dsphere index for geospatial queries
 PincodeSchema.index({ location: '2dsphere' });
