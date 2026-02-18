@@ -1,7 +1,8 @@
-const Pincode = require('../../models/vendor/Pincode');
-const VendorProfile = require('../../models/vendor/vendorProfile');
-const Cake = require('../../models/vendor/cakePackageModel');
-const { calculateDistance } = require('../../utils/geoUtils');
+const Pincode = require('../models/Pincode');
+const VendorProfile = require('../models/vendor/vendorProfile');
+const Cake = require('../models/vendor/cakePackageModel');
+const Zone = require('../models/admin/zone');
+const { calculateDistance } = require('../utils/geoUtils');
 const mongoose = require('mongoose');
 
 // ➤ Get All Pincodes (Admin)
@@ -67,10 +68,33 @@ exports.getPincodesInRadius = async (req, res) => {
 // ➤ Create Pincode (Admin)
 exports.createPincode = async (req, res) => {
     try {
-        const { pincode, area_name, district_name, zone_id, state, latitude, longitude, status } = req.body;
+        let { pincode, area_name, district_name, zone_id, state, latitude, longitude, status,
+            code, city, lat, lng } = req.body;
+
+        // Fallback for older frontend field names
+        if (!pincode && code) pincode = code;
+        if (!area_name && city) area_name = city;
+        if (!latitude && lat) latitude = lat;
+        if (!longitude && lng) longitude = lng;
+
+        // Handle zone lookup if only name is provided (common in older frontends)
+        if ((!zone_id || !mongoose.Types.ObjectId.isValid(zone_id)) && state) {
+            const zoneDoc = await Zone.findOne({ name: state });
+            if (zoneDoc) {
+                zone_id = zoneDoc._id;
+                if (!district_name) district_name = zoneDoc.name;
+            }
+        }
+
+        // Fallback for district_name
+        if (!district_name && state) district_name = state;
 
         if (!pincode || !latitude || !longitude || !zone_id || !district_name) {
-            return res.status(400).json({ success: false, message: 'Required fields missing' });
+            return res.status(400).json({
+                success: false,
+                message: 'Required fields missing',
+                received: { pincode, latitude, longitude, zone_id, district_name }
+            });
         }
 
         const pincodeDoc = await Pincode.create({
@@ -105,8 +129,15 @@ exports.createPincode = async (req, res) => {
 // ➤ Update Pincode (Admin)
 exports.updatePincode = async (req, res) => {
     try {
-        const { latitude, longitude } = req.body;
+        let { latitude, longitude, lat, lng } = req.body;
         let updateData = { ...req.body };
+
+        // Fallback for lat/lng
+        if (!latitude && lat) latitude = lat;
+        if (!longitude && lng) longitude = lng;
+
+        if (latitude) updateData.latitude = parseFloat(latitude);
+        if (longitude) updateData.longitude = parseFloat(longitude);
 
         if (latitude && longitude) {
             updateData.location = {
