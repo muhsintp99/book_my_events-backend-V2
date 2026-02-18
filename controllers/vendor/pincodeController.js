@@ -37,19 +37,22 @@ exports.getPincodesInRadius = async (req, res) => {
         const { lat, lng, radius } = req.query;
 
         if (!lat || !lng || !radius) {
-            return res.status(400).json({ success: false, message: 'Latitude, longitude, and radius are required' });
+            return res.status(400).json({
+                success: false,
+                message: 'Latitude, longitude, and radius are required'
+            });
         }
 
-        const latitude = parseFloat(lat);
-        const longitude = parseFloat(lng);
-        const radiusInKm = parseFloat(radius);
-
-        const radiusInRadians = radiusInKm / 6378.1;
+        const radiusInMeters = parseFloat(radius) * 1000;
 
         const pincodes = await Pincode.find({
             location: {
-                $geoWithin: {
-                    $centerSphere: [[longitude, latitude], radiusInRadians]
+                $near: {
+                    $geometry: {
+                        type: 'Point',
+                        coordinates: [parseFloat(lng), parseFloat(lat)]
+                    },
+                    $maxDistance: radiusInMeters
                 }
             }
         });
@@ -59,56 +62,38 @@ exports.getPincodesInRadius = async (req, res) => {
             count: pincodes.length,
             data: pincodes
         });
+
     } catch (error) {
         console.error('Error fetching pincodes:', error);
-        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+        res.status(500).json({
+            success: false,
+            message: 'Server error',
+            error: error.message
+        });
     }
 };
+
 
 // ➤ Create Pincode (Admin)
 exports.createPincode = async (req, res) => {
     try {
-        let { pincode, area_name, district_name, zone_id, state, latitude, longitude, status,
-            code, city, lat, lng } = req.body;
+        let { code, city, state, country, lat, lng } = req.body;
 
-        // Fallback for older frontend field names
-        if (!pincode && code) pincode = code;
-        if (!area_name && city) area_name = city;
-        if (!latitude && lat) latitude = lat;
-        if (!longitude && lng) longitude = lng;
-
-        // Handle zone lookup if only name is provided (common in older frontends)
-        if ((!zone_id || !mongoose.Types.ObjectId.isValid(zone_id)) && state) {
-            const zoneDoc = await Zone.findOne({ name: state });
-            if (zoneDoc) {
-                zone_id = zoneDoc._id;
-                if (!district_name) district_name = zoneDoc.name;
-            }
-        }
-
-        // Fallback for district_name
-        if (!district_name && state) district_name = state;
-
-        if (!pincode || !latitude || !longitude || !zone_id || !district_name) {
+        if (!code || !lat || !lng) {
             return res.status(400).json({
                 success: false,
-                message: 'Required fields missing',
-                received: { pincode, latitude, longitude, zone_id, district_name }
+                message: 'Code, Latitude and Longitude are required'
             });
         }
 
         const pincodeDoc = await Pincode.create({
-            pincode,
-            area_name,
-            district_name,
-            zone_id,
-            state: state || 'Kerala, India',
-            latitude: parseFloat(latitude),
-            longitude: parseFloat(longitude),
-            status: status !== undefined ? status : true,
+            code,
+            city,
+            state,
+            country: country || 'India',
             location: {
                 type: 'Point',
-                coordinates: [parseFloat(longitude), parseFloat(latitude)]
+                coordinates: [parseFloat(lng), parseFloat(lat)]
             }
         });
 
@@ -117,45 +102,69 @@ exports.createPincode = async (req, res) => {
             message: 'Pincode created successfully',
             data: pincodeDoc
         });
+
     } catch (error) {
         console.error('Error creating pincode:', error);
+
         if (error.code === 11000) {
-            return res.status(400).json({ success: false, message: 'Pincode already exists' });
+            return res.status(400).json({
+                success: false,
+                message: 'Pincode already exists'
+            });
         }
-        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+
+        res.status(500).json({
+            success: false,
+            message: 'Server error',
+            error: error.message
+        });
     }
 };
 
 // ➤ Update Pincode (Admin)
 exports.updatePincode = async (req, res) => {
     try {
-        let { latitude, longitude, lat, lng } = req.body;
-        let updateData = { ...req.body };
+        let { code, city, state, country, lat, lng } = req.body;
 
-        // Fallback for lat/lng
-        if (!latitude && lat) latitude = lat;
-        if (!longitude && lng) longitude = lng;
+        const updateData = {
+            code,
+            city,
+            state,
+            country
+        };
 
-        if (latitude) updateData.latitude = parseFloat(latitude);
-        if (longitude) updateData.longitude = parseFloat(longitude);
-
-        if (latitude && longitude) {
+        if (lat && lng) {
             updateData.location = {
                 type: 'Point',
-                coordinates: [parseFloat(longitude), parseFloat(latitude)]
+                coordinates: [parseFloat(lng), parseFloat(lat)]
             };
         }
 
-        const pincode = await Pincode.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
+        const pincode = await Pincode.findByIdAndUpdate(
+            req.params.id,
+            updateData,
+            { new: true, runValidators: true }
+        );
 
         if (!pincode) {
-            return res.status(404).json({ success: false, message: 'Pincode not found' });
+            return res.status(404).json({
+                success: false,
+                message: 'Pincode not found'
+            });
         }
 
-        res.status(200).json({ success: true, data: pincode });
+        res.status(200).json({
+            success: true,
+            data: pincode
+        });
+
     } catch (error) {
         console.error('Error updating pincode:', error);
-        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+        res.status(500).json({
+            success: false,
+            message: 'Server error',
+            error: error.message
+        });
     }
 };
 
@@ -183,7 +192,7 @@ exports.checkDeliveryAvailability = async (req, res) => {
         }
 
         // 1. Fetch pincode coordinates
-        const pincodeDoc = await Pincode.findOne({ pincode: pincodeStr, status: true });
+const pincodeDoc = await Pincode.findOne({ code: pincodeStr });
         if (!pincodeDoc) {
             return res.status(404).json({ success: false, message: 'Pincode not serviceable or disabled by admin' });
         }
