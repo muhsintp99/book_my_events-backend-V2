@@ -1830,17 +1830,22 @@ exports.getBookingsByUser = async (req, res) => {
         path: "vehicleId",
         populate: { path: "provider" },
       })
-
       .populate("makeupId")
       .populate("photographyId")
-      .populate("cateringId") // ✅ ADD THIS
-
+      .populate("cateringId")
       .populate("packageId")
       .populate("moduleId")
       .populate("cakeId")
       .populate("ornamentId")
       .populate("boutiqueId")
-
+      .populate({
+        path: "providerId",
+        select: "firstName lastName email phone role profilePhoto",
+        populate: [
+          { path: "profile" },
+          { path: "vendorProfile" }
+        ]
+      })
       .select(
         "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount"
       )
@@ -1871,7 +1876,26 @@ exports.getAllBookings = async (req, res) => {
 
 exports.getBookingById = async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id).populate("userId");
+    const booking = await Booking.findById(req.params.id)
+      .populate("userId")
+      .populate({
+        path: "providerId",
+        select: "firstName lastName email phone role profilePhoto",
+        populate: [
+          { path: "profile" },
+          { path: "vendorProfile" }
+        ]
+      })
+      .populate("venueId")
+      .populate("vehicleId")
+      .populate("makeupId")
+      .populate("photographyId")
+      .populate("cateringId")
+      .populate("cakeId")
+      .populate("ornamentId")
+      .populate("boutiqueId")
+      .populate("packageId")
+      .populate("moduleId");
 
     if (!booking) {
       return res
