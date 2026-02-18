@@ -1,25 +1,41 @@
 const Pincode = require('../../models/vendor/Pincode');
 
+/* ======================================================
+   GET PINCODES IN RADIUS (Optimized & Accurate)
+====================================================== */
 exports.getPincodesInRadius = async (req, res) => {
     try {
         const { lat, lng, radius } = req.query;
 
         if (!lat || !lng || !radius) {
-            return res.status(400).json({ success: false, message: 'Latitude, longitude, and radius are required' });
+            return res.status(400).json({
+                success: false,
+                message: 'Latitude, longitude, and radius (in KM) are required'
+            });
         }
 
         const latitude = parseFloat(lat);
         const longitude = parseFloat(lng);
         const radiusInKm = parseFloat(radius);
 
-        // Radius of Earth in km is approx 6378.1
-        // MongoDB expects radius in radians for $centerSphere
-        const radiusInRadians = radiusInKm / 6378.1;
+        if (isNaN(latitude) || isNaN(longitude) || isNaN(radiusInKm)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid latitude, longitude, or radius'
+            });
+        }
+
+        // Convert KM to meters (MongoDB uses meters for $near)
+        const radiusInMeters = radiusInKm * 1000;
 
         const pincodes = await Pincode.find({
             location: {
-                $geoWithin: {
-                    $centerSphere: [[longitude, latitude], radiusInRadians]
+                $near: {
+                    $geometry: {
+                        type: "Point",
+                        coordinates: [longitude, latitude]
+                    },
+                    $maxDistance: radiusInMeters
                 }
             }
         });
@@ -29,19 +45,40 @@ exports.getPincodesInRadius = async (req, res) => {
             count: pincodes.length,
             data: pincodes
         });
+
     } catch (error) {
         console.error('Error fetching pincodes:', error);
-        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+        res.status(500).json({
+            success: false,
+            message: 'Server error',
+            error: error.message
+        });
     }
 };
 
-// Create a new pincode (for testing/admin use)
+
+/* ======================================================
+   CREATE PINCODE
+====================================================== */
 exports.createPincode = async (req, res) => {
     try {
         const { code, city, state, country, lat, lng } = req.body;
 
         if (!code || !lat || !lng) {
-            return res.status(400).json({ success: false, message: 'Code, lat, and lng are required' });
+            return res.status(400).json({
+                success: false,
+                message: 'Code, latitude, and longitude are required'
+            });
+        }
+
+        const latitude = parseFloat(lat);
+        const longitude = parseFloat(lng);
+
+        if (isNaN(latitude) || isNaN(longitude)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid latitude or longitude'
+            });
         }
 
         const pincode = await Pincode.create({
@@ -51,7 +88,7 @@ exports.createPincode = async (req, res) => {
             country: country || 'India',
             location: {
                 type: 'Point',
-                coordinates: [parseFloat(lng), parseFloat(lat)] // GeoJSON expects [longitude, latitude]
+                coordinates: [longitude, latitude] // GeoJSON: [lng, lat]
             }
         });
 
@@ -60,12 +97,21 @@ exports.createPincode = async (req, res) => {
             message: 'Pincode created successfully',
             data: pincode
         });
+
     } catch (error) {
         console.error('Error creating pincode:', error);
-        // Handle duplicate key error
+
         if (error.code === 11000) {
-            return res.status(400).json({ success: false, message: 'Pincode already exists' });
+            return res.status(400).json({
+                success: false,
+                message: 'Pincode already exists'
+            });
         }
-        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+
+        res.status(500).json({
+            success: false,
+            message: 'Server error',
+            error: error.message
+        });
     }
 };
