@@ -1000,7 +1000,6 @@ const vendorProfileSchema = new mongoose.Schema(
       deliveryConfigurations: [{
         mode: {
           type: String,
-          enum: ['standard', 'express', 'midnight', 'pickup'],
           required: true
         },
         coverageType: {
