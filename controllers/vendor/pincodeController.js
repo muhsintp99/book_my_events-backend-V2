@@ -1,8 +1,8 @@
-const Pincode = require('../models/Pincode');
-const VendorProfile = require('../models/vendor/vendorProfile');
-const Cake = require('../models/vendor/cakePackageModel');
-const Zone = require('../models/admin/zone');
-const { calculateDistance } = require('../utils/geoUtils');
+const Pincode = require('../../models/vendor/Pincode');
+const VendorProfile = require('../../models/vendor/vendorProfile');
+const Cake = require('../../models/vendor/cakePackageModel');
+const Zone = require('../../models/admin/zone');
+const { calculateDistance } = require('../../utils/geoUtils');
 const mongoose = require('mongoose');
 
 // ➤ Get All Pincodes (Admin)
