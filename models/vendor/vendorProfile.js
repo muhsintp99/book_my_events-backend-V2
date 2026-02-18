@@ -993,8 +993,29 @@ const vendorProfileSchema = new mongoose.Schema(
       maxListings: { type: Number, default: null },
       maxPhotos: { type: Number, default: null },
       canUseAdvancedFeatures: { type: Boolean, default: false }
+    },
+
+    // ----------------------- DELIVERY PROFILE -----------------------
+    deliveryProfile: {
+      deliveryConfigurations: [{
+        mode: {
+          type: String,
+          enum: ['standard', 'express', 'midnight', 'pickup'],
+          required: true
+        },
+        coverageType: {
+          type: String,
+          enum: ['entire_zone', 'radius_based', 'selected_pincodes'],
+          default: 'entire_zone'
+        },
+        radius: { type: Number, default: 0 }, // in km
+        selectedPincodes: [{ type: String }], // Array of pincode strings
+        shippingPrice: { type: Number, default: 0 },
+        status: { type: Boolean, default: true }
+      }]
     }
   },
+
   {
     timestamps: true,
     toJSON: { virtuals: true },

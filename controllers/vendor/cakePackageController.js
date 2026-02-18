@@ -202,8 +202,19 @@ const sanitizeCakeData = (body) => {
     data.relatedItems.linkByRef = "Category";
   }
 
+  // Delivery Mode
+  if (data.deliveryMode) {
+    const validModes = ['standard', 'express', 'midnight', 'pickup'];
+    if (!validModes.includes(data.deliveryMode)) {
+      data.deliveryMode = 'standard';
+    }
+  } else {
+    data.deliveryMode = 'standard';
+  }
+
   return data;
 };
+
 
 
 /* =====================================================
@@ -394,11 +405,14 @@ const populateCake = async (id, req = null) => {
 
   // Fetch VendorProfile linked to provider
   const vendorProfile = await VendorProfile.findOne({ user: cake.provider._id })
-    .select("storeName logo coverImage")
+    .select("storeName logo coverImage latitude longitude zone")
     .lean();
 
   if (vendorProfile) {
     cake.provider.storeName = vendorProfile.storeName;
+    cake.provider.latitude = vendorProfile.latitude;
+    cake.provider.longitude = vendorProfile.longitude;
+    cake.provider.vendor_zone = vendorProfile.zone;
     cake.provider.logo = vendorProfile.logo
       ? `${baseUrl}${vendorProfile.logo}`
       : null;
@@ -406,6 +420,12 @@ const populateCake = async (id, req = null) => {
       ? `${baseUrl}${vendorProfile.coverImage}`
       : null;
     cake.provider.hasVendorProfile = true;
+
+    // ✅ If cake shipping coords are missing, auto-fill from vendor profile
+    if (!cake.shipping.pickupLatitude || !cake.shipping.pickupLongitude) {
+      cake.shipping.pickupLatitude = vendorProfile.latitude;
+      cake.shipping.pickupLongitude = vendorProfile.longitude;
+    }
   } else {
     cake.provider.storeName = `${cake.provider.firstName || ""} ${cake.provider.lastName || ""
       }`.trim();
@@ -452,6 +472,18 @@ exports.createCake = async (req, res) => {
 
     if (!body.provider) {
       return sendResponse(res, 400, false, "Provider is required");
+    }
+
+    // ✅ Requirement #3: Validate deliveryMode against vendor's enabled modes
+    const vendorProfile = await VendorProfile.findOne({ user: body.provider });
+    if (vendorProfile && vendorProfile.deliveryProfile) {
+      const enabledModes = vendorProfile.deliveryProfile.deliveryConfigurations
+        ?.filter(c => c.status)
+        .map(c => c.mode) || [];
+
+      if (!enabledModes.includes(body.deliveryMode || 'standard')) {
+        return sendResponse(res, 400, false, `Selected delivery mode '${body.deliveryMode || 'standard'}' is not enabled in your delivery profile.`);
+      }
     }
 
     // Files
@@ -1126,6 +1158,21 @@ exports.updateCake = async (req, res) => {
     }
 
     const body = sanitizeCakeData(req.body);
+
+    // ✅ Requirement #3: Validate deliveryMode against vendor's enabled modes
+    if (body.deliveryMode) {
+      const vendorProfile = await VendorProfile.findOne({ user: cake.provider });
+      if (vendorProfile && vendorProfile.deliveryProfile) {
+        const enabledModes = vendorProfile.deliveryProfile.deliveryConfigurations
+          ?.filter(c => c.status)
+          .map(c => c.mode) || [];
+
+        if (!enabledModes.includes(body.deliveryMode)) {
+          return sendResponse(res, 400, false, `Selected delivery mode '${body.deliveryMode}' is not enabled in your delivery profile.`);
+        }
+      }
+    }
+
     const filesToDelete = [];
 
     if (req.files?.thumbnail?.[0]) {
