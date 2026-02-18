@@ -158,6 +158,7 @@ const CakeSchema = new mongoose.Schema(
 
     /* ================= SHIPPING ================= */
     shipping: {
+      homeDelivery: { type: Boolean, default: true },
       free: { type: Boolean, default: false },
       flatRate: { type: Boolean, default: false },
       takeaway: { type: Boolean, default: false },
@@ -167,6 +168,12 @@ const CakeSchema = new mongoose.Schema(
       deliveryRadius: { type: Number, default: 26 },
       price: { type: Number, default: 0 },
     },
+
+    deliveryMode: {
+      type: String,
+      default: 'standard'
+    },
+
 
 
     /* ================= RELATED ITEMS ================= */

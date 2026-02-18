@@ -171,12 +171,13 @@ const sanitizeCakeData = (body) => {
     data.addonTemplate = new mongoose.Types.ObjectId(data.addonTemplate);
   }
 
-  // Shipping
+  // Shipping - read from root body if sent individually by frontend
   const shippingData = parseJSON(data.shipping, {});
   data.shipping = {
+    homeDelivery: data.homeDelivery !== undefined ? String(data.homeDelivery) === "true" : (shippingData.homeDelivery !== undefined ? String(shippingData.homeDelivery) === "true" : true),
     free: String(shippingData.free) === "true",
     flatRate: String(shippingData.flatRate) === "true",
-    takeaway: String(shippingData.takeaway) === "true",
+    takeaway: data.takeaway !== undefined ? String(data.takeaway) === "true" : (shippingData.takeaway !== undefined ? String(shippingData.takeaway) === "true" : false),
     takeawayLocation: shippingData.takeawayLocation || "",
     pickupLatitude: shippingData.pickupLatitude || "",
     pickupLongitude: shippingData.pickupLongitude || "",
@@ -202,13 +203,8 @@ const sanitizeCakeData = (body) => {
     data.relatedItems.linkByRef = "Category";
   }
 
-  // Delivery Mode
-  if (data.deliveryMode) {
-    const validModes = ['standard', 'express', 'midnight', 'pickup'];
-    if (!validModes.includes(data.deliveryMode)) {
-      data.deliveryMode = 'standard';
-    }
-  } else {
+  // Delivery Mode - No longer restricted to enum so custom modes work
+  if (!data.deliveryMode) {
     data.deliveryMode = 'standard';
   }
 
