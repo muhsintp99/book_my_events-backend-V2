@@ -14,16 +14,18 @@ exports.checkAvailability = async (req, res) => {
       moduleId,
       packageId,
       bookingDate,
+      startDate,
+      endDate,
       timeSlot
     } = req.body;
 
     /* =========================
        BASIC VALIDATION
     ========================= */
-    if (!moduleId || !packageId || !bookingDate) {
+    if (!moduleId || !packageId || (!bookingDate && !startDate)) {
       return res.status(400).json({
         success: false,
-        message: "moduleId, packageId, and bookingDate are required"
+        message: "moduleId, packageId, and bookingDate (or startDate) are required"
       });
     }
 
@@ -73,9 +75,12 @@ exports.checkAvailability = async (req, res) => {
        NORMALIZE DATE (IMPORTANT)
        Ensures date-only comparison via UTC range
     ========================= */
-    const startOfDay = new Date(bookingDate);
+    const reqStart = startDate || bookingDate;
+    const reqEnd = endDate || reqStart;
+
+    const startOfDay = new Date(reqStart);
     startOfDay.setUTCHours(0, 0, 0, 0);
-    const endOfDay = new Date(bookingDate);
+    const endOfDay = new Date(reqEnd);
     endOfDay.setUTCHours(23, 59, 59, 999);
 
     /* =========================
