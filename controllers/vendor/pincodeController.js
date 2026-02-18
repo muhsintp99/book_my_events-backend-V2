@@ -8,26 +8,21 @@ const mongoose = require('mongoose');
 // ➤ Get All Pincodes (Admin)
 exports.getAllPincodes = async (req, res) => {
     try {
-        const { zone_id, search } = req.query;
-        let query = {};
+        const pincodes = await Pincode.find().sort({ createdAt: -1 });
 
-        if (zone_id && mongoose.Types.ObjectId.isValid(zone_id)) {
-            query.zone_id = zone_id;
-        }
+        res.status(200).json({
+            success: true,
+            count: pincodes.length,
+            data: pincodes
+        });
 
-        if (search) {
-            query.$or = [
-                { pincode: { $regex: search, $options: 'i' } },
-                { area_name: { $regex: search, $options: 'i' } },
-                { district_name: { $regex: search, $options: 'i' } }
-            ];
-        }
-
-        const pincodes = await Pincode.find(query).populate('zone_id', 'name');
-        res.status(200).json({ success: true, count: pincodes.length, data: pincodes });
     } catch (error) {
         console.error('Error fetching pincodes:', error);
-        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+        res.status(500).json({
+            success: false,
+            message: 'Server error',
+            error: error.message
+        });
     }
 };
 
