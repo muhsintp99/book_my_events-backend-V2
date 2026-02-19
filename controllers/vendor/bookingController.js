@@ -1148,6 +1148,13 @@ exports.createBooking = async (req, res) => {
           });
         }
 
+        /* ✅ CALCULATE SHIPPING PRICE */
+        pricing.shippingPrice =
+          deliveryType === "Home Delivery"
+            ? Number(serviceProvider.shipping?.price) || 0
+            : 0;
+
+
         // ========================================================
         // 🔥 DYNAMIC ZONE RESTRICTION (Auto-detect district)
         // ========================================================
@@ -1638,6 +1645,8 @@ exports.createBooking = async (req, res) => {
         cakeVariations: calculatedVariations,
         addons: addons || [],
         addonTotal: pricing.addonTotal || 0,
+                shippingPrice: pricing.shippingPrice || 0,
+
         deliveryType,
         customerMessage,
       }),
@@ -1727,6 +1736,7 @@ exports.createBooking = async (req, res) => {
       finalPrice,
       advanceAmount,
       remainingAmount,
+      shippingPrice: pricing.shippingPrice || 0,
 
       securityDeposit: securityDeposit || 0,
     };
