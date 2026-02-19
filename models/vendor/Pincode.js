@@ -4,7 +4,6 @@ const PincodeSchema = new mongoose.Schema({
     code: {
         type: String,
         required: true,
-        unique: true,
         trim: true
     },
     city: { type: String },
@@ -38,6 +37,7 @@ const PincodeSchema = new mongoose.Schema({
 
 // 2dsphere index for geospatial queries
 PincodeSchema.index({ location: '2dsphere' });
+PincodeSchema.index({ code: 1, city: 1 }, { unique: true });
 PincodeSchema.index({ code: 1 });
 PincodeSchema.index({ zone_id: 1 });
 
