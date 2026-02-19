@@ -357,7 +357,8 @@ console.log("✅ Juspay SDK initialized with BASIC Auth");
 console.log("   Merchant ID:", config.MERCHANT_ID);
 console.log("   Base URL:", config.BASE_URL);
 // 🔥 Full payment modules
-const FULL_PAYMENT_MODULES = ["Cake", "Ornaments", "Boutique"];
+const FULL_PAYMENT_MODULES = ["Cake", "Ornaments", "Ornament", "Boutique", "Boutiques"];
+
 
 /**
  * TEST SDK CONNECTION
