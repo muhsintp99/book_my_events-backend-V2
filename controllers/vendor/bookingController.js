@@ -595,6 +595,7 @@ exports.createBooking = async (req, res) => {
       decorationIncluded,
       ornamentId,
       bookingMode, // purchase | rental
+      shippingPrice, // ✅ NEW: Dynamic shipping price
     } = req.body;
 
     console.log("=".repeat(60));
@@ -1151,7 +1152,7 @@ exports.createBooking = async (req, res) => {
         /* ✅ CALCULATE SHIPPING PRICE */
         pricing.shippingPrice =
           deliveryType === "Home Delivery"
-            ? Number(serviceProvider.shipping?.price) || 0
+            ? Number(shippingPrice) || Number(serviceProvider.shipping?.price) || 0
             : 0;
 
 
@@ -1645,7 +1646,7 @@ exports.createBooking = async (req, res) => {
         cakeVariations: calculatedVariations,
         addons: addons || [],
         addonTotal: pricing.addonTotal || 0,
-                shippingPrice: pricing.shippingPrice || 0,
+        shippingPrice: pricing.shippingPrice || 0,
 
         deliveryType,
         customerMessage,
