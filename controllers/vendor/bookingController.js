@@ -1479,8 +1479,9 @@ exports.createBooking = async (req, res) => {
           pricing.basePrice = pricing.basePrice * finalRentalDays;
 
           pricing.perDayPrice = (Number(rental.pricePerDay) || 0);
-          pricing.securityDeposit = Number(rental.securityDeposit) || 0;
+          pricing.securityDeposit = 0; // Explicitly 0 for Boutique per user request
           pricing.discount = 0;
+
         } else {
           // PURCHASE MODE - Check and validate stock for boutique
           const requestedQty = calculatedVariations.reduce((sum, v) => sum + v.quantity, 0);
