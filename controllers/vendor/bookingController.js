@@ -1360,8 +1360,9 @@ exports.createBooking = async (req, res) => {
 
           pricing.basePrice = baseRent;
           pricing.perDayPrice = Number(rental.pricePerDay) || 0;
-          pricing.securityDeposit = Number(rental.securityDeposit) || 0;
+          pricing.securityDeposit = 0; // Explicitly 0 for Ornament per user request
           pricing.discount = 0;
+
         } else {
           // PURCHASE MODE - Check and validate stock
           const buy = serviceProvider.buyPricing || {};
