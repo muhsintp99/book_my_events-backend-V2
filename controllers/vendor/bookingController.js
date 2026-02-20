@@ -1581,6 +1581,11 @@ exports.createBooking = async (req, res) => {
       finalPrice += securityDeposit;
     }
 
+     // 🔥 ADD SHIPPING PRICE (Critical for Cakes/Delivery)
+    // This ensures the payment gateway charges the amount displayed to the user
+    if (pricing.shippingPrice > 0) {
+      finalPrice += pricing.shippingPrice;
+    }
     // ADVANCE PAYMENT
     let advanceAmount = 0;
 
