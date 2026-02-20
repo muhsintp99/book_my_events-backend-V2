@@ -568,6 +568,8 @@ exports.createBooking = async (req, res) => {
       bookingType,
       bookingDate,
       timeSlot,
+       time,      // ✅ NEW: Support for exact time string
+      location,
       fullName,
       contactNumber,
       emailAddress,
@@ -742,7 +744,19 @@ exports.createBooking = async (req, res) => {
       });
     }
 
-    console.log("✅ NORMALIZED TIMESLOT:", JSON.stringify(normalizedTimeSlot));
+      console.log("✅ NORMALIZED TIMESLOT (PRE-OVERRIDE):", JSON.stringify(normalizedTimeSlot));
+
+    // ✅ NEW: If exact 'time' is provided separately (common in Cake/Transport), 
+    // override the normalized time values while keeping the labels.
+    if (time && normalizedTimeSlot.length > 0) {
+      console.log(`🕒 Overriding normalized time with exact time from body: "${time}"`);
+      normalizedTimeSlot = normalizedTimeSlot.map(slot => ({
+        ...slot,
+        time: time // Use the exact time string (e.g. "10:00 AM")
+      }));
+    }
+
+    console.log("✅ FINAL NORMALIZED TIMESLOT:", JSON.stringify(normalizedTimeSlot));
     console.log("=".repeat(60));
 
     // DATE NORMALIZATION
@@ -1641,6 +1655,8 @@ exports.createBooking = async (req, res) => {
 
       bookingDate: normalizedDate,
       timeSlot: normalizedTimeSlot,
+            location: location || undefined,
+
 
       ...userDetails,
 
