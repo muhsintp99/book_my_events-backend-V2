@@ -2894,8 +2894,16 @@ exports.getVehicles = async (req, res) => {
     if (brand) query.brand = parseObjectIdArray(brand);
     if (category) query.category = { $in: parseObjectIdArray(category) };
     if (isActive !== undefined) query.isActive = isActive === "true";
-    if (zone) query.zone = zone;
 
+    // ✅ Handle Zone (ID or Name)
+    if (zone) {
+      if (mongoose.Types.ObjectId.isValid(zone)) {
+        query.zone = zone;
+      } else {
+        const zoneDoc = await mongoose.model("Zone").findOne({ name: new RegExp(`^${zone}$`, "i") });
+        if (zoneDoc) query.zone = zoneDoc._id;
+      }
+    }
     // Price range filter
     if (minPrice || maxPrice) {
       query.$or = [
@@ -3098,6 +3106,17 @@ exports.getVendorsForVehicleModule = async (req, res) => {
     let query = { module: moduleId };
     if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
       query.user = providerId;
+    }
+
+        // ✅ Handle Zone (ID or Name)
+    const zone = req.query.zone || req.query.zoneId || req.query.zoneid || null;
+    if (zone) {
+      if (mongoose.Types.ObjectId.isValid(zone)) {
+        query.zone = zone;
+      } else {
+        const zoneDoc = await mongoose.model("Zone").findOne({ name: new RegExp(`^${zone}$`, "i") });
+        if (zoneDoc) query.zone = zoneDoc._id;
+      }
     }
 
     const vendorProfiles = await VendorProfile.find(query)
