@@ -1655,8 +1655,9 @@ exports.createBooking = async (req, res) => {
 
       bookingDate: normalizedDate,
       timeSlot: normalizedTimeSlot,
-            location: location || undefined,
-
+            location: location || req.body.pickupLocation || undefined,
+      time: time || undefined,
+      deliveryTime: (moduleType === "Cake") ? time : undefined,
 
       ...userDetails,
 
