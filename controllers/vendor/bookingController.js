@@ -1581,7 +1581,7 @@ exports.createBooking = async (req, res) => {
       finalPrice += securityDeposit;
     }
 
-     // 🔥 ADD SHIPPING PRICE (Critical for Cakes/Delivery)
+    // 🔥 ADD SHIPPING PRICE (Critical for Cakes/Delivery)
     // This ensures the payment gateway charges the amount displayed to the user
     if (pricing.shippingPrice > 0) {
       finalPrice += pricing.shippingPrice;
@@ -1702,9 +1702,11 @@ exports.createBooking = async (req, res) => {
         boutiqueVariations: calculatedVariations,
         bookingMode: bookingMode || "purchase",
         deliveryType,
+        days: Number(days) > 0 ? Number(days) : 1,
+        rentalDays: Number(days) > 0 ? Number(days) : 1,
         rentalPeriod: (bookingMode === "rental") ? {
-          from: req.body.rentalFrom,
-          to: req.body.rentalTo
+          from: req.body.rentalPeriod?.from || req.body.bookingDate,
+          to: req.body.rentalPeriod?.to || req.body.bookingDate
         } : undefined
       }),
 
@@ -1712,6 +1714,12 @@ exports.createBooking = async (req, res) => {
       ...((moduleKey === "ornament" || moduleKey === "ornaments") && {
         ornamentId,
         bookingMode: bookingMode || "purchase",
+        days: Number(days) > 0 ? Number(days) : 1,
+        rentalDays: Number(days) > 0 ? Number(days) : 1,
+        rentalPeriod: (bookingMode === "rental") ? {
+          from: req.body.rentalPeriod?.from || req.body.bookingDate,
+          to: req.body.rentalPeriod?.to || req.body.bookingDate
+        } : undefined
       }),
 
       // ================= OTHER MODULES =================
@@ -1743,6 +1751,10 @@ exports.createBooking = async (req, res) => {
       advanceAmount,
       remainingAmount,
       shippingPrice: pricing.shippingPrice || 0,
+
+      // Root level fallback for rental duration
+      days: Number(days) > 0 ? Number(days) : (moduleType === "Transport" ? Number(days) : undefined),
+      rentalDays: Number(days) > 0 ? Number(days) : undefined,
 
       securityDeposit: securityDeposit || 0,
     };

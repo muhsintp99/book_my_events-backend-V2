@@ -596,6 +596,9 @@ const bookingSchema = new mongoose.Schema(
     ],
     addonTotal: { type: Number, default: 0 },
 
+    days: { type: Number },
+    rentalDays: { type: Number },
+
     securityDeposit: { type: Number, default: 0 },
   },
   { timestamps: true }
