@@ -1480,9 +1480,8 @@ exports.createBooking = async (req, res) => {
 
         if (bMode === "rental") {
           const rental = serviceProvider.rentalPricing || {};
-          const minDays = Number(rental.minimumDays) || 1;
           const requestedDays = Number(days) || 1;
-          const finalRentalDays = Math.max(requestedDays, minDays);
+          const finalRentalDays = Math.max(requestedDays, 1);
 
           // Base price already has sum of variations or base product
           pricing.basePrice = pricing.basePrice * finalRentalDays;
@@ -1491,9 +1490,6 @@ exports.createBooking = async (req, res) => {
           pricing.securityDeposit = 0; // Explicitly 0 for Boutique per user request
           pricing.discount = 0;
 
-          if (finalRentalDays > requestedDays) {
-            successMessage = `Booking initiated! (Minimum ${minDays} days applied for rental)`;
-          }
 
         } else {
           // PURCHASE MODE - Check and validate stock for boutique
