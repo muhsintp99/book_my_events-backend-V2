@@ -444,6 +444,7 @@ exports.getVendorsForMakeupModule = async (req, res) => {
 
     const vendorProfiles = await VendorProfile.find(query)
       .select("user storeName logo coverImage subscriptionStatus isFreeTrial zone")
+      .populate("zone", "name")
       .lean();
 
     if (!vendorProfiles.length) {
