@@ -427,7 +427,6 @@ exports.getVendorsForMakeupModule = async (req, res) => {
   try {
     const { moduleId } = req.params;
     const providerId = req.query.providerId || req.query.providerid || null;
-    const zoneId = req.query.zoneId || req.query.zoneid || null;
 
     if (!mongoose.Types.ObjectId.isValid(moduleId)) {
       return res.status(400).json({ success: false, message: "Invalid module ID" });
@@ -438,12 +437,8 @@ exports.getVendorsForMakeupModule = async (req, res) => {
       query.user = providerId;
     }
 
-    if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
-      query.zone = zoneId;
-    }
-
     const vendorProfiles = await VendorProfile.find(query)
-      .select("user storeName logo coverImage subscriptionStatus isFreeTrial zone")
+      .select("user storeName logo coverImage subscriptionStatus isFreeTrial")
       .lean();
 
     if (!vendorProfiles.length) {
@@ -510,7 +505,6 @@ exports.getVendorsForMakeupModule = async (req, res) => {
         logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
         coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
         hasVendorProfile: true,
-        zone: vp?.zone || null,
         packageCount, // ✅ ADD PACKAGE COUNT TO RESPONSE
         subscription: sub
           ? {
