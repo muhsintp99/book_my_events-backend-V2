@@ -1491,6 +1491,10 @@ exports.createBooking = async (req, res) => {
           pricing.securityDeposit = 0; // Explicitly 0 for Boutique per user request
           pricing.discount = 0;
 
+          if (finalRentalDays > requestedDays) {
+            successMessage = `Booking initiated! (Minimum ${minDays} days applied for rental)`;
+          }
+
         } else {
           // PURCHASE MODE - Check and validate stock for boutique
           const requestedQty = calculatedVariations.reduce((sum, v) => sum + v.quantity, 0);
