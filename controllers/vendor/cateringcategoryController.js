@@ -595,11 +595,9 @@ exports.getVendorsForCateringModule = async (req, res) => {
   try {
     const { moduleId } = req.params;
 
-    // ✅ Support both providerId & providerid
-    const providerId =
-      req.query.providerId ||
-      req.query.providerid ||
-      null;
+    // ✅ Support both providerId & providerid, and zoneId
+    const providerId = req.query.providerId || req.query.providerid || null;
+    const zoneId = req.query.zoneId || req.query.zoneid || null;
 
     if (!mongoose.Types.ObjectId.isValid(moduleId)) {
       return res.status(400).json({
@@ -616,9 +614,14 @@ exports.getVendorsForCateringModule = async (req, res) => {
       query.user = providerId;
     }
 
+    // ✅ Add zone filtering
+    if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
+      query.zone = zoneId;
+    }
+
     // 🔥 Fetch VendorProfiles
     const vendorProfiles = await VendorProfile.find(query)
-      .select("user storeName logo coverImage")
+      .select("user storeName logo coverImage zone")
       .lean();
 
     if (!vendorProfiles.length) {

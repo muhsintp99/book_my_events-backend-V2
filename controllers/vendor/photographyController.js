@@ -435,6 +435,7 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
   try {
     const { moduleId } = req.params;
     const providerId = req.query.providerid || req.query.providerId || null;
+    const zoneId = req.query.zoneId || req.query.zoneid || null;
 
     if (!mongoose.Types.ObjectId.isValid(moduleId)) {
       return res.status(400).json({
@@ -443,33 +444,51 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
       });
     }
 
-    // 🔹 Build Photography query (THIS FIXES SINGLE VENDOR)
-    let photoQuery = { module: moduleId };
+    // 🔹 Build VendorProfile query
+    let vpQuery = { module: moduleId };
 
     if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
-      photoQuery.provider = providerId;
+      vpQuery.user = providerId;
     }
 
-    // 🔹 Get vendor IDs from Photography
-    const vendorIds = await Photography.distinct("provider", photoQuery);
+    if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
+      vpQuery.zone = zoneId;
+    }
 
-    if (!vendorIds.length) {
+    // 🔹 Get vendor profiles with zone populated
+    const vendorProfiles = await VendorProfile.find(vpQuery)
+      .select("user storeName logo coverImage zone")
+      .populate("zone", "name")
+      .lean();
+
+    if (!vendorProfiles.length) {
       return res.json({
         success: true,
         data: providerId ? null : []
       });
     }
 
+    const vendorIds = vendorProfiles.map(v => v.user);
+
+    // ✅ COUNT PACKAGES PER VENDOR using aggregation
+    const packageCounts = await Photography.aggregate([
+      {
+        $match: {
+          module: new mongoose.Types.ObjectId(moduleId),
+          provider: { $in: vendorIds }
+        }
+      },
+      {
+        $group: {
+          _id: "$provider",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
     // 🔹 Get users
     const users = await User.find({ _id: { $in: vendorIds } })
       .select("firstName lastName email phone profilePhoto")
-      .lean();
-
-    // 🔹 Vendor profiles
-    const vendorProfiles = await VendorProfile.find({
-      user: { $in: vendorIds }
-    })
-      .select("user storeName logo coverImage")
       .lean();
 
     // 🔹 Subscriptions
@@ -492,6 +511,10 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
       const sub = subscriptions.find(
         s => s.userId.toString() === user._id.toString()
       );
+
+      // ✅ GET PACKAGE COUNT FOR THIS VENDOR
+      const pkgCountItem = packageCounts.find(p => p._id.toString() === user._id.toString());
+      const packageCount = pkgCountItem ? pkgCountItem.count : 0;
 
       const now = new Date();
       const isExpired = sub ? sub.endDate < now : true;
@@ -516,6 +539,8 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
         logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
         coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
         hasVendorProfile: !!vp,
+        zone: vp?.zone || null,
+        packageCount,
 
         // 🔥 SUBSCRIPTION
         subscription: sub
@@ -560,10 +585,12 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
     }
 
     // ✅ ALL VENDORS RESPONSE
+    const filtered = final.filter(v => v.packageCount > 0);
+
     return res.json({
       success: true,
-      count: final.length,
-      data: final
+      count: filtered.length,
+      data: filtered
     });
 
   } catch (err) {
