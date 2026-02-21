@@ -574,15 +574,15 @@ const deleteFileIfExists = (filePath) => {
 ----------------------------------------------------- */
 exports.createCategory = async (req, res) => {
   try {
-    const { title, module, secondaryModule, parentCategory, brands, createdBy, description } =
-  req.body;
+    const { title, module, parentCategory, brands, createdBy, description } =
+      req.body;
 
-if (!title) return res.status(400).json({ error: "Title required" });
+    if (!title) return res.status(400).json({ error: "Title required" });
+    if (!module) return res.status(400).json({ error: "Module required" });
 
-const categoryData = {
-  title: title.trim(),
-  module: module || null,
-  secondaryModule: secondaryModule || null,
+    const categoryData = {
+      title: title.trim(),
+      module,
       parentCategory: parentCategory || null,
       description: description || "",
       createdBy: createdBy || null,
@@ -635,9 +635,6 @@ exports.updateCategory = async (req, res) => {
     const {
       title,
       module,
-        secondaryModule,   // ADD THIS
-
-    
       parentCategory,
       brands,
       updatedBy,
@@ -659,7 +656,6 @@ exports.updateCategory = async (req, res) => {
 
     if (title) category.title = title.trim();
     if (module) category.module = module;
-    if (secondaryModule !== undefined) category.secondaryModule = secondaryModule || null;
     if (description) category.description = description;
     if (brands) category.brands = JSON.parse(brands);
     if (displayOrder) category.displayOrder = parseInt(displayOrder);
@@ -788,8 +784,7 @@ exports.getSubCategoriesByParent = async (req, res) => {
 exports.getCategories = async (req, res) => {
   try {
     const categories = await Category.find()
-  .populate("module")
-  .populate("secondaryModule")
+      .populate("module")
       .populate("parentCategory")
       .populate("subCategories")
       .populate("brands")
