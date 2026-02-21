@@ -595,7 +595,25 @@ exports.updateVendorBio = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
   try {
-    const { role, vendorName, firstName, lastName, businessAddress, mobileNumber, socialLinks, bankDetails, latitude, longitude, storeAddress } = req.body;
+    const {
+      role,
+      vendorName,
+      firstName,
+      lastName,
+      businessAddress,
+      mobileNumber,
+      socialLinks,
+      bankDetails,
+      latitude,
+      longitude,
+      storeAddress,
+      vendorType,
+      maxBookings,
+      services,
+      specialised,
+      startingPrice,
+      minBookingPrice
+    } = req.body;
     const id = req.params.id; // Could be Profile ID or User ID
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -646,6 +664,19 @@ exports.updateProfile = async (req, res) => {
       if (mobileNumber) updatedData.mobileNumber = mobileNumber;
       if (latitude) updatedData.latitude = latitude;
       if (longitude) updatedData.longitude = longitude;
+        if (vendorType) updatedData.vendorType = vendorType;
+      if (maxBookings !== undefined) updatedData.maxBookings = maxBookings;
+
+      if (services) {
+        try {
+          updatedData.services = typeof services === 'string' ? JSON.parse(services) : services;
+        } catch (err) {
+          console.error("Invalid services JSON", err);
+        }
+      }
+      if (specialised) updatedData.specialised = specialised;
+      if (startingPrice !== undefined) updatedData.startingPrice = startingPrice;
+      if (minBookingPrice !== undefined) updatedData.minBookingPrice = minBookingPrice;
       if (storeAddress) {
         try {
           updatedData.storeAddress = typeof storeAddress === 'string' ? JSON.parse(storeAddress) : storeAddress;

@@ -946,7 +946,30 @@ const vendorProfileSchema = new mongoose.Schema(
       enum: ["individual", "company"],
       default: "individual"
     },
+maxBookings: {
+      type: Number,
+      default: null
+    },
 
+    services: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category"
+    }],
+
+    specialised: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category"
+    },
+
+    startingPrice: {
+      type: Number,
+      default: null
+    },
+
+    minBookingPrice: {
+      type: Number,
+      default: null
+    },
     // ----------------------- APPROVAL SYSTEM -----------------------
     status: {
       type: String,

@@ -2051,6 +2051,12 @@ exports.register = async (req, res) => {
       latitude,
       longitude,
       accountType,
+       vendorType,
+      maxBookings,
+      services,
+      specialised,
+      startingPrice,
+      minBookingPrice,
     } = req.body;
 
     const finalRole = req.body.role === "vendor" ? "vendor" : "user";
@@ -2063,6 +2069,10 @@ exports.register = async (req, res) => {
       req.body.module = undefined;
       req.body.zone = undefined;
       req.body.subscriptionPlan = undefined;
+       req.body.services = undefined;
+      req.body.specialised = undefined;
+      req.body.startingPrice = undefined;
+      req.body.minBookingPrice = undefined;
       req.files = {};
     }
 
@@ -2205,10 +2215,19 @@ exports.register = async (req, res) => {
         }
         : undefined;
 
-      const vendorTypeValue = isVendorTypeModule
-        ? req.body.vendorType || "individual"
-        : undefined;
+     
+      const vendorTypeValue = vendorType || "individual";
 
+      // Parse services if string
+      let parsedServices = services;
+      if (typeof services === 'string') {
+        try {
+          parsedServices = JSON.parse(services);
+        } catch (err) {
+          console.error("Invalid services JSON", err);
+          parsedServices = [];
+        }
+      }
       vendorProfile = await VendorProfile.create(
         [
           {
@@ -2234,6 +2253,11 @@ exports.register = async (req, res) => {
             bankDetails,
             bio: bioSection,
             vendorType: vendorTypeValue,
+             maxBookings: maxBookings || null,
+            services: parsedServices || [],
+            specialised: specialised || null,
+            startingPrice: startingPrice || null,
+            minBookingPrice: minBookingPrice || null,
             subscriptionPlan: subscriptionPlan || null,
             subscriptionStatus: subscriptionPlan ? "pending_payment" : "none",
             subscriptionStartDate: null,
@@ -2340,6 +2364,10 @@ exports.register = async (req, res) => {
         state: vendorProfile?.storeAddress?.state || "",
         zipCode: vendorProfile?.storeAddress?.zipCode || "",
         fullAddress: vendorProfile?.storeAddress?.fullAddress || "",
+         services: vendorProfile?.services || [],
+        specialised: vendorProfile?.specialised || null,
+        startingPrice: vendorProfile?.startingPrice || null,
+        minBookingPrice: vendorProfile?.minBookingPrice || null,
       },
     };
 
