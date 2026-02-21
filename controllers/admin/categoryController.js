@@ -554,7 +554,10 @@
 
 const fs = require("fs");
 const path = require("path");
+const mongoose = require("mongoose");
 const Category = require("../../models/admin/category");
+const Module = require("../../models/admin/module");
+const SecondaryModule = require("../../models/admin/secondarymodule");
 
 /* -----------------------------------------------------
    DELETE FILE UTILITY
@@ -580,9 +583,22 @@ exports.createCategory = async (req, res) => {
     if (!title) return res.status(400).json({ error: "Title required" });
     if (!module) return res.status(400).json({ error: "Module required" });
 
+    // Determine the module model type
+    let moduleModel = "Module";
+    let targetModule = await Module.findById(module);
+    if (!targetModule) {
+      targetModule = await SecondaryModule.findById(module);
+      if (targetModule) {
+        moduleModel = "SecondaryModule";
+      }
+    }
+
+    if (!targetModule) return res.status(404).json({ error: "Module not found" });
+
     const categoryData = {
       title: title.trim(),
       module,
+      moduleModel,
       parentCategory: parentCategory || null,
       description: description || "",
       createdBy: createdBy || null,
@@ -591,6 +607,17 @@ exports.createCategory = async (req, res) => {
     };
 
     const newCategory = await Category.create(categoryData);
+
+    // Add to module's categories array
+    if (moduleModel === "SecondaryModule") {
+      await SecondaryModule.findByIdAndUpdate(module, {
+        $addToSet: { categories: newCategory._id },
+      });
+    } else {
+      await Module.findByIdAndUpdate(module, {
+        $addToSet: { categories: newCategory._id },
+      });
+    }
 
     // If subcategory → push into parent
     if (parentCategory) {
@@ -625,8 +652,6 @@ exports.createCategory = async (req, res) => {
   }
 };
 
-
-
 /* -----------------------------------------------------
    UPDATE CATEGORY
 ----------------------------------------------------- */
@@ -650,12 +675,12 @@ exports.updateCategory = async (req, res) => {
     if (!category) return res.status(404).json({ error: "Category not found" });
 
     if (req.file) {
-      deleteFileIfExists(path.join(__dirname, `../../${category.image}`));
+      const oldImagePath = category.image ? path.join(__dirname, `../../${category.image}`) : null;
+      if (oldImagePath) deleteFileIfExists(oldImagePath);
       category.image = `/uploads/categories/${req.file.filename}`;
     }
 
     if (title) category.title = title.trim();
-    if (module) category.module = module;
     if (description) category.description = description;
     if (brands) category.brands = JSON.parse(brands);
     if (displayOrder) category.displayOrder = parseInt(displayOrder);
@@ -664,6 +689,31 @@ exports.updateCategory = async (req, res) => {
     if (isActive !== undefined) category.isActive = isActive === "true";
     if (isFeatured !== undefined)
       category.isFeatured = isFeatured === "true";
+
+    // Module change handling
+    if (module && module !== category.module?.toString()) {
+      // Remove from old module
+      const OldModel = mongoose.model(category.moduleModel || 'Module');
+      await OldModel.findByIdAndUpdate(category.module, {
+        $pull: { categories: category._id }
+      });
+
+      // Find new module type
+      let newModuleModel = "Module";
+      let targetModule = await Module.findById(module);
+      if (!targetModule) {
+        targetModule = await SecondaryModule.findById(module);
+        if (targetModule) newModuleModel = "SecondaryModule";
+      }
+
+      if (targetModule) {
+        await targetModule.constructor.findByIdAndUpdate(module, {
+          $addToSet: { categories: category._id }
+        });
+        category.module = module;
+        category.moduleModel = newModuleModel;
+      }
+    }
 
     // Parent change handling
     if (
@@ -718,6 +768,14 @@ exports.deleteCategory = async (req, res) => {
     const category = await Category.findById(req.params.id);
     if (!category) return res.status(404).json({ error: "Category not found" });
 
+    // Remove from module
+    if (category.module) {
+      const ModuleModel = mongoose.model(category.moduleModel || 'Module');
+      await ModuleModel.findByIdAndUpdate(category.module, {
+        $pull: { categories: category._id }
+      });
+    }
+
     if (category.parentCategory) {
       await Category.findByIdAndUpdate(category.parentCategory, {
         $pull: { subCategories: category._id },
@@ -735,6 +793,7 @@ exports.deleteCategory = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
 
 
 exports.getParentCategories = async (req, res) => {
