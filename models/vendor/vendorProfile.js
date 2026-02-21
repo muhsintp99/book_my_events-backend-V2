@@ -957,7 +957,6 @@ const vendorProfileSchema = new mongoose.Schema(
     registrationSource: {
       type: String,
       enum: ["website", "admin"],
-      default: "website",
       index: true
     },
 
