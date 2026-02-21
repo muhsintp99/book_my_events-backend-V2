@@ -526,6 +526,7 @@ app.use("/api/makeup-packages", require("./routes/admin/makeupPackageRoutes"));
 app.use("/api/makeup-types", require("./routes/admin/makeupTypeRoutes"));
 app.use("/api/packages", require("./routes/admin/packageRoutes"));
 app.use("/api/admin/kyc", require("./routes/admin/kycRoutes"));
+app.use("/api/admin/vendor-registrations", require("./routes/admin/vendorRegistrationRoutes"));
 app.use("/api/vendorprofiles", require("./routes/vendor/vendorProfileRoutes"));
 app.use("/api/reviews", require("./routes/vendor/reviewRouters"));
 app.use("/api/venues", require("./routes/vendor/venueRoutes"));

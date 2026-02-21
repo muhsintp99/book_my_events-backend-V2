@@ -1918,6 +1918,17 @@ exports.login = async (req, res) => {
           select: "name description coordinates city country isActive isTopZone icon",
         },
       ]);
+
+      // ❌ Restrict login if vendor status is not approved
+      if (vendorProfile && (vendorProfile.status === "pending" || vendorProfile.status === "rejected")) {
+        return res.status(403).json({
+          success: false,
+          message: vendorProfile.status === "pending"
+            ? "Your account is under verification. Please wait for admin approval."
+            : "Your registration has been rejected. Please contact support.",
+          status: vendorProfile.status
+        });
+      }
     }
 
     let upgradeDetails = {
