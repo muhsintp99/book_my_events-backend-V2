@@ -3,7 +3,7 @@ const router = express.Router();
 const kycController = require("../../controllers/admin/kycController");
 
 // TODO: Add auth middleware if needed
-// const { protect, admin } = require("../../middlewares/authMiddleware");
+// const { protect, adminOnly } = require("../../middlewares/authMiddleware");
 
 /**
  * @route   GET /api/admin/kyc
