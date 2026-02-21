@@ -93,6 +93,12 @@ const CategorySchema = new Schema(
       required: true,
     },
 
+    secondaryModule: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "SecondaryModule",
+  default: null,
+},
+
     brands: [{ type: mongoose.Schema.Types.ObjectId, ref: "Brand" }],
 
     isActive: { type: Boolean, default: true },
