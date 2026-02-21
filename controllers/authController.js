@@ -2114,8 +2114,23 @@ exports.register = async (req, res) => {
     }
 
     let userPassword = password;
+    let isAdminAddedVendor = false;
     if (finalRole === "vendor") {
-      userPassword = Math.random().toString(36).slice(-8);
+      if (password && password.length >= 6) {
+        // ✅ Vendor self-registration via vendor panel — use their own password
+        userPassword = password;
+      } else if (!password) {
+        // ✅ Admin-added vendor — generate random password and send via email
+        userPassword = Math.random().toString(36).slice(-8);
+        isAdminAddedVendor = true;
+      } else {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({
+          success: false,
+          message: "Password must be at least 6 characters long",
+        });
+      }
     } else {
       if (!userPassword || userPassword.length < 6) {
         await session.abortTransaction();
@@ -2236,11 +2251,19 @@ exports.register = async (req, res) => {
 
     // Send emails
     try {
-      if (role === "vendor") {
+      if (role === "vendor" && isAdminAddedVendor) {
+        // Admin-added vendor: send generated credentials via email
         await sendEmail(
           user[0].email,
           "Your Vendor Account Credentials",
           vendorEmail(user[0], userPassword)
+        );
+      } else if (role === "vendor" && !isAdminAddedVendor) {
+        // Self-registered vendor: send welcome email (they already know their password)
+        await sendEmail(
+          user[0].email,
+          "Welcome to BookMyEvent — Your Account is Pending Review",
+          welcomeEmail(user[0])
         );
       } else {
         await sendEmail(
