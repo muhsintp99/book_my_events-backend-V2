@@ -1919,8 +1919,12 @@ exports.login = async (req, res) => {
         },
       ]);
 
-      // ❌ Restrict login if vendor status is not approved
-      if (vendorProfile && (vendorProfile.status === "pending" || vendorProfile.status === "rejected")) {
+      // ❌ Restrict login if vendor status is not approved (only for website registrations)
+      if (
+        vendorProfile &&
+        vendorProfile.registrationSource === "website" &&
+        (vendorProfile.status === "pending" || vendorProfile.status === "rejected")
+      ) {
         return res.status(403).json({
           success: false,
           message: vendorProfile.status === "pending"
@@ -2251,6 +2255,7 @@ exports.register = async (req, res) => {
               : null,
             user: user[0]._id,
             status: "pending",
+            registrationSource: isAdminAddedVendor ? "admin" : "website",
           },
         ],
         { session }

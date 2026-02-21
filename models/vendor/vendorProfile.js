@@ -954,6 +954,12 @@ const vendorProfileSchema = new mongoose.Schema(
       default: "pending",
       index: true
     },
+    registrationSource: {
+      type: String,
+      enum: ["website", "admin"],
+      default: "website",
+      index: true
+    },
 
     reviewedBy: {
       type: mongoose.Schema.Types.ObjectId,
