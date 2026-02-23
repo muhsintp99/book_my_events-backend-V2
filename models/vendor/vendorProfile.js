@@ -858,10 +858,15 @@ const vendorProfileSchema = new mongoose.Schema(
     },
 
     // ----------------------- MODULE & ZONE -----------------------
-    module: {
+   module: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Module",
+      refPath: "moduleType",
       default: null
+    },
+      moduleType: {
+      type: String,
+      enum: ["Module", "SecondaryModule"],
+      default: "Module"
     },
 
     zone: {

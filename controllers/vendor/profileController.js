@@ -34,7 +34,9 @@ exports.getAllVendors = async (req, res) => {
       .populate({
         path: "zone",
         select: "name description coordinates city country isActive isTopZone icon"
-      });
+       })
+      .populate("services", "title")
+      .populate("specialised", "title");
 
     // Enhance vendors with counts
     const enhancedVendors = await Promise.all(
@@ -164,6 +166,8 @@ exports.getSingleVendor = async (req, res) => {
     const vendor = await VendorProfile.findOne({ user: providerId })
       .populate("user", "firstName lastName email phone role profilePhoto")
       .populate("module", "title moduleId icon")
+       .populate("services", "title")
+      .populate("specialised", "title")
       .populate("zone", "name description coordinates city country isActive isTopZone icon");
 
     if (!vendor) {
@@ -1030,6 +1034,8 @@ exports.getProviderAdminDetails = async (req, res) => {
       Profile.findOne({ userId: providerId }),
       VendorProfile.findOne({ user: providerId })
         .populate("module", "title moduleId icon")
+        .populate("services", "title")
+        .populate("specialised", "title")
         .populate("zone", "name description coordinates city country isActive isTopZone icon")
     ]);
 
@@ -1122,6 +1128,8 @@ exports.getVendorCollectionDetails = async (req, res) => {
       User.findById(providerId).select("firstName lastName email phone profilePhoto"),
       Profile.findOne({ userId: providerId }).select("-bankDetails -kycDetails"),
       VendorProfile.findOne({ user: providerId })
+      .populate("services", "title")
+        .populate("specialised", "title")
         .populate("zone", "name description city country")
     ]);
 

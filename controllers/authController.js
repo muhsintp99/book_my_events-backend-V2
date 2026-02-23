@@ -2198,7 +2198,14 @@ exports.register = async (req, res) => {
     let vendorProfile = null;
     if (role === "vendor") {
       const ModuleModel = mongoose.model("Module");
-      const moduleData = await ModuleModel.findById(module);
+        const SecondaryModuleModel = mongoose.model("SecondaryModule");
+      let moduleData = await ModuleModel.findById(module);
+      let mType = "Module";
+
+      if (!moduleData) {
+        moduleData = await SecondaryModuleModel.findById(module);
+        mType = "SecondaryModule";
+      }
       const moduleName = moduleData?.title?.toLowerCase() || "";
       const isCakeModule =
         moduleName === "cake" || moduleName === "cake vendor";
@@ -2274,6 +2281,8 @@ exports.register = async (req, res) => {
             module: mongoose.Types.ObjectId.isValid(module?.toString().trim())
               ? new mongoose.Types.ObjectId(module.toString().trim())
               : null,
+               moduleType: mType,
+
             zone: mongoose.Types.ObjectId.isValid(zone?.toString().trim())
               ? new mongoose.Types.ObjectId(zone.toString().trim())
               : null,
@@ -2325,8 +2334,9 @@ exports.register = async (req, res) => {
     if (vendorProfile) {
       vendorProfile = await VendorProfile.findById(vendorProfile[0]._id)
         .populate("module", "title")
-        .populate("zone", "name description coordinates city country isActive isTopZone icon");
-    }
+        .populate("services", "title")
+        .populate("specialised", "title")
+        .populate("zone", "name description coordinates city country isActive isTopZone icon");    }
 
     const responseData = {
       success: true,
