@@ -10,7 +10,7 @@ exports.getPendingRegistrations = async (req, res) => {
     try {
         const registrations = await VendorProfile.find({
             status: "pending",
-            registrationSource: "website"
+            registrationSource: { $ne: "admin" }
         })
             .populate("user", "firstName lastName email phone userId")
             .populate("module", "title")

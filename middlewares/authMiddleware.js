@@ -38,26 +38,22 @@ const User = require('../models/User');
 exports.protect = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    // console.log('Authorization Header:', authHeader); // Log header for debugging
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ success: false, message: 'Not authorized, token missing' });
     }
 
     const token = authHeader.split(' ')[1];
-    console.log('Token:', token); // Log token for debugging
 
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
-      console.log('Decoded Token:', decoded); // Log decoded payload
     } catch (err) {
       console.error('Token verification error:', err.message);
       return res.status(401).json({ success: false, message: 'Not authorized, invalid or expired token' });
     }
 
     const user = await User.findById(decoded.id);
-    console.log('User found:', user ? user : 'No user'); // Log user result
 
     if (!user) {
       return res.status(401).json({ success: false, message: 'User not found or deleted' });
@@ -83,12 +79,12 @@ exports.authorizeRoles = (...roles) => {
   };
 };
 
-// Admin only middleware
+// Admin or Superadmin only middleware
 exports.adminOnly = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({ success: false, message: 'Not authorized' });
   }
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
     return res.status(403).json({ success: false, message: 'Admin access required' });
   }
   next();
