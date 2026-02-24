@@ -8,7 +8,7 @@ const { welcomeEmail } = require("../../utils/sentEmail");
 // @access  Private/Admin
 exports.getPendingRegistrations = async (req, res) => {
     try {
-        const registrations = await VendorProfile.find({ status: "pending", registrationSource: "website" })
+        const registrations = await VendorProfile.find({ status: "pending", registrationSource: { $ne: "admin" } })
             .populate("user", "firstName lastName email phone userId")
             .populate("module", "title")
             .populate("zone", "name")
