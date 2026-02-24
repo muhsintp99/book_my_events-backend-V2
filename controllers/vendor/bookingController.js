@@ -568,7 +568,7 @@ exports.createBooking = async (req, res) => {
       bookingType,
       bookingDate,
       timeSlot,
-       time,      // ✅ NEW: Support for exact time string
+      time,      // ✅ NEW: Support for exact time string
       location,
       fullName,
       contactNumber,
@@ -744,7 +744,7 @@ exports.createBooking = async (req, res) => {
       });
     }
 
-      console.log("✅ NORMALIZED TIMESLOT (PRE-OVERRIDE):", JSON.stringify(normalizedTimeSlot));
+    console.log("✅ NORMALIZED TIMESLOT (PRE-OVERRIDE):", JSON.stringify(normalizedTimeSlot));
 
     // ✅ NEW: If exact 'time' is provided separately (common in Cake/Transport), 
     // override the normalized time values while keeping the labels.
@@ -1655,7 +1655,7 @@ exports.createBooking = async (req, res) => {
 
       bookingDate: normalizedDate,
       timeSlot: normalizedTimeSlot,
-            location: location || req.body.pickupLocation || undefined,
+      location: location || req.body.pickupLocation || undefined,
       time: time || undefined,
       deliveryTime: (moduleType === "Cake") ? time : undefined,
 
@@ -2855,5 +2855,52 @@ exports.checkAvailability = async (req, res) => {
   } catch (error) {
     console.error("Check availability error:", error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// =======================================================
+// CANCEL ABANDONED PAYMENT BOOKING
+// POST /bookings/:id/cancel-payment
+// Called by frontend when user goes back from payment page without paying
+// =======================================================
+exports.cancelPaymentBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid booking ID" });
+    }
+
+    const booking = await Booking.findById(id);
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
+
+    // Only cancel bookings that are truly abandoned (paymentStatus = initiated)
+    // Don't cancel bookings that are already paid or confirmed
+    if (booking.paymentStatus === "completed" || booking.status === "Confirmed" || booking.status === "Accepted") {
+      return res.json({
+        success: false,
+        message: "Cannot cancel a completed or accepted booking via this endpoint",
+        status: booking.status,
+        paymentStatus: booking.paymentStatus
+      });
+    }
+
+    booking.paymentStatus = "cancelled";
+    booking.status = "Cancelled";
+    await booking.save();
+
+    console.log(`✅ Booking ${id} cancelled due to abandoned payment`);
+
+    return res.json({
+      success: true,
+      message: "Booking cancelled successfully. The date is now available for fresh bookings."
+    });
+
+  } catch (error) {
+    console.error("cancelPaymentBooking error:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };

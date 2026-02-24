@@ -150,6 +150,7 @@ router.patch("/:id/reject", ctrl.rejectBooking);
 router.patch("/:id/cancel", ctrl.cancelBooking);  // ✅ NEW: Cancel booking
 router.patch("/:id/payment", ctrl.updatePaymentStatus);
 router.patch("/:id/chat", ctrl.addChatConversation);
+router.post("/:id/cancel-payment", ctrl.cancelPaymentBooking);  // ✅ NEW: Cancel abandoned payment booking
 
 /* ========================================================
    DYNAMIC ROUTE — MUST BE LAST

@@ -88,11 +88,36 @@ exports.checkAvailability = async (req, res) => {
     ========================= */
     const { vehicleId, boutiqueId, ornamentId, cakeId, venueId, makeupId, photographyId, cateringId } = req.body;
 
+    // 🔥 AUTO-CANCEL STALE INITIATED BOOKINGS (older than 30 min)
+    // This cleans up abandoned payment sessions that would otherwise block availability
+    try {
+      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+      const staleQuery = {
+        paymentStatus: "initiated",
+        status: "Pending",
+        updatedAt: { $lt: thirtyMinutesAgo }
+      };
+      // Add package-specific ID to narrow the cleanup
+      if (venueId && mongoose.Types.ObjectId.isValid(venueId)) {
+        staleQuery.venueId = new mongoose.Types.ObjectId(venueId);
+      } else if (packageId && mongoose.Types.ObjectId.isValid(packageId)) {
+        staleQuery.$or = [{ venueId: new mongoose.Types.ObjectId(packageId) }, { packageId: new mongoose.Types.ObjectId(packageId) }];
+      }
+      const cancelledCount = await Booking.updateMany(staleQuery, {
+        $set: { paymentStatus: "cancelled", status: "Cancelled" }
+      });
+      if (cancelledCount.modifiedCount > 0) {
+        console.log(`🧹 Auto-cancelled ${cancelledCount.modifiedCount} stale initiated booking(s) for cleanup`);
+      }
+    } catch (cleanupErr) {
+      console.warn("⚠️ Stale booking cleanup failed (non-fatal):", cleanupErr.message);
+    }
+
     const conflictQuery = {
       bookingDate: { $gte: startOfDay, $lte: endOfDay },
       status: { $in: ["Pending", "Accepted", "Confirmed"] },
-      // Exclude bookings where payment failed/cancelled
-      paymentStatus: { $nin: ["failed", "cancelled"] }
+      // Exclude bookings where payment failed, cancelled, OR was merely initiated (abandoned payment)
+      paymentStatus: { $nin: ["failed", "cancelled", "initiated"] }
     };
 
     // 🔥 RELAXED MODULE ID: 
