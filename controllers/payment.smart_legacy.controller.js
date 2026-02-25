@@ -407,8 +407,8 @@ exports.createSmartGatewayPayment = async (req, res) => {
       .populate("makeupId")
       .populate("photographyId")
       .populate("cateringId")
-      .populate("ornamentId");
-
+      .populate("ornamentId")
+      .populate("mehandiId");
     if (!booking) {
       return res.status(404).json({
         success: false,
@@ -445,6 +445,16 @@ exports.createSmartGatewayPayment = async (req, res) => {
           amountToPay =
             Number(booking.cateringId?.advanceBookingAmount) || 0;
         }
+
+        if (
+  booking.moduleType === "Mehandi" ||
+  booking.moduleType === "Mehandi Artist"
+) {
+  amountToPay =
+    Number(booking.mehandiId?.advanceBookingAmount) ||
+    Number(booking.advanceAmount) ||
+    0;
+}
       }
     }
 

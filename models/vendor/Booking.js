@@ -274,7 +274,16 @@ const bookingSchema = new mongoose.Schema(
       },
       default: null,
     },
-
+  mehandiId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "MehandiPackage",
+      required: function () {
+        return (
+          this.moduleType === "Mehandi" || this.moduleType === "Mehandi Artist"
+        );
+      },
+      default: null,
+    },
     packageId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Package",
