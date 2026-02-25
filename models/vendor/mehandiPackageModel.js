@@ -10,7 +10,7 @@ const mehandiPackageSchema = new mongoose.Schema(
 
     module: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Module",
+      ref: "SecondaryModule",
       required: true,
     },
 

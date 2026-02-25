@@ -52,10 +52,14 @@ exports.createMehandiPackage = async (req, res) => {
       image,
     });
 
+    const populatedPkg = await Mehandi.findById(pkg._id)
+      .populate("module", "title")
+      .populate("provider", "firstName lastName email phone");
+
     res.status(201).json({
       success: true,
       message: "Mehandi package created successfully",
-      data: pkg,
+      data: populatedPkg,
     });
 
   } catch (err) {
@@ -161,6 +165,7 @@ exports.getMehandiByVendor = async (req, res) => {
 
     const packages = await Mehandi.find({ provider: vendorId })
       .populate("module", "title")
+      .populate("provider", "firstName lastName email phone")
       .sort({ createdAt: -1 });
 
     res.json({
@@ -241,10 +246,14 @@ exports.updateMehandiPackage = async (req, res) => {
 
     await pkg.save();
 
+    const populatedPkg = await Mehandi.findById(pkg._id)
+      .populate("module", "title")
+      .populate("provider", "firstName lastName email phone");
+
     res.json({
       success: true,
       message: "Package updated successfully",
-      data: pkg,
+      data: populatedPkg,
     });
 
   } catch (err) {
@@ -279,18 +288,40 @@ exports.deleteMehandiPackage = async (req, res) => {
    TOGGLE ACTIVE
 ===================================================== */
 exports.toggleActiveStatus = async (req, res) => {
-  const pkg = await Mehandi.findById(req.params.id);
-  pkg.isActive = !pkg.isActive;
-  await pkg.save();
-  res.json({ success: true, data: pkg });
+  try {
+    const pkg = await Mehandi.findById(req.params.id);
+    if (!pkg) return res.status(404).json({ success: false, message: "Package not found" });
+
+    pkg.isActive = !pkg.isActive;
+    await pkg.save();
+
+    const populatedPkg = await Mehandi.findById(pkg._id)
+      .populate("module", "title")
+      .populate("provider", "firstName lastName email phone");
+
+    res.json({ success: true, data: populatedPkg });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
 
 /* =====================================================
    TOGGLE TOP PICK
 ===================================================== */
 exports.toggleTopPickStatus = async (req, res) => {
-  const pkg = await Mehandi.findById(req.params.id);
-  pkg.isTopPick = !pkg.isTopPick;
-  await pkg.save();
-  res.json({ success: true, data: pkg });
+  try {
+    const pkg = await Mehandi.findById(req.params.id);
+    if (!pkg) return res.status(404).json({ success: false, message: "Package not found" });
+
+    pkg.isTopPick = !pkg.isTopPick;
+    await pkg.save();
+
+    const populatedPkg = await Mehandi.findById(pkg._id)
+      .populate("module", "title")
+      .populate("provider", "firstName lastName email phone");
+
+    res.json({ success: true, data: populatedPkg });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
