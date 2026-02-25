@@ -38,11 +38,10 @@ exports.welcomeEmail = (user) => `
     <p>Hi <strong>${user.firstName}</strong>,</p>
     <p>Your account has been successfully created as a <strong>${user.role}</strong>.</p>
     
-    ${
-      user.role === "user"
-        ? `<p><strong>User ID:</strong> ${user.userId}</p>`
-        : ""
-    }
+    ${user.role === "user"
+    ? `<p><strong>User ID:</strong> ${user.userId}</p>`
+    : ""
+  }
 
     <p>You can login using your registered email: <strong>${user.email}</strong>.</p>
 
@@ -169,5 +168,53 @@ exports.bookingConfirmationEmail = (booking) => `
     <p>Thank you for choosing BookMyEvent!<br/>We are excited to host your event 🎊</p>
 
     <p>Best Regards,<br/><strong>BookMyEvent Team</strong></p>
+  </div>
+`;
+
+exports.vendorApprovalEmail = (user) => `
+  <div style="font-family:Arial,sans-serif;line-height:1.6">
+    <div style="background-color:#4CAF50;color:#fff;padding:20px;text-align:center;border-radius:10px 10px 0 0;">
+      <h2 style="margin:0;">Congratulations! 🎉</h2>
+    </div>
+    <div style="padding:20px;border:1px solid #ddd;border-top:none;border-radius:0 0 10px 10px;">
+      <p>Hi <strong>${user.firstName}</strong>,</p>
+      <p>We are thrilled to let you know that your vendor account has been <strong>successfully verified and approved</strong>!</p>
+      
+      <p>Welcome to the BookMyEvent vendor community. You are now ready to list your services, set your prices, and start receiving bookings from customers.</p>
+      
+      <br/>
+      <div style="text-align:center;">
+        <a href="https://vendor.bookmyevent.ae/pages/login"
+           style="display:inline-block;background-color:#E15B65;color:#fff;
+                  padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;">
+           Login to Your Dashboard
+        </a>
+      </div>
+      <br/>
+      <br/>
+      
+      <p>If you have any questions, feel free to contact our support team.</p>
+      <p>Best Regards,<br/><strong>BookMyEvent Team</strong></p>
+    </div>
+  </div>
+`;
+
+exports.vendorRejectionEmail = (user, reason) => `
+  <div style="font-family:Arial,sans-serif;line-height:1.6">
+    <div style="background-color:#E15B65;color:#fff;padding:20px;text-align:center;border-radius:10px 10px 0 0;">
+      <h2 style="margin:0;">Update on Your Registration</h2>
+    </div>
+    <div style="padding:20px;border:1px solid #ddd;border-top:none;border-radius:0 0 10px 10px;">
+      <p>Hi <strong>${user.firstName}</strong>,</p>
+      <p>Thank you for your interest in joining BookMyEvent as a vendor.</p>
+      <p>We have carefully reviewed your registration details. Unfortunately, we are unable to approve your application at this time.</p>
+      
+      ${reason ? `<div style="background-color:#f9f9f9;padding:15px;border-left:4px solid #E15B65;margin:20px 0;"><p style="margin:0;"><strong>Reason:</strong> ${reason}</p></div>` : ''}
+      
+      <p>If you believe this was a mistake or you have updated your information, you are welcome to re-apply or contact our support team for further clarification.</p>
+      
+      <br/>
+      <p>Best Regards,<br/><strong>BookMyEvent Team</strong></p>
+    </div>
   </div>
 `;

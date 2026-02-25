@@ -1,7 +1,7 @@
 const VendorProfile = require("../../models/vendor/vendorProfile");
 const User = require("../../models/User");
 const sendEmail = require("../../utils/sendEmail");
-const { welcomeEmail } = require("../../utils/sentEmail");
+const { welcomeEmail, vendorApprovalEmail, vendorRejectionEmail } = require("../../utils/sentEmail");
 
 // @desc    Get all pending vendor registrations
 // @route   GET /api/admin/vendor-registrations/pending
@@ -89,7 +89,7 @@ exports.approveRegistration = async (req, res) => {
                 await sendEmail(
                     registration.user.email,
                     "Congratulations! Your Vendor Account is Approved",
-                    welcomeEmail(registration.user)
+                    vendorApprovalEmail(registration.user)
                 );
             } catch (emailErr) {
                 console.error("Failed to send approval email:", emailErr.message);
@@ -128,6 +128,24 @@ exports.rejectRegistration = async (req, res) => {
         registration.status = "rejected";
         // We could store the rejection reason if we added a field to the model
         await registration.save();
+
+        // Ensure user is inactive/unverified if rejected
+        if (registration.user) {
+            registration.user.isActive = false;
+            registration.user.isVerified = false;
+            await registration.user.save();
+
+            // Send rejection email
+            try {
+                await sendEmail(
+                    registration.user.email,
+                    "Update on Your BookMyEvent Vendor Registration",
+                    vendorRejectionEmail(registration.user, reason)
+                );
+            } catch (emailErr) {
+                console.error("Failed to send rejection email:", emailErr.message);
+            }
+        }
 
         res.status(200).json({
             success: true,

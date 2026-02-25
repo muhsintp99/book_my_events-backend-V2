@@ -2820,7 +2820,13 @@ exports.checkAvailability = async (req, res) => {
 
     bookings.forEach((b) => {
       const status = b.status; // "Pending" or "Accepted"
-      const targetList = status === "Accepted" ? bookedSessions : pendingSessions;
+
+      // 🔥 KEY FIX: If payment is completed, treat as hard-booked even if status is still "Pending"
+      // (vendor hasn't accepted yet but user PAID → block the slot)
+      const isHardBooked = status === "Accepted" || status === "Confirmed" ||
+        (status === "Pending" && b.paymentStatus === "completed");
+
+      const targetList = isHardBooked ? bookedSessions : pendingSessions;
 
       // 1. Array of slots [{label: "Morning"}, {label: "Evening"}]
       if (Array.isArray(b.timeSlot)) {

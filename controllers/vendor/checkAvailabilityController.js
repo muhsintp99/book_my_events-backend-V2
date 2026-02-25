@@ -335,7 +335,33 @@ exports.checkAvailability = async (req, res) => {
       });
     }
 
+    // 🔥 CRITICAL FIX: Check for Pending bookings where payment IS completed
+    // (Vendor hasn't accepted yet, but the user PAID → must block availability)
+    let paidPendingConflict = null;
+    try {
+      paidPendingConflict = await Booking.findOne({
+        ...finalConflictQuery,
+        status: "Pending",
+        paymentStatus: "completed"
+      }).select("_id bookingDate status paymentStatus timeSlot").lean();
+    } catch (err) {
+      console.warn("⚠️ Paid-pending check error (non-fatal):", err.message);
+    }
+
+    console.log("📊 Paid-Pending Conflict:", paidPendingConflict ? "FOUND (payment made, date is BLOCKED)" : "NONE");
+
+    if (paidPendingConflict) {
+      return res.json({
+        success: true,
+        available: false, // ❌ HARD BLOCK — payment was made
+        availabilityStatus: "Booked",
+        message: "This date has an active paid booking and is unavailable. Please try another date.",
+        conflict: paidPendingConflict
+      });
+    }
+
     // 2. Check for Pending bookings (SOFT-AVAILABLE / WISHLIST)
+    // At this point paymentStatus is NOT completed (and not initiated — excluded by conflictQuery)
     let pendingConflict = null;
     try {
       pendingConflict = await Booking.findOne({
