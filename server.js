@@ -552,7 +552,7 @@ app.use("/api/vendor/subscription", require("./routes/vendor/subscriptionRequest
 app.use("/api/admin/subscription", require("./routes/admin/subscriptionRoutes"));
 app.use("/api/admin/subscription-request/payment", require("./routes/admin/subscriptionRequestPayment.routes"));
 app.use("/api/pincodes", require("./routes/vendor/pincodeRoutes")); // ✅ NEW: Pincodes routes
-
+app.use("/api/mehandi", require("./routes/vendor/mehandiRoutes"));
 /**********************************************************
  * SOCKET.IO (LIVE CHAT) - FIXED VERSION
  **********************************************************/

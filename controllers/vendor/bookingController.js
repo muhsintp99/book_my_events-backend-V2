@@ -14,6 +14,7 @@ const Vehicle = require("../../models/vendor/Vehicle");
 const Cake = require("../../models/vendor/cakePackageModel");
 const Ornament = require("../../models/vendor/ornamentPackageModel");
 const Boutique = require("../../models/vendor/boutiquePackageModel");
+const Mehandi = require("../../models/vendor/mehandiPackageModel");
 
 const AUTH_API_URL = "https://api.bookmyevent.ae/api/auth/login";
 
@@ -821,6 +822,8 @@ exports.createBooking = async (req, res) => {
       conflictQuery.makeupId = toId(makeupId || packageId);
     } else if (photographyId || title === "Photography") {
       conflictQuery.photographyId = toId(photographyId || packageId);
+    } else if (req.body.mehandiId || title === "Mehandi" || title === "Mehandi Artist") {
+      conflictQuery.mehandiId = toId(req.body.mehandiId || packageId);
     } else if (cateringId || title === "Catering") {
       conflictQuery.cateringId = toId(cateringId || packageId);
     } else if (packageId) {
@@ -847,6 +850,7 @@ exports.createBooking = async (req, res) => {
     if (conflictQuery.cakeId) itemIds.cakeId = conflictQuery.cakeId;
     if (conflictQuery.makeupId) itemIds.makeupId = conflictQuery.makeupId;
     if (conflictQuery.photographyId) itemIds.photographyId = conflictQuery.photographyId;
+    if (conflictQuery.mehandiId) itemIds.mehandiId = conflictQuery.mehandiId;
     if (conflictQuery.cateringId) itemIds.cateringId = conflictQuery.cateringId;
     if (conflictQuery.packageId) itemIds.packageId = conflictQuery.packageId;
 
@@ -1333,6 +1337,15 @@ exports.createBooking = async (req, res) => {
         pricing.basePrice = Number(serviceProvider.price) || 0;
         break;
 
+      case "Mehandi":
+      case "Mehandi Artist":
+        serviceProvider = await Mehandi.findById(req.body.mehandiId || packageId).lean();
+        if (!serviceProvider) throw new Error("Mehandi package not found");
+
+        pricing.basePrice = Number(serviceProvider.packagePrice) || 0;
+        pricing.advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
+        break;
+
       case "Catering":
         if (!cateringId || !numberOfGuests) {
           return res.status(400).json({
@@ -1748,6 +1761,7 @@ exports.createBooking = async (req, res) => {
       photographyId: moduleType === "Photography" ? photographyId : undefined,
       cateringId: moduleType === "Catering" ? cateringId : undefined,
       boutiqueId: (moduleType === "Boutique" || moduleType === "Boutiques") ? req.body.boutiqueId : undefined,
+      mehandiId: (moduleType === "Mehandi" || moduleType === "Mehandi Artist") ? (req.body.mehandiId || packageId) : undefined,
       numberOfGuests:
         (moduleType === "Venues" || moduleType === "Catering")
           ? numberOfGuests
@@ -1885,6 +1899,7 @@ exports.getBookingsByUser = async (req, res) => {
       .populate("cakeId")
       .populate("ornamentId")
       .populate("boutiqueId")
+      .populate("mehandiId")
       .populate({
         path: "providerId",
         select: "firstName lastName email phone role profilePhoto",
@@ -1941,6 +1956,7 @@ exports.getBookingById = async (req, res) => {
       .populate("cakeId")
       .populate("ornamentId")
       .populate("boutiqueId")
+      .populate("mehandiId")
       .populate("packageId")
       .populate("moduleId");
 
@@ -2122,6 +2138,7 @@ exports.getBookingsByProvider = async (req, res) => {
       .populate("moduleId")
       .populate("ornamentId")
       .populate("boutiqueId")
+      .populate("mehandiId")
       .populate("cakeId")
       .populate("photographyId")
       .populate("cateringId")
@@ -2175,6 +2192,7 @@ exports.getBookingById = async (req, res) => {
       .populate("moduleId")
       .populate("boutiqueId")
       .populate("ornamentId")
+      .populate("mehandiId")
       .populate("cakeId")
       .populate("photographyId")
       .populate("cateringId")
@@ -2243,6 +2261,7 @@ exports.getUpcomingBookings = async (req, res) => {
       .populate("userId")
       .populate("moduleId")
       .populate("ornamentId")
+      .populate("mehandiId")
       .populate("cakeId")
       .populate("photographyId")
       .populate("cateringId")
@@ -2318,6 +2337,7 @@ exports.getPastBookings = async (req, res) => {
       .populate("moduleId")
       .populate("ornamentId")
       .populate("boutiqueId")
+      .populate("mehandiId")
       .populate("cakeId")
       .populate("photographyId")
       .populate("cateringId")
