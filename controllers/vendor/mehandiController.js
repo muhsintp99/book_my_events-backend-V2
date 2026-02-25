@@ -21,6 +21,7 @@ const deleteFileIfExists = (filePath) => {
 exports.createMehandiPackage = async (req, res) => {
   try {
     const {
+      secondaryModule,
       module,
       providerId,
       packageName,
@@ -43,7 +44,7 @@ exports.createMehandiPackage = async (req, res) => {
 
     const pkg = await Mehandi.create({
       packageId,
-      module,
+      secondaryModule: secondaryModule || module,
       provider: providerId,
       packageName,
       description,
@@ -53,7 +54,7 @@ exports.createMehandiPackage = async (req, res) => {
     });
 
     const populatedPkg = await Mehandi.findById(pkg._id)
-      .populate("module", "title")
+      .populate("secondaryModule", "title")
       .populate("provider", "firstName lastName email phone");
 
     res.status(201).json({
@@ -87,7 +88,7 @@ exports.getAllMehandiPackages = async (req, res) => {
     }
 
     if (moduleId && mongoose.Types.ObjectId.isValid(moduleId)) {
-      query.module = moduleId;
+      query.secondaryModule = moduleId;
     }
 
     if (minPrice) {
@@ -102,7 +103,7 @@ exports.getAllMehandiPackages = async (req, res) => {
 
     const packages = await Mehandi.find(query)
       .populate("provider", "firstName lastName email phone")
-      .populate("module", "title")
+      .populate("secondaryModule", "title")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit));
@@ -136,7 +137,7 @@ exports.getMehandiPackageById = async (req, res) => {
 
     const pkg = await Mehandi.findById(id)
       .populate("provider", "firstName lastName email phone")
-      .populate("module", "title");
+      .populate("secondaryModule", "title");
 
     if (!pkg) {
       return res.status(404).json({ success: false, message: "Package not found" });
@@ -164,7 +165,7 @@ exports.getMehandiByVendor = async (req, res) => {
     }
 
     const packages = await Mehandi.find({ provider: vendorId })
-      .populate("module", "title")
+      .populate("secondaryModule", "title")
       .populate("provider", "firstName lastName email phone")
       .sort({ createdAt: -1 });
 
@@ -187,7 +188,7 @@ exports.getMehandiVendors = async (req, res) => {
     const { moduleId } = req.params;
 
     const vendors = await Mehandi.aggregate([
-      { $match: { module: new mongoose.Types.ObjectId(moduleId) } },
+      { $match: { secondaryModule: new mongoose.Types.ObjectId(moduleId) } },
       { $group: { _id: "$provider", packageCount: { $sum: 1 } } }
     ]);
 
@@ -247,7 +248,7 @@ exports.updateMehandiPackage = async (req, res) => {
     await pkg.save();
 
     const populatedPkg = await Mehandi.findById(pkg._id)
-      .populate("module", "title")
+      .populate("secondaryModule", "title")
       .populate("provider", "firstName lastName email phone");
 
     res.json({
@@ -296,7 +297,7 @@ exports.toggleActiveStatus = async (req, res) => {
     await pkg.save();
 
     const populatedPkg = await Mehandi.findById(pkg._id)
-      .populate("module", "title")
+      .populate("secondaryModule", "title")
       .populate("provider", "firstName lastName email phone");
 
     res.json({ success: true, data: populatedPkg });
@@ -317,7 +318,7 @@ exports.toggleTopPickStatus = async (req, res) => {
     await pkg.save();
 
     const populatedPkg = await Mehandi.findById(pkg._id)
-      .populate("module", "title")
+      .populate("secondaryModule", "title")
       .populate("provider", "firstName lastName email phone");
 
     res.json({ success: true, data: populatedPkg });

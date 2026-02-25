@@ -8,10 +8,11 @@ const mehandiPackageSchema = new mongoose.Schema(
       unique: true,
     },
 
-    module: {
+    secondaryModule: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SecondaryModule",
       required: true,
+      alias: "module"
     },
 
     provider: {
@@ -57,9 +58,31 @@ const mehandiPackageSchema = new mongoose.Schema(
       default: false,
     },
 
-   
+
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: {
+      transform: function (doc, ret) {
+        if (ret.module && !ret.secondaryModule) {
+          ret.secondaryModule = ret.module;
+        }
+        delete ret.module;
+        return ret;
+      },
+      virtuals: true
+    },
+    toObject: {
+      transform: function (doc, ret) {
+        if (ret.module && !ret.secondaryModule) {
+          ret.secondaryModule = ret.module;
+        }
+        delete ret.module;
+        return ret;
+      },
+      virtuals: true
+    }
+  }
 );
 
 module.exports = mongoose.model("MehandiPackage", mehandiPackageSchema);
