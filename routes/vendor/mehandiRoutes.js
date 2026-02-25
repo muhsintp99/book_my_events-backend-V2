@@ -42,6 +42,12 @@ router.get(
   controller.getMehandiVendors
 );
 
+// ✅ Get Single Package by ID
+router.get(
+  "/:id",
+  controller.getMehandiPackageById
+);
+
 // ✅ Update Package
 router.put(
   "/:id",

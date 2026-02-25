@@ -120,6 +120,35 @@ exports.getAllMehandiPackages = async (req, res) => {
 };
 
 /* =====================================================
+   GET SINGLE PACKAGE BY ID
+===================================================== */
+exports.getMehandiPackageById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid package ID" });
+    }
+
+    const pkg = await Mehandi.findById(id)
+      .populate("provider", "firstName lastName email phone")
+      .populate("module", "title");
+
+    if (!pkg) {
+      return res.status(404).json({ success: false, message: "Package not found" });
+    }
+
+    res.json({
+      success: true,
+      data: pkg,
+    });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/* =====================================================
    GET PACKAGES BY VENDOR
 ===================================================== */
 exports.getMehandiByVendor = async (req, res) => {
