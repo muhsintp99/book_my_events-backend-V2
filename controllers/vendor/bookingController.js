@@ -15,6 +15,7 @@ const Cake = require("../../models/vendor/cakePackageModel");
 const Ornament = require("../../models/vendor/ornamentPackageModel");
 const Boutique = require("../../models/vendor/boutiquePackageModel");
 const Mehandi = require("../../models/vendor/mehandiPackageModel");
+const Invitation = require("../../models/vendor/invitationPackageModel");
 
 const AUTH_API_URL = "https://api.bookmyevent.ae/api/auth/login";
 
@@ -597,6 +598,7 @@ exports.createBooking = async (req, res) => {
       addons,
       decorationIncluded,
       ornamentId,
+      invitationId, // ✅ NEW: Support for Invitation & Printing
       bookingMode, // purchase | rental
       shippingPrice, // ✅ NEW: Dynamic shipping price
     } = req.body;
@@ -826,6 +828,8 @@ exports.createBooking = async (req, res) => {
       conflictQuery.mehandiId = toId(req.body.mehandiId || packageId);
     } else if (cateringId || title === "Catering") {
       conflictQuery.cateringId = toId(cateringId || packageId);
+    } else if (invitationId || title === "Invitation & Printing" || title === "Invitation" || title === "Printing") {
+      conflictQuery.invitationId = toId(invitationId || packageId);
     } else if (packageId) {
       conflictQuery.packageId = toId(packageId);
     }
@@ -852,6 +856,7 @@ exports.createBooking = async (req, res) => {
     if (conflictQuery.photographyId) itemIds.photographyId = conflictQuery.photographyId;
     if (conflictQuery.mehandiId) itemIds.mehandiId = conflictQuery.mehandiId;
     if (conflictQuery.cateringId) itemIds.cateringId = conflictQuery.cateringId;
+    if (conflictQuery.invitationId) itemIds.invitationId = conflictQuery.invitationId;
     if (conflictQuery.packageId) itemIds.packageId = conflictQuery.packageId;
 
     if (Object.keys(itemIds).length > 0) {
@@ -1341,6 +1346,16 @@ exports.createBooking = async (req, res) => {
       case "Mehandi Artist":
         serviceProvider = await Mehandi.findById(req.body.mehandiId || packageId).lean();
         if (!serviceProvider) throw new Error("Mehandi package not found");
+
+        pricing.basePrice = Number(serviceProvider.packagePrice) || 0;
+        pricing.advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
+        break;
+
+      case "Invitation & Printing":
+      case "Invitation":
+      case "Printing":
+        serviceProvider = await Invitation.findById(invitationId || req.body.invitationId || packageId).lean();
+        if (!serviceProvider) throw new Error("Invitation package not found");
 
         pricing.basePrice = Number(serviceProvider.packagePrice) || 0;
         pricing.advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;

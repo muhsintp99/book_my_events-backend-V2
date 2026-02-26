@@ -86,7 +86,7 @@ exports.checkAvailability = async (req, res) => {
     /* =========================
        BUILD CONFLICT QUERY
     ========================= */
-    const { vehicleId, boutiqueId, ornamentId, cakeId, venueId, makeupId, photographyId, cateringId } = req.body;
+    const { vehicleId, boutiqueId, ornamentId, cakeId, venueId, makeupId, photographyId, cateringId, invitationId } = req.body;
 
     // 🔥 AUTO-CANCEL STALE INITIATED BOOKINGS (older than 30 min)
     // This cleans up abandoned payment sessions that would otherwise block availability
@@ -193,6 +193,12 @@ exports.checkAvailability = async (req, res) => {
       conflictQuery.$or = [
         { cateringId: cId },
         { packageId: cId }
+      ];
+    } else if (invitationId || title === "Invitation & Printing" || title === "Invitation" || title === "Printing") {
+      const iId = toId(invitationId || packageId);
+      conflictQuery.$or = [
+        { invitationId: iId },
+        { packageId: iId }
       ];
     } else {
       conflictQuery.packageId = pkgId;

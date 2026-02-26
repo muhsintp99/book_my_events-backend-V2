@@ -274,12 +274,24 @@ const bookingSchema = new mongoose.Schema(
       },
       default: null,
     },
-  mehandiId: {
+    mehandiId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "MehandiPackage",
       required: function () {
         return (
           this.moduleType === "Mehandi" || this.moduleType === "Mehandi Artist"
+        );
+      },
+      default: null,
+    },
+    invitationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "InvitationPackage",
+      required: function () {
+        return (
+          this.moduleType === "Invitation & Printing" ||
+          this.moduleType === "Invitation" ||
+          this.moduleType === "Printing"
         );
       },
       default: null,
@@ -330,7 +342,7 @@ const bookingSchema = new mongoose.Schema(
     location: {
       type: String,
     },
-      time: {
+    time: {
       type: String, // Exact time string (e.g. 10:00 AM)
     },
     deliveryTime: {
