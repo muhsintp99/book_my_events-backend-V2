@@ -70,6 +70,60 @@ exports.createMehandiPackage = async (req, res) => {
 /* =====================================================
    GET ALL PACKAGES (SEARCH + FILTER + PAGINATION)
 ===================================================== */
+// exports.getAllMehandiPackages = async (req, res) => {
+//   try {
+//     const {
+//       keyword,
+//       moduleId,
+//       minPrice,
+//       maxPrice,
+//       page = 1,
+//       limit = 10,
+//     } = req.query;
+
+//     let query = {};
+
+//     if (keyword) {
+//       query.packageName = { $regex: keyword, $options: "i" };
+//     }
+
+//     if (moduleId && mongoose.Types.ObjectId.isValid(moduleId)) {
+//       query.secondaryModule = moduleId;
+//     }
+
+//     if (minPrice) {
+//       query.packagePrice = { ...query.packagePrice, $gte: Number(minPrice) };
+//     }
+
+//     if (maxPrice) {
+//       query.packagePrice = { ...query.packagePrice, $lte: Number(maxPrice) };
+//     }
+
+//     const skip = (page - 1) * limit;
+
+//     const packages = await Mehandi.find(query)
+//       .populate("provider", "firstName lastName email phone")
+//       .populate("secondaryModule", "title")
+//       .sort({ createdAt: -1 })
+//       .skip(skip)
+//       .limit(Number(limit));
+
+//     const total = await Mehandi.countDocuments(query);
+
+//     res.json({
+//       success: true,
+//       count: packages.length,
+//       total,
+//       totalPages: Math.ceil(total / limit),
+//       page: Number(page),
+//       data: packages,
+//     });
+
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.getAllMehandiPackages = async (req, res) => {
   try {
     const {
@@ -77,45 +131,239 @@ exports.getAllMehandiPackages = async (req, res) => {
       moduleId,
       minPrice,
       maxPrice,
+      zoneId,
+      city,
+      address,
       page = 1,
       limit = 10,
     } = req.query;
 
-    let query = {};
+    const skip = (page - 1) * limit;
+
+    /* =====================================================
+       BASE MATCH
+    ===================================================== */
+    let matchStage = { isActive: true };
 
     if (keyword) {
-      query.packageName = { $regex: keyword, $options: "i" };
+      matchStage.packageName = { $regex: keyword, $options: "i" };
     }
 
     if (moduleId && mongoose.Types.ObjectId.isValid(moduleId)) {
-      query.secondaryModule = moduleId;
+      matchStage.secondaryModule = new mongoose.Types.ObjectId(moduleId);
     }
 
     if (minPrice) {
-      query.packagePrice = { ...query.packagePrice, $gte: Number(minPrice) };
+      matchStage.packagePrice = { ...matchStage.packagePrice, $gte: Number(minPrice) };
     }
 
     if (maxPrice) {
-      query.packagePrice = { ...query.packagePrice, $lte: Number(maxPrice) };
+      matchStage.packagePrice = { ...matchStage.packagePrice, $lte: Number(maxPrice) };
     }
 
-    const skip = (page - 1) * limit;
+    /* =====================================================
+       MAIN PIPELINE
+    ===================================================== */
+    const pipeline = [
+      { $match: matchStage },
 
-    const packages = await Mehandi.find(query)
-      .populate("provider", "firstName lastName email phone")
-      .populate("secondaryModule", "title")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit));
+      /* ---------- provider ---------- */
+      {
+        $lookup: {
+          from: "users",
+          localField: "provider",
+          foreignField: "_id",
+          as: "provider",
+        },
+      },
+      { $unwind: "$provider" },
 
-    const total = await Mehandi.countDocuments(query);
+      /* ---------- vendor profile ---------- */
+      {
+        $lookup: {
+          from: "vendorprofiles",
+          localField: "provider._id",
+          foreignField: "user",
+          as: "vendorProfile",
+        },
+      },
+      { $unwind: "$vendorProfile" },
+
+      /* ---------- filters ---------- */
+      {
+        $match: {
+          "vendorProfile.status": "approved",
+          "vendorProfile.isActive": true,
+        },
+      },
+    ];
+
+    /* ---------- zone filter ---------- */
+    if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
+      pipeline.push({
+        $match: {
+          "vendorProfile.zone": new mongoose.Types.ObjectId(zoneId),
+        },
+      });
+    }
+
+    /* ---------- city filter ---------- */
+    if (city) {
+      pipeline.push({
+        $match: {
+          "vendorProfile.storeAddress.city": {
+            $regex: city,
+            $options: "i",
+          },
+        },
+      });
+    }
+
+    /* ---------- address filter ---------- */
+    if (address) {
+      pipeline.push({
+        $match: {
+          "vendorProfile.storeAddress.fullAddress": {
+            $regex: address,
+            $options: "i",
+          },
+        },
+      });
+    }
+
+    /* =====================================================
+       POPULATIONS
+    ===================================================== */
+
+    /* secondary module */
+    pipeline.push({
+      $lookup: {
+        from: "secondarymodules",
+        localField: "secondaryModule",
+        foreignField: "_id",
+        as: "secondaryModule",
+      },
+    });
+    pipeline.push({ $unwind: "$secondaryModule" });
+
+    /* zone */
+    pipeline.push({
+      $lookup: {
+        from: "zones",
+        let: { zoneId: "$vendorProfile.zone" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$_id", "$$zoneId"] }
+            }
+          },
+          {
+            $project: {
+              _id: 1,
+              name: 1,
+              city: 1,
+              country: 1
+            }
+          }
+        ],
+        as: "vendorProfile.zone"
+      }
+    });
+
+    pipeline.push({
+      $unwind: {
+        path: "$vendorProfile.zone",
+        preserveNullAndEmptyArrays: true
+      }
+    });
+
+    /* services */
+    pipeline.push({
+      $lookup: {
+        from: "categories",
+        let: { serviceIds: "$vendorProfile.services" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $in: ["$_id", "$$serviceIds"] }
+            }
+          },
+          {
+            $project: {
+              _id: 1,
+              title: 1,
+              image: 1
+            }
+          }
+        ],
+        as: "vendorProfile.services"
+      }
+    });
+
+    /* specialised */
+    pipeline.push({
+      $lookup: {
+        from: "categories",
+        let: { specialisedId: "$vendorProfile.specialised" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$_id", "$$specialisedId"] }
+            }
+          },
+          {
+            $project: {
+              _id: 1,
+              title: 1,
+              image: 1
+            }
+          }
+        ],
+        as: "vendorProfile.specialised"
+      }
+    });
+
+    pipeline.push({
+      $unwind: {
+        path: "$vendorProfile.specialised",
+        preserveNullAndEmptyArrays: true
+      }
+    });
+    /* =====================================================
+       REMOVE SENSITIVE DATA
+    ===================================================== */
+    pipeline.push({
+      $project: {
+        "provider.password": 0,
+        "provider.refreshToken": 0,
+        "provider.otp": 0,
+      },
+    });
+
+    /* =====================================================
+       SORT + PAGINATION
+    ===================================================== */
+    const dataPipeline = [
+      ...pipeline,
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: Number(limit) },
+    ];
+
+    const packages = await Mehandi.aggregate(dataPipeline);
+
+    /* =====================================================
+       COUNT PIPELINE
+    ===================================================== */
+    const countPipeline = [...pipeline, { $count: "total" }];
+    const countResult = await Mehandi.aggregate(countPipeline);
+    const total = countResult[0]?.total || 0;
 
     res.json({
       success: true,
-      count: packages.length,
       total,
-      totalPages: Math.ceil(total / limit),
       page: Number(page),
+      totalPages: Math.ceil(total / limit),
       data: packages,
     });
 
@@ -127,25 +375,82 @@ exports.getAllMehandiPackages = async (req, res) => {
 /* =====================================================
    GET SINGLE PACKAGE BY ID
 ===================================================== */
+// exports.getMehandiPackageById = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     if (!mongoose.Types.ObjectId.isValid(id)) {
+//       return res.status(400).json({ success: false, message: "Invalid package ID" });
+//     }
+
+//     const pkg = await Mehandi.findById(id)
+//       .populate("provider", "firstName lastName email phone")
+//       .populate("secondaryModule", "title");
+
+//     if (!pkg) {
+//       return res.status(404).json({ success: false, message: "Package not found" });
+//     }
+
+//     res.json({
+//       success: true,
+//       data: pkg,
+//     });
+
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
+
 exports.getMehandiPackageById = async (req, res) => {
   try {
     const { id } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ success: false, message: "Invalid package ID" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid package ID"
+      });
     }
 
     const pkg = await Mehandi.findById(id)
-      .populate("provider", "firstName lastName email phone")
-      .populate("secondaryModule", "title");
+      .populate({
+        path: "provider",
+        select: "firstName lastName email phone profilePhoto",
+        populate: {
+          path: "vendorProfile",
+          match: { status: "approved", isActive: true },
+          populate: [
+            {
+              path: "zone",
+              select: "_id name city country"
+            },
+            {
+              path: "services",
+              select: "_id title image"
+            },
+            {
+              path: "specialised",
+              select: "_id title image"
+            }
+          ]
+        }
+      })
+      .populate({
+        path: "secondaryModule",
+        select: "_id title icon"
+      });
 
     if (!pkg) {
-      return res.status(404).json({ success: false, message: "Package not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Package not found"
+      });
     }
 
     res.json({
       success: true,
-      data: pkg,
+      data: pkg
     });
 
   } catch (err) {
@@ -153,26 +458,79 @@ exports.getMehandiPackageById = async (req, res) => {
   }
 };
 
+
 /* =====================================================
    GET PACKAGES BY VENDOR
 ===================================================== */
+// exports.getMehandiByVendor = async (req, res) => {
+//   try {
+//     const { vendorId } = req.params; 
+//     if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+//       return res.status(400).json({ success: false, message: "Invalid vendor ID" });
+//     }
+
+//     const packages = await Mehandi.find({ provider: vendorId })
+//       .populate("secondaryModule", "title")
+//       .populate("provider", "firstName lastName email phone")
+//       .sort({ createdAt: -1 });
+
+//     res.json({
+//       success: true,
+//       count: packages.length,
+//       data: packages,
+//     });
+
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.getMehandiByVendor = async (req, res) => {
   try {
     const { vendorId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(vendorId)) {
-      return res.status(400).json({ success: false, message: "Invalid vendor ID" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid vendor ID"
+      });
     }
 
-    const packages = await Mehandi.find({ provider: vendorId })
-      .populate("secondaryModule", "title")
-      .populate("provider", "firstName lastName email phone")
+    const packages = await Mehandi.find({
+      provider: vendorId,
+      isActive: true
+    })
+      .populate({
+        path: "provider",
+        select: "firstName lastName email phone profilePhoto",
+        populate: {
+          path: "vendorProfile",
+          populate: [
+            {
+              path: "zone",
+              select: "_id name city country"
+            },
+            {
+              path: "services",
+              select: "_id title image"
+            },
+            {
+              path: "specialised",
+              select: "_id title image"
+            }
+          ]
+        }
+      })
+      .populate({
+        path: "secondaryModule",
+        select: "_id title icon"
+      })
       .sort({ createdAt: -1 });
 
     res.json({
       success: true,
       count: packages.length,
-      data: packages,
+      data: packages
     });
 
   } catch (err) {
@@ -183,39 +541,162 @@ exports.getMehandiByVendor = async (req, res) => {
 /* =====================================================
    GET VENDORS WITH PACKAGE COUNT
 ===================================================== */
+// exports.getMehandiVendors = async (req, res) => {
+//   try {
+//     const { moduleId } = req.params;
+
+//     const vendors = await Mehandi.aggregate([
+//       { $match: { secondaryModule: new mongoose.Types.ObjectId(moduleId) } },
+//       { $group: { _id: "$provider", packageCount: { $sum: 1 } } }
+//     ]);
+
+//     const vendorIds = vendors.map(v => v._id);
+
+//     const users = await User.find({ _id: { $in: vendorIds } })
+//       .select("firstName lastName email phone");
+
+//     const final = users.map(user => {
+//       const countObj = vendors.find(v => v._id.toString() === user._id.toString());
+//       return {
+//         ...user.toObject(),
+//         packageCount: countObj?.packageCount || 0,
+//       };
+//     });
+
+//     res.json({
+//       success: true,
+//       count: final.length,
+//       data: final,
+//     });
+
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.getMehandiVendors = async (req, res) => {
   try {
     const { moduleId } = req.params;
+    const { zoneId, city, address } = req.query;
 
-    const vendors = await Mehandi.aggregate([
-      { $match: { secondaryModule: new mongoose.Types.ObjectId(moduleId) } },
-      { $group: { _id: "$provider", packageCount: { $sum: 1 } } }
+    if (!mongoose.Types.ObjectId.isValid(moduleId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid module ID"
+      });
+    }
+
+    /* ================================
+       1️⃣ Get Providers With Packages
+    ================================= */
+    const vendorsAgg = await Mehandi.aggregate([
+      {
+        $match: {
+          secondaryModule: new mongoose.Types.ObjectId(moduleId),
+          isActive: true
+        }
+      },
+      {
+        $group: {
+          _id: "$provider",
+          packageCount: { $sum: 1 }
+        }
+      }
     ]);
 
-    const vendorIds = vendors.map(v => v._id);
+    const vendorIds = vendorsAgg.map(v => v._id);
 
+    /* ================================
+       2️⃣ Build Profile Filter
+    ================================= */
+    let profileMatch = {
+      status: "approved",
+      isActive: true
+    };
+
+    if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
+      profileMatch.zone = new mongoose.Types.ObjectId(zoneId);
+    }
+
+    if (city) {
+      profileMatch["storeAddress.city"] = {
+        $regex: city,
+        $options: "i"
+      };
+    }
+
+    if (address) {
+      profileMatch["storeAddress.fullAddress"] = {
+        $regex: address,
+        $options: "i"
+      };
+    }
+
+    /* ================================
+       3️⃣ Populate Vendor Profile
+    ================================= */
     const users = await User.find({ _id: { $in: vendorIds } })
-      .select("firstName lastName email phone");
+      .select("firstName lastName email phone profilePhoto")
+      .populate({
+        path: "vendorProfile",
+        match: profileMatch,
+        populate: [
+          {
+            path: "zone",
+            select: "name"
+          },
+          {
+            path: "services",
+            select: "title icon slug"
+          },
+          {
+            path: "specialised",
+            select: "title icon slug"
+          }
+        ]
+      });
 
-    const final = users.map(user => {
-      const countObj = vendors.find(v => v._id.toString() === user._id.toString());
+    const filteredUsers = users.filter(u => u.vendorProfile);
+
+    const final = filteredUsers.map(user => {
+      const countObj = vendorsAgg.find(
+        v => v._id.toString() === user._id.toString()
+      );
+
       return {
-        ...user.toObject(),
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        profilePhoto: user.profilePhoto,
+
         packageCount: countObj?.packageCount || 0,
+
+        storeName: user.vendorProfile.storeName,
+
+        zone: user.vendorProfile.zone,
+        storeAddress: user.vendorProfile.storeAddress,
+
+        // ✅ Categories Added
+        categories: user.vendorProfile.services,
+        specialised: user.vendorProfile.specialised,
+
+        latitude: user.vendorProfile.latitude,
+        longitude: user.vendorProfile.longitude
       };
     });
 
     res.json({
       success: true,
       count: final.length,
-      data: final,
+      data: final
     });
 
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 /* =====================================================
    UPDATE PACKAGE
 ===================================================== */
