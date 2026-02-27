@@ -38,6 +38,7 @@ exports.createInvitationPackage = async (req, res) => {
             description,
             packagePrice,
             advanceBookingAmount,
+            category,
         } = req.body;
 
         if (!packageName)
@@ -68,12 +69,14 @@ exports.createInvitationPackage = async (req, res) => {
             description,
             packagePrice,
             advanceBookingAmount,
+            category,
             thumbnail,
             images,
         });
 
         const populatedPkg = await Invitation.findById(pkg._id)
             .populate("secondaryModule", "title")
+            .populate("category", "title image")
             .populate("provider", "firstName lastName email phone");
 
         res.status(201).json({
@@ -100,6 +103,7 @@ exports.getAllInvitationPackages = async (req, res) => {
             zoneId,
             city,
             address,
+            categoryId,
             page = 1,
             limit = 10,
         } = req.query;
@@ -114,6 +118,10 @@ exports.getAllInvitationPackages = async (req, res) => {
 
         if (moduleId && mongoose.Types.ObjectId.isValid(moduleId)) {
             matchStage.secondaryModule = new mongoose.Types.ObjectId(moduleId);
+        }
+
+        if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) {
+            matchStage.category = new mongoose.Types.ObjectId(categoryId);
         }
 
         if (minPrice) {
@@ -188,6 +196,16 @@ exports.getAllInvitationPackages = async (req, res) => {
         pipeline.push({ $unwind: "$secondaryModule" });
 
         pipeline.push({
+            $lookup: {
+                from: "categories",
+                localField: "category",
+                foreignField: "_id",
+                as: "category",
+            },
+        });
+        pipeline.push({ $unwind: "$category" });
+
+        pipeline.push({
             $project: {
                 "provider.password": 0,
                 "provider.refreshToken": 0,
@@ -249,7 +267,12 @@ exports.getInvitationPackageById = async (req, res) => {
             .populate({
                 path: "secondaryModule",
                 select: "_id title icon"
+            })
+            .populate({
+                path: "category",
+                select: "_id title image"
             });
+
 
         if (!pkg) {
             return res.status(404).json({ success: false, message: "Package not found" });
@@ -293,6 +316,10 @@ exports.getInvitationByVendor = async (req, res) => {
                 path: "secondaryModule",
                 select: "_id title icon"
             })
+            .populate({
+                path: "category",
+                select: "_id title image"
+            })
             .sort({ createdAt: -1 });
 
         res.json({
@@ -320,6 +347,7 @@ exports.updateInvitationPackage = async (req, res) => {
             description,
             packagePrice,
             advanceBookingAmount,
+            category,
             updatedBy,
         } = req.body;
 
@@ -327,6 +355,7 @@ exports.updateInvitationPackage = async (req, res) => {
         if (description) pkg.description = description;
         if (packagePrice) pkg.packagePrice = packagePrice;
         if (advanceBookingAmount) pkg.advanceBookingAmount = advanceBookingAmount;
+        if (category) pkg.category = category;
 
         // Handle thumbnail update
         if (req.files && req.files.thumbnail && req.files.thumbnail[0]) {
