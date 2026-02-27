@@ -52,13 +52,13 @@ exports.createInvitationPackage = async (req, res) => {
         // Handle thumbnail
         let thumbnail = null;
         if (req.files && req.files.thumbnail && req.files.thumbnail[0]) {
-            thumbnail = `/Uploads/invitation/${req.files.thumbnail[0].filename}`;
+            thumbnail = `/uploads/invitation/${req.files.thumbnail[0].filename}`;
         }
 
         // Handle multiple images
         let images = [];
         if (req.files && req.files.images) {
-            images = req.files.images.map(file => `/Uploads/invitation/${file.filename}`);
+            images = req.files.images.map(file => `/uploads/invitation/${file.filename}`);
         }
 
         const pkg = await Invitation.create({
@@ -360,7 +360,7 @@ exports.updateInvitationPackage = async (req, res) => {
         // Handle thumbnail update
         if (req.files && req.files.thumbnail && req.files.thumbnail[0]) {
             if (pkg.thumbnail) deleteFileIfExists(pkg.thumbnail);
-            pkg.thumbnail = `/Uploads/invitation/${req.files.thumbnail[0].filename}`;
+            pkg.thumbnail = `/uploads/invitation/${req.files.thumbnail[0].filename}`;
         }
 
         // Handle images update (replaces all images if provided)
@@ -368,7 +368,7 @@ exports.updateInvitationPackage = async (req, res) => {
             if (pkg.images && pkg.images.length > 0) {
                 pkg.images.forEach(img => deleteFileIfExists(img));
             }
-            pkg.images = req.files.images.map(file => `/Uploads/invitation/${file.filename}`);
+            pkg.images = req.files.images.map(file => `/uploads/invitation/${file.filename}`);
         }
 
         pkg.updatedBy = updatedBy || pkg.updatedBy;
