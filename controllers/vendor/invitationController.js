@@ -292,6 +292,7 @@ exports.getInvitationPackageById = async (req, res) => {
 
 /* =====================================================
    GET PACKAGES BY VENDOR
+===================================================== */
 exports.getInvitationByVendor = async (req, res) => {
     try {
         const { vendorId } = req.params;
@@ -308,37 +309,37 @@ exports.getInvitationByVendor = async (req, res) => {
         }
 
         const packages = await Invitation.find(query)
-    .populate({
-        path: "provider",
-        select: "firstName lastName email phone profilePhoto",
-        populate: {
-            path: "vendorProfile",
-            populate: [
-                { path: "zone", select: "_id name city country" },
-                { path: "services", select: "_id title image" },
-                { path: "specialised", select: "_id title image" }
-            ]
-        }
-    })
-    .populate({
-        path: "secondaryModule",
-        select: "_id title icon"
-    })
-    .populate({
-        path: "category",
-        select: "_id title image"
-    })
-    .sort({ createdAt: -1 });
+            .populate({
+                path: "provider",
+                select: "firstName lastName email phone profilePhoto",
+                populate: {
+                    path: "vendorProfile",
+                    populate: [
+                        { path: "zone", select: "_id name city country" },
+                        { path: "services", select: "_id title image" },
+                        { path: "specialised", select: "_id title image" }
+                    ]
+                }
+            })
+            .populate({
+                path: "secondaryModule",
+                select: "_id title icon"
+            })
+            .populate({
+                path: "category",
+                select: "_id title image"
+            })
+            .sort({ createdAt: -1 });
 
-res.json({
-    success: true,
-    count: packages.length,
-    data: packages
-});
+        res.json({
+            success: true,
+            count: packages.length,
+            data: packages
+        });
 
     } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-}
+        res.status(500).json({ success: false, message: err.message });
+    }
 };
 
 /* =====================================================
