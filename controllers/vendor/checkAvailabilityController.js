@@ -241,13 +241,11 @@ exports.checkAvailability = async (req, res) => {
 
     // 1. Check for Accepted/Confirmed bookings (FULLY BOOKED)
     let acceptedConflict = null;
-    try {
-      // For non-Venue modules, only HARD BLOCK if Accepted/Confirmed.
-      // For Venues, we preserve the existing logic (which might include Pending if paid).
-      const blockStatus = (title === "Venues")
-        ? ["Pending", "Accepted", "Confirmed"]
-        : ["Accepted", "Confirmed"];
+    const blockStatus = (title === "Venues")
+      ? ["Pending", "Accepted", "Confirmed"]
+      : ["Accepted", "Confirmed"];
 
+    try {
       acceptedConflict = await Booking.findOne({
         ...finalConflictQuery,
         status: { $in: blockStatus }
