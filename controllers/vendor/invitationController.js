@@ -104,6 +104,7 @@ exports.getAllInvitationPackages = async (req, res) => {
             city,
             address,
             categoryId,
+            provider,
             page = 1,
             limit = 10,
         } = req.query;
@@ -122,6 +123,10 @@ exports.getAllInvitationPackages = async (req, res) => {
 
         if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) {
             matchStage.category = new mongoose.Types.ObjectId(categoryId);
+        }
+
+        if (provider && mongoose.Types.ObjectId.isValid(provider)) {
+            matchStage.provider = new mongoose.Types.ObjectId(provider);
         }
 
         if (minPrice) {
@@ -287,50 +292,53 @@ exports.getInvitationPackageById = async (req, res) => {
 
 /* =====================================================
    GET PACKAGES BY VENDOR
-===================================================== */
 exports.getInvitationByVendor = async (req, res) => {
     try {
         const { vendorId } = req.params;
+        const { moduleId } = req.query;
 
         if (!mongoose.Types.ObjectId.isValid(vendorId)) {
             return res.status(400).json({ success: false, message: "Invalid vendor ID" });
         }
 
-        const packages = await Invitation.find({
-            provider: vendorId,
-            isActive: true
-        })
-            .populate({
-                path: "provider",
-                select: "firstName lastName email phone profilePhoto",
-                populate: {
-                    path: "vendorProfile",
-                    populate: [
-                        { path: "zone", select: "_id name city country" },
-                        { path: "services", select: "_id title image" },
-                        { path: "specialised", select: "_id title image" }
-                    ]
-                }
-            })
-            .populate({
-                path: "secondaryModule",
-                select: "_id title icon"
-            })
-            .populate({
-                path: "category",
-                select: "_id title image"
-            })
-            .sort({ createdAt: -1 });
+        let query = { provider: vendorId };
 
-        res.json({
-            success: true,
-            count: packages.length,
-            data: packages
-        });
+        if (moduleId && mongoose.Types.ObjectId.isValid(moduleId)) {
+            query.secondaryModule = new mongoose.Types.ObjectId(moduleId);
+        }
+
+        const packages = await Invitation.find(query)
+    .populate({
+        path: "provider",
+        select: "firstName lastName email phone profilePhoto",
+        populate: {
+            path: "vendorProfile",
+            populate: [
+                { path: "zone", select: "_id name city country" },
+                { path: "services", select: "_id title image" },
+                { path: "specialised", select: "_id title image" }
+            ]
+        }
+    })
+    .populate({
+        path: "secondaryModule",
+        select: "_id title icon"
+    })
+    .populate({
+        path: "category",
+        select: "_id title image"
+    })
+    .sort({ createdAt: -1 });
+
+res.json({
+    success: true,
+    count: packages.length,
+    data: packages
+});
 
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
-    }
+    res.status(500).json({ success: false, message: err.message });
+}
 };
 
 /* =====================================================

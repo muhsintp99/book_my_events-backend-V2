@@ -136,72 +136,40 @@ exports.checkAvailability = async (req, res) => {
     ========================= */
     const toId = (val) => (mongoose.Types.ObjectId.isValid(val) ? new mongoose.Types.ObjectId(val) : val);
 
-    // 🔥 ROBUST QUERY: Check BOTH module-specific field AND packageId
-    // This handles cases where bookings might have either field populated
-    const pkgId = toId(packageId);
+    // 🔥 ROBUST ID MAPPING: Check BOTH module-specific field AND packageId
+    // We prioritize the provided IDs but also check packageId as a fallback.
+    const vId = toId(venueId || packageId);
+    const bId = toId(req.body.boutiqueId || boutiqueId || packageId);
+    const oId = toId(ornamentId || packageId);
+    const cId = toId(cakeId || packageId);
+    const mId = toId(makeupId || packageId);
+    const pId = toId(photographyId || packageId);
+    const catId = toId(cateringId || packageId);
+    const transId = toId(vehicleId || packageId);
+    const invId = toId(invitationId || packageId);
 
-    if (vehicleId || title === "Transport") {
-      const vId = toId(vehicleId || packageId);
-      conflictQuery.$or = [
-        { vehicleId: vId },
-        { packageId: vId }
-      ];
-    } else if (boutiqueId || title === "Boutique" || title === "Boutiques") {
-      const bId = toId(boutiqueId || packageId);
-      conflictQuery.$or = [
-        { boutiqueId: bId },
-        { packageId: bId }
-      ];
-    } else if (ornamentId || title === "Ornaments" || title === "Ornament") {
-      const oId = toId(ornamentId || packageId);
-      conflictQuery.$or = [
-        { ornamentId: oId },
-        { packageId: oId }
-      ];
-    } else if (cakeId || title === "Cake") {
-      const cId = toId(cakeId || packageId);
-      conflictQuery.$or = [
-        { cakeId: cId },
-        { packageId: cId }
-      ];
-    } else if (venueId || title === "Venues") {
-      const vId = toId(venueId || packageId);
-      conflictQuery.$or = [
-        { venueId: vId },
-        { packageId: vId }
-      ];
-      if (req.body.providerId) {
-        conflictQuery.$or.push({ providerId: toId(req.body.providerId) });
-      }
-    } else if (makeupId || title === "Makeup" || title === "Makeup Artist") {
-      const mId = toId(makeupId || packageId);
-      conflictQuery.$or = [
-        { makeupId: mId },
-        { packageId: mId }
-      ];
-      if (req.body.providerId) {
-        conflictQuery.$or.push({ providerId: toId(req.body.providerId) });
-      }
-    } else if (photographyId || title === "Photography") {
-      const pId = toId(photographyId || packageId);
-      conflictQuery.$or = [
-        { photographyId: pId },
-        { packageId: pId }
-      ];
-    } else if (cateringId || title === "Catering") {
-      const cId = toId(cateringId || packageId);
-      conflictQuery.$or = [
-        { cateringId: cId },
-        { packageId: cId }
-      ];
-    } else if (invitationId || title === "Invitation & Printing" || title === "Invitation" || title === "Printing") {
-      const iId = toId(invitationId || packageId);
-      conflictQuery.$or = [
-        { invitationId: iId },
-        { packageId: iId }
-      ];
+    if (transId && (title === "Transport" || vehicleId)) {
+      conflictQuery.$or = [{ vehicleId: transId }, { packageId: transId }];
+    } else if (bId && (title === "Boutique" || title === "Boutiques" || boutiqueId)) {
+      conflictQuery.$or = [{ boutiqueId: bId }, { packageId: bId }];
+    } else if (oId && (title === "Ornaments" || title === "Ornament" || ornamentId)) {
+      conflictQuery.$or = [{ ornamentId: oId }, { packageId: oId }];
+    } else if (cId && (title === "Cake" || cakeId)) {
+      conflictQuery.$or = [{ cakeId: cId }, { packageId: cId }];
+    } else if (vId && (title === "Venues" || venueId)) {
+      conflictQuery.$or = [{ venueId: vId }, { packageId: vId }];
+      if (req.body.providerId) conflictQuery.$or.push({ providerId: toId(req.body.providerId) });
+    } else if (mId && (title === "Makeup" || title === "Makeup Artist" || makeupId)) {
+      conflictQuery.$or = [{ makeupId: mId }, { packageId: mId }];
+      if (req.body.providerId) conflictQuery.$or.push({ providerId: toId(req.body.providerId) });
+    } else if (pId && (title === "Photography" || photographyId)) {
+      conflictQuery.$or = [{ photographyId: pId }, { packageId: pId }];
+    } else if (catId && (title === "Catering" || cateringId)) {
+      conflictQuery.$or = [{ cateringId: catId }, { packageId: catId }];
+    } else if (invId && (title === "Invitation & Printing" || title === "Invitation" || title === "Printing" || invitationId)) {
+      conflictQuery.$or = [{ invitationId: invId }, { packageId: invId }];
     } else {
-      conflictQuery.packageId = pkgId;
+      conflictQuery.packageId = toId(packageId);
     }
 
     /* =========================
@@ -274,9 +242,15 @@ exports.checkAvailability = async (req, res) => {
     // 1. Check for Accepted/Confirmed bookings (FULLY BOOKED)
     let acceptedConflict = null;
     try {
+      // For non-Venue modules, only HARD BLOCK if Accepted/Confirmed.
+      // For Venues, we preserve the existing logic (which might include Pending if paid).
+      const blockStatus = (title === "Venues")
+        ? ["Pending", "Accepted", "Confirmed"]
+        : ["Accepted", "Confirmed"];
+
       acceptedConflict = await Booking.findOne({
         ...finalConflictQuery,
-        status: { $in: ["Accepted", "Confirmed"] }
+        status: { $in: blockStatus }
       }).select("_id bookingDate status rentalPeriod timeSlot").lean();
     } catch (queryError) {
       // Handle Mongoose validation errors gracefully (timeSlot array issue)

@@ -1768,15 +1768,17 @@ exports.createBooking = async (req, res) => {
       }),
 
       // ================= OTHER MODULES =================
-      venueId: moduleType === "Venues" ? venueId : undefined,
-      makeupId:
-        (moduleType === "Makeup" || moduleType === "Makeup Artist")
-          ? makeupId
-          : undefined,
-      photographyId: moduleType === "Photography" ? photographyId : undefined,
-      cateringId: moduleType === "Catering" ? cateringId : undefined,
-      boutiqueId: (moduleType === "Boutique" || moduleType === "Boutiques") ? req.body.boutiqueId : undefined,
-      mehandiId: (moduleType === "Mehandi" || moduleType === "Mehandi Artist") ? (req.body.mehandiId || packageId) : undefined,
+      packageId: packageId || undefined,
+      venueId: (venueId || (moduleType === "Venues" ? packageId : undefined)),
+      makeupId: (makeupId || ((moduleType === "Makeup" || moduleType === "Makeup Artist") ? packageId : undefined)),
+      photographyId: (photographyId || (moduleType === "Photography" ? packageId : undefined)),
+      cateringId: (cateringId || (moduleType === "Catering" ? packageId : undefined)),
+      boutiqueId: (req.body.boutiqueId || boutiqueId || ((moduleType === "Boutique" || moduleType === "Boutiques") ? packageId : undefined)),
+      mehandiId: (req.body.mehandiId || ((moduleType === "Mehandi" || moduleType === "Mehandi Artist") ? packageId : undefined)),
+      ornamentId: (ornamentId || ((moduleKey === "ornament" || moduleKey === "ornaments") ? packageId : undefined)),
+      vehicleId: (vehicleId || (moduleType === "Transport" ? packageId : undefined)),
+      invitationId: (invitationId || req.body.invitationId || (["Invitation & Printing", "Invitation", "Printing"].includes(moduleType) ? packageId : undefined)),
+
       numberOfGuests:
         (moduleType === "Venues" || moduleType === "Catering")
           ? numberOfGuests
