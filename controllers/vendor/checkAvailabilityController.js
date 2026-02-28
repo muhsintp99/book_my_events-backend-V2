@@ -272,7 +272,7 @@ exports.checkAvailability = async (req, res) => {
 
         acceptedConflict = await Booking.findOne({
           ...fallbackQuery,
-          status: { $in: ["Accepted", "Confirmed"] }
+          status: { $in: blockStatus }
         }).select("_id bookingDate status rentalPeriod timeSlot").lean();
 
         // Manually check timeSlot match
@@ -295,15 +295,6 @@ exports.checkAvailability = async (req, res) => {
     }
 
     console.log("📊 Accepted Conflict:", acceptedConflict ? "FOUND" : "NONE");
-    if (acceptedConflict) {
-      console.log("🔥 CONFLICT DETAILS:", {
-        id: acceptedConflict._id,
-        status: acceptedConflict.status,
-        date: acceptedConflict.bookingDate,
-        timeSlot: acceptedConflict.timeSlot,
-        timeSlotType: typeof acceptedConflict.timeSlot
-      });
-    }
 
     if (acceptedConflict) {
       return res.json({
@@ -312,31 +303,6 @@ exports.checkAvailability = async (req, res) => {
         availabilityStatus: "Booked",
         message: "This date is already booked and unavailable. Please try another date.",
         conflict: acceptedConflict
-      });
-    }
-
-    // 🔥 CRITICAL FIX: Check for Pending bookings where payment IS completed
-    // (Vendor hasn't accepted yet, but the user PAID → must block availability)
-    let paidPendingConflict = null;
-    try {
-      paidPendingConflict = await Booking.findOne({
-        ...finalConflictQuery,
-        status: "Pending",
-        paymentStatus: "completed"
-      }).select("_id bookingDate status paymentStatus timeSlot").lean();
-    } catch (err) {
-      console.warn("⚠️ Paid-pending check error (non-fatal):", err.message);
-    }
-
-    console.log("📊 Paid-Pending Conflict:", paidPendingConflict ? "FOUND (payment made, date is BLOCKED)" : "NONE");
-
-    if (paidPendingConflict) {
-      return res.json({
-        success: true,
-        available: false, // ❌ HARD BLOCK — payment was made
-        availabilityStatus: "Booked",
-        message: "This date has an active paid booking and is unavailable. Please try another date.",
-        conflict: paidPendingConflict
       });
     }
 
