@@ -16,6 +16,7 @@ const Ornament = require("../../models/vendor/ornamentPackageModel");
 const Boutique = require("../../models/vendor/boutiquePackageModel");
 const Mehandi = require("../../models/vendor/mehandiPackageModel");
 const Invitation = require("../../models/vendor/invitationPackageModel");
+const Florist = require("../../models/vendor/floristPackageModel");
 
 const AUTH_API_URL = "https://api.bookmyevent.ae/api/auth/login";
 
@@ -599,6 +600,7 @@ exports.createBooking = async (req, res) => {
       decorationIncluded,
       ornamentId,
       invitationId, // ✅ NEW: Support for Invitation & Printing
+      floristId, // ✅ NEW: Support for Florist
       bookingMode, // purchase | rental
       shippingPrice, // ✅ NEW: Dynamic shipping price
     } = req.body;
@@ -830,7 +832,10 @@ exports.createBooking = async (req, res) => {
       conflictQuery.cateringId = toId(cateringId || packageId);
     } else if (invitationId || title === "Invitation & Printing" || title === "Invitation" || title === "Printing") {
       conflictQuery.invitationId = toId(invitationId || packageId);
-    } else if (packageId) {
+    } else if (floristId || title === "Florist") {
+      conflictQuery.floristId = toId(floristId || packageId);
+    }
+    else if (packageId) {
       conflictQuery.packageId = toId(packageId);
     }
 
@@ -857,6 +862,7 @@ exports.createBooking = async (req, res) => {
     if (conflictQuery.mehandiId) itemIds.mehandiId = conflictQuery.mehandiId;
     if (conflictQuery.cateringId) itemIds.cateringId = conflictQuery.cateringId;
     if (conflictQuery.invitationId) itemIds.invitationId = conflictQuery.invitationId;
+    if (conflictQuery.floristId) itemIds.floristId = conflictQuery.floristId;
     if (conflictQuery.packageId) itemIds.packageId = conflictQuery.packageId;
 
     if (Object.keys(itemIds).length > 0) {
@@ -1356,7 +1362,13 @@ exports.createBooking = async (req, res) => {
       case "Printing":
         serviceProvider = await Invitation.findById(invitationId || req.body.invitationId || packageId).lean();
         if (!serviceProvider) throw new Error("Invitation package not found");
+        pricing.basePrice = Number(serviceProvider.packagePrice) || 0;
+        pricing.advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
+        break;
 
+      case "Florist":
+        serviceProvider = await Florist.findById(floristId || req.body.floristId || packageId).lean();
+        if (!serviceProvider) throw new Error("Florist package not found");
         pricing.basePrice = Number(serviceProvider.packagePrice) || 0;
         pricing.advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
         break;
@@ -1775,6 +1787,7 @@ exports.createBooking = async (req, res) => {
           : undefined,
       photographyId: moduleType === "Photography" ? photographyId : undefined,
       cateringId: moduleType === "Catering" ? cateringId : undefined,
+      floristId: moduleType === "Florist" ? (req.body.floristId || packageId) : undefined,
       boutiqueId: (moduleType === "Boutique" || moduleType === "Boutiques") ? req.body.boutiqueId : undefined,
       mehandiId: (moduleType === "Mehandi" || moduleType === "Mehandi Artist") ? (req.body.mehandiId || packageId) : undefined,
       numberOfGuests:
@@ -1915,6 +1928,8 @@ exports.getBookingsByUser = async (req, res) => {
       .populate("ornamentId")
       .populate("boutiqueId")
       .populate("mehandiId")
+      .populate("floristId")
+      .populate("invitationId")
       .populate({
         path: "providerId",
         select: "firstName lastName email phone role profilePhoto",
@@ -1951,45 +1966,6 @@ exports.getAllBookings = async (req, res) => {
   }
 };
 
-exports.getBookingById = async (req, res) => {
-  try {
-    const booking = await Booking.findById(req.params.id)
-      .populate("userId")
-      .populate({
-        path: "providerId",
-        select: "firstName lastName email phone role profilePhoto",
-        populate: [
-          { path: "profile" },
-          { path: "vendorProfile" }
-        ]
-      })
-      .populate("venueId")
-      .populate("vehicleId")
-      .populate("makeupId")
-      .populate("photographyId")
-      .populate("cateringId")
-      .populate("cakeId")
-      .populate("ornamentId")
-      .populate("boutiqueId")
-      .populate("mehandiId")
-      .populate("packageId")
-      .populate("moduleId");
-
-    if (!booking) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Booking not found" });
-    }
-
-    return res.json({ success: true, booking });
-  } catch (err) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid booking ID",
-      error: err.message,
-    });
-  }
-};
 
 // ⭐ GET BOOKINGS BY PAYMENT STATUS FOR A PROVIDER
 exports.getBookingsByPaymentStatus = async (req, res) => {
@@ -2154,6 +2130,8 @@ exports.getBookingsByProvider = async (req, res) => {
       .populate("ornamentId")
       .populate("boutiqueId")
       .populate("mehandiId")
+      .populate("floristId")
+      .populate("invitationId")
       .populate("cakeId")
       .populate("photographyId")
       .populate("cateringId")
@@ -2208,6 +2186,8 @@ exports.getBookingById = async (req, res) => {
       .populate("boutiqueId")
       .populate("ornamentId")
       .populate("mehandiId")
+      .populate("floristId")
+      .populate("invitationId")
       .populate("cakeId")
       .populate("photographyId")
       .populate("cateringId")

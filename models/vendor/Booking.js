@@ -296,6 +296,14 @@ const bookingSchema = new mongoose.Schema(
       },
       default: null,
     },
+    floristId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "FloristPackage",
+      required: function () {
+        return this.moduleType === "Florist";
+      },
+      default: null,
+    },
     packageId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Package",

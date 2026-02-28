@@ -555,6 +555,7 @@ app.use("/api/admin/subscription-request/payment", require("./routes/admin/subsc
 app.use("/api/pincodes", require("./routes/vendor/pincodeRoutes")); // ✅ NEW: Pincodes routes
 app.use("/api/mehandi", require("./routes/vendor/mehandiRoutes"));
 app.use("/api/invitation-printing", require("./routes/vendor/invitationRoutes"));
+app.use("/api/florist", require("./routes/vendor/floristRoutes"));
 /**********************************************************
  * SOCKET.IO (LIVE CHAT) - FIXED VERSION
  **********************************************************/
