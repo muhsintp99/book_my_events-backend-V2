@@ -304,6 +304,17 @@ const bookingSchema = new mongoose.Schema(
       },
       default: null,
     },
+    lightAndSoundId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "LightAndSoundPackage",
+      required: function () {
+        return (
+          this.moduleType === "Light and Sound" ||
+          this.moduleType === "Light & Sound"
+        );
+      },
+      default: null,
+    },
     packageId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Package",

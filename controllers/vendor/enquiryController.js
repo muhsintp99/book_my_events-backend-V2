@@ -8,6 +8,8 @@ const Cake = require("../../models/vendor/cakePackageModel");
 const Ornament = require("../../models/vendor/ornamentPackageModel");
 const Boutique = require("../../models/vendor/boutiquePackageModel");
 const Invitation = require("../../models/vendor/invitationPackageModel");
+const LightAndSound = require("../../models/vendor/lightAndSoundPackageModel");
+
 
 /* ======================================================
    🔥 UNIVERSAL PACKAGE RESOLVER
@@ -66,6 +68,11 @@ const resolvePackageDetails = async (moduleTitle, packageId) => {
 
     if (moduleTitle === "Invitation & Printing" || moduleTitle === "Invitation" || moduleTitle === "Printing") {
       return await Invitation.findById(packageId)
+        .populate("provider", "userId firstName lastName email profile");
+    }
+
+    if (moduleTitle === "Light and Sound" || moduleTitle === "Light & Sound") {
+      return await LightAndSound.findById(packageId)
         .populate("provider", "userId firstName lastName email profile");
     }
 
