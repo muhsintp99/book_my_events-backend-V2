@@ -343,6 +343,133 @@ exports.getFloristByVendor = async (req, res) => {
 };
 
 /* =====================================================
+   GET VENDORS WITH PACKAGE COUNT
+===================================================== */
+exports.getFloristVendors = async (req, res) => {
+    try {
+        const { moduleId } = req.params;
+        const { zoneId, city, address } = req.query;
+
+        if (!mongoose.Types.ObjectId.isValid(moduleId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid module ID"
+            });
+        }
+
+        /* ================================
+           1️⃣ Get Providers With Packages
+        ================================= */
+        const vendorsAgg = await Florist.aggregate([
+            {
+                $match: {
+                    secondaryModule: new mongoose.Types.ObjectId(moduleId),
+                    isActive: true
+                }
+            },
+            {
+                $group: {
+                    _id: "$provider",
+                    packageCount: { $sum: 1 }
+                }
+            }
+        ]);
+
+        const vendorIds = vendorsAgg.map(v => v._id);
+
+        /* ================================
+           2️⃣ Build Profile Filter
+        ================================= */
+        let profileMatch = {
+            status: "approved",
+            isActive: true
+        };
+
+        if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
+            profileMatch.zone = new mongoose.Types.ObjectId(zoneId);
+        }
+
+        if (city) {
+            profileMatch["storeAddress.city"] = {
+                $regex: city,
+                $options: "i"
+            };
+        }
+
+        if (address) {
+            profileMatch["storeAddress.fullAddress"] = {
+                $regex: address,
+                $options: "i"
+            };
+        }
+
+        /* ================================
+           3️⃣ Populate Vendor Profile
+        ================================= */
+        const users = await User.find({ _id: { $in: vendorIds } })
+            .select("firstName lastName email phone profilePhoto")
+            .populate({
+                path: "vendorProfile",
+                match: profileMatch,
+                populate: [
+                    {
+                        path: "zone",
+                        select: "name"
+                    },
+                    {
+                        path: "services",
+                        select: "title icon slug"
+                    },
+                    {
+                        path: "specialised",
+                        select: "title icon slug"
+                    }
+                ]
+            });
+
+        const filteredUsers = users.filter(u => u.vendorProfile);
+
+        const final = filteredUsers.map(user => {
+            const countObj = vendorsAgg.find(
+                v => v._id.toString() === user._id.toString()
+            );
+
+            return {
+                _id: user._id,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                phone: user.phone,
+                profilePhoto: user.profilePhoto,
+
+                packageCount: countObj?.packageCount || 0,
+
+                storeName: user.vendorProfile.storeName,
+
+                zone: user.vendorProfile.zone,
+                storeAddress: user.vendorProfile.storeAddress,
+
+                // ✅ Categories Added
+                categories: user.vendorProfile.services,
+                specialised: user.vendorProfile.specialised,
+
+                latitude: user.vendorProfile.latitude,
+                longitude: user.vendorProfile.longitude
+            };
+        });
+
+        res.json({
+            success: true,
+            count: final.length,
+            data: final
+        });
+
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+/* =====================================================
    UPDATE PACKAGE
 ===================================================== */
 exports.updateFloristPackage = async (req, res) => {

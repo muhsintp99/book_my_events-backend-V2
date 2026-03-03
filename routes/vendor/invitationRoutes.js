@@ -41,6 +41,12 @@ router.get(
     controller.getInvitationByVendor
 );
 
+// ✅ Get Vendors with Package Count
+router.get(
+    "/vendors/:moduleId",
+    controller.getInvitationVendors
+);
+
 // ✅ Get Single Package by ID
 router.get(
     "/:id",

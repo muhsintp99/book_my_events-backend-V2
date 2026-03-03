@@ -41,6 +41,12 @@ router.get(
     controller.getLightAndSoundByVendor
 );
 
+// ✅ Get Vendors with Package Count
+router.get(
+    "/vendors/:moduleId",
+    controller.getLightAndSoundVendors
+);
+
 // ✅ Get Single Package by ID
 router.get(
     "/:id",
