@@ -316,6 +316,19 @@ const bookingSchema = new mongoose.Schema(
       },
       default: null,
     },
+    emceeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "EmceePackage",
+      required: function () {
+        return (
+          this.moduleType === "Event Host / Emcee" ||
+          this.moduleType === "Emcee" ||
+          this.moduleType === "Event Host"
+        );
+      },
+      default: null,
+    },
+
     packageId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Package",

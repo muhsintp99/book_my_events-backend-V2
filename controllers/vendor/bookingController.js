@@ -18,6 +18,8 @@ const Mehandi = require("../../models/vendor/mehandiPackageModel");
 const Invitation = require("../../models/vendor/invitationPackageModel");
 const Florist = require("../../models/vendor/floristPackageModel");
 const Bouncer = require("../../models/vendor/bouncerPackageModel");
+const Emcee = require("../../models/vendor/emceePackageModel");
+
 
 
 const AUTH_API_URL = "https://api.bookmyevent.ae/api/auth/login";
@@ -605,7 +607,11 @@ exports.createBooking = async (req, res) => {
       floristId, // ✅ NEW: Support for Florist
       bookingMode, // purchase | rental
       shippingPrice, // ✅ NEW: Dynamic shipping price
+      mehandiId,
+      bouncerId,
+      emceeId,
     } = req.body;
+
 
     console.log("=".repeat(60));
     console.log("📥 BOOKING REQUEST RECEIVED");
@@ -1387,6 +1393,16 @@ exports.createBooking = async (req, res) => {
         pricing.advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
         break;
 
+      case "Event Host / Emcee":
+      case "Emcee":
+      case "Event Host":
+        serviceProvider = await Emcee.findById(req.body.emceeId || packageId).lean();
+        if (!serviceProvider) throw new Error("Emcee package not found");
+        pricing.basePrice = Number(serviceProvider.packagePrice) || 0;
+        pricing.advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
+        break;
+
+
       case "Catering":
         if (!cateringId || !numberOfGuests) {
           return res.status(400).json({
@@ -1804,7 +1820,19 @@ exports.createBooking = async (req, res) => {
       floristId: moduleType === "Florist" ? (req.body.floristId || packageId) : undefined,
       boutiqueId: (moduleType === "Boutique" || moduleType === "Boutiques") ? req.body.boutiqueId : undefined,
       mehandiId: (moduleType === "Mehandi" || moduleType === "Mehandi Artist") ? (req.body.mehandiId || packageId) : undefined,
-      bouncerId: (moduleType === "Bouncers & Security" || moduleType === "Bouncers" || moduleType === "Security") ? (req.body.bouncerId || packageId) : undefined,
+      bouncerId:
+        (moduleType === "Bouncers & Security" ||
+          moduleType === "Bouncers" ||
+          moduleType === "Security")
+          ? bouncerId
+          : undefined,
+      emceeId:
+        (moduleType === "Event Host / Emcee" ||
+          moduleType === "Emcee" ||
+          moduleType === "Event Host")
+          ? emceeId
+          : undefined,
+
 
       numberOfGuests:
         (moduleType === "Venues" || moduleType === "Catering")
@@ -1947,6 +1975,8 @@ exports.getBookingsByUser = async (req, res) => {
       .populate("floristId")
       .populate("invitationId")
       .populate("bouncerId")
+      .populate("emceeId")
+
 
       .populate({
         path: "providerId",
@@ -2209,6 +2239,8 @@ exports.getBookingById = async (req, res) => {
       .populate("floristId")
       .populate("invitationId")
       .populate("bouncerId")
+      .populate("emceeId")
+
 
       .populate("cakeId")
       .populate("photographyId")
@@ -2282,7 +2314,9 @@ exports.getUpcomingBookings = async (req, res) => {
       .populate("floristId")
       .populate("invitationId")
       .populate("bouncerId")
+      .populate("emceeId")
       .populate("cakeId")
+
       .populate("photographyId")
       .populate("cateringId")
 
@@ -2362,7 +2396,9 @@ exports.getPastBookings = async (req, res) => {
       .populate("floristId")
       .populate("invitationId")
       .populate("bouncerId")
+      .populate("emceeId")
       .populate("cakeId")
+
       .populate("photographyId")
       .populate("cateringId")
 

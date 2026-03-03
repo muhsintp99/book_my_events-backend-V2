@@ -508,7 +508,6 @@ app.use("/Uploads", express.static(path.join(__dirname, "Uploads")));
 app.get("/", (req, res) => {
   res.send("BookMyEvent API Running 🚀");
 });
-
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/delete-user", require("./routes/userDeleteRoutes"));
@@ -557,6 +556,8 @@ app.use("/api/mehandi", require("./routes/vendor/mehandiRoutes"));
 app.use("/api/invitation-printing", require("./routes/vendor/invitationRoutes"));
 app.use("/api/florist", require("./routes/vendor/floristRoutes"));
 app.use("/api/bouncers-security", require("./routes/vendor/bouncerRoutes"));
+app.use("/api/emcee", require("./routes/vendor/emceeRoutes"));
+
 
 /**********************************************************
  * SOCKET.IO (LIVE CHAT) - FIXED VERSION
