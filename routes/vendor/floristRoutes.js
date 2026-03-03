@@ -35,16 +35,16 @@ router.get(
     controller.getAllFloristPackages
 );
 
-// ✅ Get Packages by Vendor
-router.get(
-    "/vendor/:vendorId",
-    controller.getFloristByVendor
-);
-
 // ✅ Get Vendors with Package Count
 router.get(
     "/vendors/:moduleId",
     controller.getFloristVendors
+);
+
+// ✅ Get Packages by Vendor
+router.get(
+    "/vendor/:vendorId",
+    controller.getFloristByVendor
 );
 
 // ✅ Get Single Package by ID
