@@ -42,9 +42,24 @@ exports.createEmceePackage = async (req, res) => {
         let parsedServices = [];
         if (services) {
             try {
-                parsedServices = typeof services === 'string' ? JSON.parse(services) : services;
+                // Handle various string formats: JSON, single-quoted array, or comma-separated list
+                if (typeof services === 'string') {
+                    let clean = services.trim();
+                    if (clean.startsWith('[') && clean.endsWith(']')) {
+                        // Replace common non-standard JSON quotes
+                        clean = clean.replace(/'/g, '"');
+                        parsedServices = JSON.parse(clean);
+                    } else if (clean.includes(',')) {
+                        parsedServices = clean.split(',').map(s => s.trim());
+                    } else if (clean) {
+                        parsedServices = [clean];
+                    }
+                } else {
+                    parsedServices = Array.isArray(services) ? services : [services];
+                }
             } catch (e) {
-                parsedServices = services;
+                console.error("Services parsing error:", e);
+                parsedServices = []; // Default to empty if parsing fails
             }
         }
 
@@ -449,9 +464,25 @@ exports.updateEmceePackage = async (req, res) => {
 
         if (services) {
             try {
-                pkg.services = typeof services === 'string' ? JSON.parse(services) : services;
+                let parsedUpdatedServices = [];
+                if (typeof services === 'string') {
+                    let clean = services.trim();
+                    if (clean.startsWith('[') && clean.endsWith(']')) {
+                        clean = clean.replace(/'/g, '"');
+                        parsedUpdatedServices = JSON.parse(clean);
+                    } else if (clean.includes(',')) {
+                        parsedUpdatedServices = clean.split(',').map(s => s.trim());
+                    } else if (clean) {
+                        parsedUpdatedServices = [clean];
+                    }
+                } else {
+                    parsedUpdatedServices = Array.isArray(services) ? services : [services];
+                }
+                pkg.services = parsedUpdatedServices;
             } catch (e) {
-                pkg.services = services;
+                console.error("Services update parsing error:", e);
+                // Keep original if update parsing fails or clear? Usually safer to leave it or set empty
+                // pkg.services = []; 
             }
         }
 
