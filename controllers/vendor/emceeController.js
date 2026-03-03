@@ -308,10 +308,14 @@ exports.getEmceeVendors = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid module ID" });
         }
 
+        /* ================================
+           1️⃣ Get Providers With Packages
+        ================================= */
         const vendorsAgg = await Emcee.aggregate([
             {
                 $match: {
-                    secondaryModule: new mongoose.Types.ObjectId(moduleId)
+                    secondaryModule: new mongoose.Types.ObjectId(moduleId),
+                    isActive: true
                 }
             },
             {
@@ -324,8 +328,11 @@ exports.getEmceeVendors = async (req, res) => {
 
         const vendorIds = vendorsAgg.map(v => v._id);
 
+        /* ================================
+           2️⃣ Build Profile Filter
+        ================================= */
         let profileMatch = {
-            // status: "approved", 
+            // status: "approved", // 💡 Relaxation for testing
             isActive: true
         };
 
@@ -341,6 +348,9 @@ exports.getEmceeVendors = async (req, res) => {
             profileMatch["storeAddress.fullAddress"] = { $regex: address, $options: "i" };
         }
 
+        /* ================================
+           3️⃣ Populate Vendor Profile
+        ================================= */
         const users = await User.find({ _id: { $in: vendorIds } })
             .select("firstName lastName email phone profilePhoto")
             .populate({
