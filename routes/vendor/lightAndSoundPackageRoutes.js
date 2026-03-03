@@ -1,69 +1,69 @@
 const express = require("express");
 const router = express.Router();
 
-const controller = require("../../controllers/vendor/floristController");
+const controller = require("../../controllers/vendor/lightAndSoundPackageController");
 const createUpload = require("../../middlewares/upload");
 
 // =======================================================
-// CREATE MULTER INSTANCE FOR FLORIST FOLDER
+// CREATE MULTER INSTANCE FOR LIGHT AND SOUND FOLDER
 // =======================================================
-const upload = createUpload("florist", {
-    fileSizeMB: 5, // max file size 5MB
+const upload = createUpload("light-sound", {
+    fileSizeMB: 10, // max file size 10MB
     allowedTypes: ["image/jpeg", "image/png", "image/jpg"]
 });
 
 // Use .fields for multiple fields (thumbnail and images)
-const floristUpload = upload.fields([
+const lightAndSoundUpload = upload.fields([
     { name: "thumbnail", maxCount: 1 },
-    { name: "images", maxCount: 10 }
+    { name: "images", maxCount: 15 }
 ]);
 
 // =======================================================
 // ROUTES
 // =======================================================
 
-// ✅ Create Florist Package
+// ✅ Create Light and Sound Package
 router.post(
     "/create",
-    floristUpload,
-    controller.createFloristPackage
+    lightAndSoundUpload,
+    controller.createLightAndSoundPackage
 );
 
 // ✅ Get All Packages
 router.get(
     "/",
-    controller.getAllFloristPackages
-);
-
-// ✅ Get Vendors with Package Count
-router.get(
-    "/vendors/:moduleId",
-    controller.getFloristVendors
+    controller.getAllLightAndSoundPackages
 );
 
 // ✅ Get Packages by Vendor
 router.get(
     "/vendor/:vendorId",
-    controller.getFloristByVendor
+    controller.getLightAndSoundByVendor
+);
+
+// ✅ Get Vendors with Package Count
+router.get(
+    "/vendors/:moduleId",
+    controller.getLightAndSoundVendors
 );
 
 // ✅ Get Single Package by ID
 router.get(
     "/:id",
-    controller.getFloristPackageById
+    controller.getLightAndSoundPackageById
 );
 
 // ✅ Update Package
 router.put(
     "/:id",
-    floristUpload,
-    controller.updateFloristPackage
+    lightAndSoundUpload,
+    controller.updateLightAndSoundPackage
 );
 
 // ✅ Delete Package
 router.delete(
     "/:id",
-    controller.deleteFloristPackage
+    controller.deleteLightAndSoundPackage
 );
 
 // ✅ Toggle Active Status

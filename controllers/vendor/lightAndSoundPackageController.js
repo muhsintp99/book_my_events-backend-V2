@@ -1,4 +1,4 @@
-const Invitation = require("../../models/vendor/invitationPackageModel");
+const LightAndSound = require("../../models/vendor/lightAndSoundPackageModel");
 const VendorProfile = require("../../models/vendor/vendorProfile");
 const User = require("../../models/User");
 const mongoose = require("mongoose");
@@ -9,12 +9,15 @@ const path = require("path");
    HELPER: Delete File
 ===================================================== */
 const deleteFileIfExists = (filePath) => {
-    if (filePath && fs.existsSync(filePath)) {
+    if (filePath) {
         try {
-            // Ensure we are working with an absolute path if it starts with /Uploads
-            const absolutePath = filePath.startsWith("/")
-                ? path.join(__dirname, "../../", filePath)
-                : filePath;
+            // Ensure we are working with an absolute path if it starts with /Uploads or /uploads
+            let absolutePath;
+            if (filePath.startsWith("/")) {
+                absolutePath = path.join(__dirname, "../../", filePath);
+            } else {
+                absolutePath = path.resolve(filePath);
+            }
 
             if (fs.existsSync(absolutePath)) {
                 fs.unlinkSync(absolutePath);
@@ -28,7 +31,7 @@ const deleteFileIfExists = (filePath) => {
 /* =====================================================
    CREATE PACKAGE
 ===================================================== */
-exports.createInvitationPackage = async (req, res) => {
+exports.createLightAndSoundPackage = async (req, res) => {
     try {
         const {
             secondaryModule,
@@ -47,21 +50,21 @@ exports.createInvitationPackage = async (req, res) => {
         if (!providerId)
             return res.status(400).json({ success: false, message: "Provider required" });
 
-        const packageId = `INV-${Date.now()}`;
+        const packageId = `LS-${Date.now()}`;
 
         // Handle thumbnail
         let thumbnail = null;
         if (req.files && req.files.thumbnail && req.files.thumbnail[0]) {
-            thumbnail = `/uploads/invitation/${req.files.thumbnail[0].filename}`;
+            thumbnail = `/uploads/light-sound/${req.files.thumbnail[0].filename}`;
         }
 
         // Handle multiple images
         let images = [];
         if (req.files && req.files.images) {
-            images = req.files.images.map(file => `/uploads/invitation/${file.filename}`);
+            images = req.files.images.map(file => `/uploads/light-sound/${file.filename}`);
         }
 
-        const pkg = await Invitation.create({
+        const pkg = await LightAndSound.create({
             packageId,
             secondaryModule: secondaryModule || module,
             provider: providerId,
@@ -74,14 +77,14 @@ exports.createInvitationPackage = async (req, res) => {
             images,
         });
 
-        const populatedPkg = await Invitation.findById(pkg._id)
+        const populatedPkg = await LightAndSound.findById(pkg._id)
             .populate("secondaryModule", "title")
             .populate("category", "title image")
             .populate("provider", "firstName lastName email phone");
 
         res.status(201).json({
             success: true,
-            message: "Invitation package created successfully",
+            message: "Light and Sound package created successfully",
             data: populatedPkg,
         });
 
@@ -93,7 +96,7 @@ exports.createInvitationPackage = async (req, res) => {
 /* =====================================================
    GET ALL PACKAGES (SEARCH + FILTER + PAGINATION)
 ===================================================== */
-exports.getAllInvitationPackages = async (req, res) => {
+exports.getAllLightAndSoundPackages = async (req, res) => {
     try {
         const {
             keyword,
@@ -225,10 +228,10 @@ exports.getAllInvitationPackages = async (req, res) => {
             { $limit: Number(limit) },
         ];
 
-        const packages = await Invitation.aggregate(dataPipeline);
+        const packages = await LightAndSound.aggregate(dataPipeline);
 
         const countPipeline = [...pipeline, { $count: "total" }];
-        const countResult = await Invitation.aggregate(countPipeline);
+        const countResult = await LightAndSound.aggregate(countPipeline);
         const total = countResult[0]?.total || 0;
 
         res.json({
@@ -247,7 +250,7 @@ exports.getAllInvitationPackages = async (req, res) => {
 /* =====================================================
    GET SINGLE PACKAGE BY ID
 ===================================================== */
-exports.getInvitationPackageById = async (req, res) => {
+exports.getLightAndSoundPackageById = async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -255,7 +258,7 @@ exports.getInvitationPackageById = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid package ID" });
         }
 
-        const pkg = await Invitation.findById(id)
+        const pkg = await LightAndSound.findById(id)
             .populate({
                 path: "provider",
                 select: "firstName lastName email phone profilePhoto",
@@ -293,7 +296,7 @@ exports.getInvitationPackageById = async (req, res) => {
 /* =====================================================
    GET PACKAGES BY VENDOR
 ===================================================== */
-exports.getInvitationByVendor = async (req, res) => {
+exports.getLightAndSoundByVendor = async (req, res) => {
     try {
         const { vendorId } = req.params;
         const { moduleId } = req.query;
@@ -308,7 +311,7 @@ exports.getInvitationByVendor = async (req, res) => {
             query.secondaryModule = new mongoose.Types.ObjectId(moduleId);
         }
 
-        const packages = await Invitation.find(query)
+        const packages = await LightAndSound.find(query)
             .populate({
                 path: "provider",
                 select: "firstName lastName email phone profilePhoto",
@@ -345,7 +348,7 @@ exports.getInvitationByVendor = async (req, res) => {
 /* =====================================================
    GET VENDORS WITH PACKAGE COUNT
 ===================================================== */
-exports.getInvitationVendors = async (req, res) => {
+exports.getLightAndSoundVendors = async (req, res) => {
     try {
         const { moduleId } = req.params;
         const { zoneId, city, address } = req.query;
@@ -360,7 +363,7 @@ exports.getInvitationVendors = async (req, res) => {
         /* ================================
            1️⃣ Get Providers With Packages
         ================================= */
-        const vendorsAgg = await Invitation.aggregate([
+        const vendorsAgg = await LightAndSound.aggregate([
             {
                 $match: {
                     secondaryModule: new mongoose.Types.ObjectId(moduleId),
@@ -472,9 +475,9 @@ exports.getInvitationVendors = async (req, res) => {
 /* =====================================================
    UPDATE PACKAGE
 ===================================================== */
-exports.updateInvitationPackage = async (req, res) => {
+exports.updateLightAndSoundPackage = async (req, res) => {
     try {
-        const pkg = await Invitation.findById(req.params.id);
+        const pkg = await LightAndSound.findById(req.params.id);
         if (!pkg)
             return res.status(404).json({ success: false, message: "Package not found" });
 
@@ -484,6 +487,7 @@ exports.updateInvitationPackage = async (req, res) => {
             packagePrice,
             advanceBookingAmount,
             category,
+            rentalAvailability,
             updatedBy,
         } = req.body;
 
@@ -492,11 +496,12 @@ exports.updateInvitationPackage = async (req, res) => {
         if (packagePrice) pkg.packagePrice = packagePrice;
         if (advanceBookingAmount) pkg.advanceBookingAmount = advanceBookingAmount;
         if (category) pkg.category = category;
+        if (rentalAvailability) pkg.rentalAvailability = rentalAvailability;
 
         // Handle thumbnail update
         if (req.files && req.files.thumbnail && req.files.thumbnail[0]) {
             if (pkg.thumbnail) deleteFileIfExists(pkg.thumbnail);
-            pkg.thumbnail = `/uploads/invitation/${req.files.thumbnail[0].filename}`;
+            pkg.thumbnail = `/uploads/light-sound/${req.files.thumbnail[0].filename}`;
         }
 
         // Handle images update (replaces all images if provided)
@@ -504,14 +509,14 @@ exports.updateInvitationPackage = async (req, res) => {
             if (pkg.images && pkg.images.length > 0) {
                 pkg.images.forEach(img => deleteFileIfExists(img));
             }
-            pkg.images = req.files.images.map(file => `/uploads/invitation/${file.filename}`);
+            pkg.images = req.files.images.map(file => `/uploads/light-sound/${file.filename}`);
         }
 
         pkg.updatedBy = updatedBy || pkg.updatedBy;
 
         await pkg.save();
 
-        const populatedPkg = await Invitation.findById(pkg._id)
+        const populatedPkg = await LightAndSound.findById(pkg._id)
             .populate("secondaryModule", "title")
             .populate("provider", "firstName lastName email phone");
 
@@ -529,9 +534,9 @@ exports.updateInvitationPackage = async (req, res) => {
 /* =====================================================
    DELETE PACKAGE
 ===================================================== */
-exports.deleteInvitationPackage = async (req, res) => {
+exports.deleteLightAndSoundPackage = async (req, res) => {
     try {
-        const pkg = await Invitation.findById(req.params.id);
+        const pkg = await LightAndSound.findById(req.params.id);
         if (!pkg)
             return res.status(404).json({ success: false, message: "Package not found" });
 
@@ -558,7 +563,7 @@ exports.deleteInvitationPackage = async (req, res) => {
 ===================================================== */
 exports.toggleActiveStatus = async (req, res) => {
     try {
-        const pkg = await Invitation.findById(req.params.id);
+        const pkg = await LightAndSound.findById(req.params.id);
         if (!pkg) return res.status(404).json({ success: false, message: "Package not found" });
 
         pkg.isActive = !pkg.isActive;
@@ -571,7 +576,7 @@ exports.toggleActiveStatus = async (req, res) => {
 
 exports.toggleTopPickStatus = async (req, res) => {
     try {
-        const pkg = await Invitation.findById(req.params.id);
+        const pkg = await LightAndSound.findById(req.params.id);
         if (!pkg) return res.status(404).json({ success: false, message: "Package not found" });
 
         pkg.isTopPick = !pkg.isTopPick;

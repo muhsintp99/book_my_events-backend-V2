@@ -87,7 +87,7 @@ exports.checkAvailability = async (req, res) => {
     /* =========================
        BUILD CONFLICT QUERY
     ========================= */
-    const { vehicleId, boutiqueId, ornamentId, cakeId, venueId, makeupId, photographyId, cateringId, invitationId } = req.body;
+    const { vehicleId, boutiqueId, ornamentId, cakeId, venueId, makeupId, photographyId, cateringId, invitationId, lightAndSoundId } = req.body;
 
     // 🔥 AUTO-CANCEL STALE INITIATED BOOKINGS (older than 30 min)
     // This cleans up abandoned payment sessions that would otherwise block availability
@@ -148,6 +148,7 @@ exports.checkAvailability = async (req, res) => {
     const catId = toId(cateringId || packageId);
     const transId = toId(vehicleId || packageId);
     const invId = toId(invitationId || packageId);
+    const lsId = toId(lightAndSoundId || packageId);
 
     if (transId && (title === "Transport" || vehicleId)) {
       conflictQuery.$or = [{ vehicleId: transId }, { packageId: transId }];
@@ -169,6 +170,8 @@ exports.checkAvailability = async (req, res) => {
       conflictQuery.$or = [{ cateringId: catId }, { packageId: catId }];
     } else if (invId && (title === "Invitation & Printing" || title === "Invitation" || title === "Printing" || invitationId)) {
       conflictQuery.$or = [{ invitationId: invId }, { packageId: invId }];
+    } else if (lsId && (title === "Light and Sound" || title === "Light & Sound" || lightAndSoundId)) {
+      conflictQuery.$or = [{ lightAndSoundId: lsId }, { packageId: lsId }];
     } else {
       conflictQuery.packageId = toId(packageId);
     }
@@ -213,7 +216,7 @@ exports.checkAvailability = async (req, res) => {
        CHECK EXISTING BOOKINGS
     ========================= */
     // BUILD RENTAL OVERLAP QUERY (If it's a rental item)
-    const isRentalModule = ["Boutique", "Boutiques", "Ornaments", "Ornament"].includes(title);
+    const isRentalModule = ["Boutique", "Boutiques", "Ornaments", "Ornament", "Light and Sound", "Light & Sound"].includes(title);
 
     // We check for overlap: (RequestedDate BETWEEN ExistingFrom AND ExistingTo)
     // OR (ExistingFrom BETWEEN RequestedStartOfDay AND RequestedEndOfDay)
