@@ -304,6 +304,18 @@ const bookingSchema = new mongoose.Schema(
       },
       default: null,
     },
+    bouncerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BouncerPackage",
+      required: function () {
+        return (
+          this.moduleType === "Bouncers & Security" ||
+          this.moduleType === "Bouncers" ||
+          this.moduleType === "Security"
+        );
+      },
+      default: null,
+    },
     packageId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Package",
