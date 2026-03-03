@@ -36,7 +36,17 @@ exports.createEmceePackage = async (req, res) => {
             description,
             packagePrice,
             advanceBookingAmount,
+            services
         } = req.body;
+
+        let parsedServices = [];
+        if (services) {
+            try {
+                parsedServices = typeof services === 'string' ? JSON.parse(services) : services;
+            } catch (e) {
+                parsedServices = services;
+            }
+        }
 
         if (!packageName)
             return res.status(400).json({ success: false, message: "Package name required" });
@@ -59,10 +69,12 @@ exports.createEmceePackage = async (req, res) => {
             packagePrice,
             advanceBookingAmount,
             image,
+            services: parsedServices
         });
 
         const populatedPkg = await Emcee.findById(pkg._id)
             .populate("secondaryModule", "title")
+            .populate("services", "title image")
             .populate("provider", "firstName lastName email phone");
 
         res.status(201).json({
@@ -91,11 +103,16 @@ exports.getAllEmceePackages = async (req, res) => {
             address,
             page = 1,
             limit = 10,
+            categoryId
         } = req.query;
 
         const skip = (page - 1) * limit;
 
         let matchStage = { isActive: true };
+
+        if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) {
+            matchStage.services = new mongoose.Types.ObjectId(categoryId);
+        }
 
         if (keyword) {
             matchStage.packageName = { $regex: keyword, $options: "i" };
@@ -240,6 +257,10 @@ exports.getEmceePackageById = async (req, res) => {
             .populate({
                 path: "secondaryModule",
                 select: "_id title icon"
+            })
+            .populate({
+                path: "services",
+                select: "_id title image"
             });
 
         if (!pkg) {
@@ -282,6 +303,10 @@ exports.getEmceeByVendor = async (req, res) => {
             .populate({
                 path: "secondaryModule",
                 select: "_id title icon"
+            })
+            .populate({
+                path: "services",
+                select: "_id title image"
             })
             .sort({ createdAt: -1 });
 
@@ -414,12 +439,21 @@ exports.updateEmceePackage = async (req, res) => {
             packagePrice,
             advanceBookingAmount,
             updatedBy,
+            services,
         } = req.body;
 
         if (packageName) pkg.packageName = packageName;
         if (description) pkg.description = description;
         if (packagePrice) pkg.packagePrice = packagePrice;
         if (advanceBookingAmount) pkg.advanceBookingAmount = advanceBookingAmount;
+
+        if (services) {
+            try {
+                pkg.services = typeof services === 'string' ? JSON.parse(services) : services;
+            } catch (e) {
+                pkg.services = services;
+            }
+        }
 
         if (req.file) {
             deleteFileIfExists(pkg.image);
@@ -431,6 +465,7 @@ exports.updateEmceePackage = async (req, res) => {
 
         const populatedPkg = await Emcee.findById(pkg._id)
             .populate("secondaryModule", "title")
+            .populate("services", "title image")
             .populate("provider", "firstName lastName email phone");
 
         res.json({
