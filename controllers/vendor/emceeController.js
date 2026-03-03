@@ -265,8 +265,7 @@ exports.getEmceeByVendor = async (req, res) => {
         }
 
         const packages = await Emcee.find({
-            provider: vendorId,
-            isActive: true
+            provider: vendorId
         })
             .populate({
                 path: "provider",
@@ -312,8 +311,7 @@ exports.getEmceeVendors = async (req, res) => {
         const vendorsAgg = await Emcee.aggregate([
             {
                 $match: {
-                    secondaryModule: new mongoose.Types.ObjectId(moduleId),
-                    isActive: true
+                    secondaryModule: new mongoose.Types.ObjectId(moduleId)
                 }
             },
             {
