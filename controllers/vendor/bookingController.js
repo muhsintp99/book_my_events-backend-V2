@@ -17,6 +17,8 @@ const Boutique = require("../../models/vendor/boutiquePackageModel");
 const Mehandi = require("../../models/vendor/mehandiPackageModel");
 const Invitation = require("../../models/vendor/invitationPackageModel");
 const Florist = require("../../models/vendor/floristPackageModel");
+const Bouncer = require("../../models/vendor/bouncerPackageModel");
+
 
 const AUTH_API_URL = "https://api.bookmyevent.ae/api/auth/login";
 
@@ -834,6 +836,8 @@ exports.createBooking = async (req, res) => {
       conflictQuery.invitationId = toId(invitationId || packageId);
     } else if (floristId || title === "Florist") {
       conflictQuery.floristId = toId(floristId || packageId);
+    } else if (req.body.bouncerId || title === "Bouncers & Security" || title === "Bouncers" || title === "Security") {
+      conflictQuery.bouncerId = toId(req.body.bouncerId || packageId);
     }
     else if (packageId) {
       conflictQuery.packageId = toId(packageId);
@@ -863,6 +867,7 @@ exports.createBooking = async (req, res) => {
     if (conflictQuery.cateringId) itemIds.cateringId = conflictQuery.cateringId;
     if (conflictQuery.invitationId) itemIds.invitationId = conflictQuery.invitationId;
     if (conflictQuery.floristId) itemIds.floristId = conflictQuery.floristId;
+    if (conflictQuery.bouncerId) itemIds.bouncerId = conflictQuery.bouncerId;
     if (conflictQuery.packageId) itemIds.packageId = conflictQuery.packageId;
 
     if (Object.keys(itemIds).length > 0) {
@@ -1373,6 +1378,15 @@ exports.createBooking = async (req, res) => {
         pricing.advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
         break;
 
+      case "Bouncers & Security":
+      case "Bouncers":
+      case "Security":
+        serviceProvider = await Bouncer.findById(req.body.bouncerId || packageId).lean();
+        if (!serviceProvider) throw new Error("Bouncer package not found");
+        pricing.basePrice = Number(serviceProvider.packagePrice) || 0;
+        pricing.advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
+        break;
+
       case "Catering":
         if (!cateringId || !numberOfGuests) {
           return res.status(400).json({
@@ -1790,6 +1804,8 @@ exports.createBooking = async (req, res) => {
       floristId: moduleType === "Florist" ? (req.body.floristId || packageId) : undefined,
       boutiqueId: (moduleType === "Boutique" || moduleType === "Boutiques") ? req.body.boutiqueId : undefined,
       mehandiId: (moduleType === "Mehandi" || moduleType === "Mehandi Artist") ? (req.body.mehandiId || packageId) : undefined,
+      bouncerId: (moduleType === "Bouncers & Security" || moduleType === "Bouncers" || moduleType === "Security") ? (req.body.bouncerId || packageId) : undefined,
+
       numberOfGuests:
         (moduleType === "Venues" || moduleType === "Catering")
           ? numberOfGuests
@@ -1930,6 +1946,8 @@ exports.getBookingsByUser = async (req, res) => {
       .populate("mehandiId")
       .populate("floristId")
       .populate("invitationId")
+      .populate("bouncerId")
+
       .populate({
         path: "providerId",
         select: "firstName lastName email phone role profilePhoto",
@@ -2132,6 +2150,8 @@ exports.getBookingsByProvider = async (req, res) => {
       .populate("mehandiId")
       .populate("floristId")
       .populate("invitationId")
+      .populate("bouncerId")
+
       .populate("cakeId")
       .populate("photographyId")
       .populate("cateringId")
@@ -2188,6 +2208,8 @@ exports.getBookingById = async (req, res) => {
       .populate("mehandiId")
       .populate("floristId")
       .populate("invitationId")
+      .populate("bouncerId")
+
       .populate("cakeId")
       .populate("photographyId")
       .populate("cateringId")
@@ -2257,9 +2279,13 @@ exports.getUpcomingBookings = async (req, res) => {
       .populate("moduleId")
       .populate("ornamentId")
       .populate("mehandiId")
+      .populate("floristId")
+      .populate("invitationId")
+      .populate("bouncerId")
       .populate("cakeId")
       .populate("photographyId")
       .populate("cateringId")
+
       .select("+paymentStatus +paymentType +status +bookingType +finalPrice")
       .lean();
 
@@ -2333,9 +2359,13 @@ exports.getPastBookings = async (req, res) => {
       .populate("ornamentId")
       .populate("boutiqueId")
       .populate("mehandiId")
+      .populate("floristId")
+      .populate("invitationId")
+      .populate("bouncerId")
       .populate("cakeId")
       .populate("photographyId")
       .populate("cateringId")
+
       .select("+paymentStatus +paymentType +status +bookingType +finalPrice")
       .lean();
 
