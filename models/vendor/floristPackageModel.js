@@ -63,11 +63,12 @@ const floristPackageSchema = new mongoose.Schema(
             default: false,
         },
 
-        category: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "Category",
-            required: true
-        },
+        services: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "Category",
+            },
+        ],
 
         updatedBy: {
             type: mongoose.Schema.Types.ObjectId,
