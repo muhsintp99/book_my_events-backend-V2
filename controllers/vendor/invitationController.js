@@ -38,8 +38,35 @@ exports.createInvitationPackage = async (req, res) => {
             description,
             packagePrice,
             advanceBookingAmount,
-            category,
+            services,
         } = req.body;
+
+        let parsedServices = [];
+        if (services) {
+            try {
+                let rawSvc = services;
+                if (Array.isArray(rawSvc) && rawSvc.length === 1 && typeof rawSvc[0] === 'string' && rawSvc[0].trim().startsWith('[')) {
+                    rawSvc = rawSvc[0];
+                }
+
+                if (typeof rawSvc === 'string') {
+                    let clean = rawSvc.trim();
+                    if (clean.startsWith('[') && clean.endsWith(']')) {
+                        clean = clean.replace(/'/g, '"');
+                        parsedServices = JSON.parse(clean);
+                    } else if (clean.includes(',')) {
+                        parsedServices = clean.split(',').map(s => s.trim());
+                    } else if (clean) {
+                        parsedServices = [clean];
+                    }
+                } else {
+                    parsedServices = Array.isArray(rawSvc) ? rawSvc : [rawSvc];
+                }
+            } catch (e) {
+                console.error("Services parsing error:", e);
+                parsedServices = [];
+            }
+        }
 
         if (!packageName)
             return res.status(400).json({ success: false, message: "Package name required" });
@@ -69,14 +96,14 @@ exports.createInvitationPackage = async (req, res) => {
             description,
             packagePrice,
             advanceBookingAmount,
-            category,
+            services: parsedServices,
             thumbnail,
             images,
         });
 
         const populatedPkg = await Invitation.findById(pkg._id)
             .populate("secondaryModule", "title")
-            .populate("category", "title image")
+            .populate("services", "title image")
             .populate("provider", "firstName lastName email phone");
 
         res.status(201).json({
@@ -103,7 +130,7 @@ exports.getAllInvitationPackages = async (req, res) => {
             zoneId,
             city,
             address,
-            categoryId,
+            serviceId,
             provider,
             page = 1,
             limit = 10,
@@ -121,8 +148,8 @@ exports.getAllInvitationPackages = async (req, res) => {
             matchStage.secondaryModule = new mongoose.Types.ObjectId(moduleId);
         }
 
-        if (categoryId && mongoose.Types.ObjectId.isValid(categoryId)) {
-            matchStage.category = new mongoose.Types.ObjectId(categoryId);
+        if (serviceId && mongoose.Types.ObjectId.isValid(serviceId)) {
+            matchStage.services = new mongoose.Types.ObjectId(serviceId);
         }
 
         if (provider && mongoose.Types.ObjectId.isValid(provider)) {
@@ -203,12 +230,11 @@ exports.getAllInvitationPackages = async (req, res) => {
         pipeline.push({
             $lookup: {
                 from: "categories",
-                localField: "category",
+                localField: "services",
                 foreignField: "_id",
-                as: "category",
+                as: "services",
             },
         });
-        pipeline.push({ $unwind: "$category" });
 
         pipeline.push({
             $project: {
@@ -274,7 +300,7 @@ exports.getInvitationPackageById = async (req, res) => {
                 select: "_id title icon"
             })
             .populate({
-                path: "category",
+                path: "services",
                 select: "_id title image"
             });
 
@@ -326,7 +352,7 @@ exports.getInvitationByVendor = async (req, res) => {
                 select: "_id title icon"
             })
             .populate({
-                path: "category",
+                path: "services",
                 select: "_id title image"
             })
             .sort({ createdAt: -1 });
@@ -483,7 +509,7 @@ exports.updateInvitationPackage = async (req, res) => {
             description,
             packagePrice,
             advanceBookingAmount,
-            category,
+            services,
             updatedBy,
         } = req.body;
 
@@ -491,7 +517,34 @@ exports.updateInvitationPackage = async (req, res) => {
         if (description) pkg.description = description;
         if (packagePrice) pkg.packagePrice = packagePrice;
         if (advanceBookingAmount) pkg.advanceBookingAmount = advanceBookingAmount;
-        if (category) pkg.category = category;
+
+        if (services) {
+            let parsedServices = [];
+            try {
+                let rawSvc = services;
+                if (Array.isArray(rawSvc) && rawSvc.length === 1 && typeof rawSvc[0] === 'string' && rawSvc[0].trim().startsWith('[')) {
+                    rawSvc = rawSvc[0];
+                }
+
+                if (typeof rawSvc === 'string') {
+                    let clean = rawSvc.trim();
+                    if (clean.startsWith('[') && clean.endsWith(']')) {
+                        clean = clean.replace(/'/g, '"');
+                        parsedServices = JSON.parse(clean);
+                    } else if (clean.includes(',')) {
+                        parsedServices = clean.split(',').map(s => s.trim());
+                    } else if (clean) {
+                        parsedServices = [clean];
+                    }
+                } else {
+                    parsedServices = Array.isArray(rawSvc) ? rawSvc : [rawSvc];
+                }
+            } catch (e) {
+                console.error("Services parsing error:", e);
+                parsedServices = [];
+            }
+            pkg.services = parsedServices;
+        }
 
         // Handle thumbnail update
         if (req.files && req.files.thumbnail && req.files.thumbnail[0]) {

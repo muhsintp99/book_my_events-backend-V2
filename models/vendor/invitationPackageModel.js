@@ -63,10 +63,10 @@ const invitationPackageSchema = new mongoose.Schema(
             default: false,
         },
 
-        category: {
-            type: mongoose.Schema.Types.ObjectId,
+        services: {
+            type: [mongoose.Schema.Types.ObjectId],
             ref: "Category",
-            required: true
+            default: []
         },
 
         updatedBy: {
