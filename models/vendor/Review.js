@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const reviewSchema = new mongoose.Schema(
   {
-    targetId: { type: mongoose.Schema.Types.ObjectId, required: true }, 
+    targetId: { type: mongoose.Schema.Types.ObjectId, required: true },
     targetType: {
       type: String,
       required: true,
@@ -10,6 +10,7 @@ const reviewSchema = new mongoose.Schema(
     },
 
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    vendorId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     rating: { type: Number, required: true, min: 1, max: 5 },
 
     comment: { type: String, trim: true },

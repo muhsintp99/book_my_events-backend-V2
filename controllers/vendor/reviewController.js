@@ -32,6 +32,26 @@ exports.getReviewsWithComments = async (req, res) => {
   }
 };
 
+exports.getReviewsByVendor = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const reviews = await Review.find({ vendorId })
+      .populate("user", "firstName lastName email profilePhoto")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    for (const review of reviews) {
+      review.comments = await ReviewComment.find({ review: review._id })
+        .populate("user", "firstName lastName email profilePhoto")
+        .lean();
+    }
+
+    res.status(200).json({ success: true, data: reviews });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // Add Comment under Review
 exports.addComment = async (req, res) => {
   try {
@@ -66,6 +86,26 @@ exports.deleteComment = async (req, res) => {
     });
 
     res.status(200).json({ success: true, message: "Comment deleted" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.replyToReview = async (req, res) => {
+  try {
+    const { replyText } = req.body;
+    const review = await Review.findByIdAndUpdate(
+      req.params.reviewId,
+      {
+        replyFromOwner: replyText,
+        repliedAt: new Date(),
+      },
+      { new: true }
+    );
+
+    if (!review) return res.status(404).json({ message: "Review not found" });
+
+    res.status(200).json({ success: true, data: review });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

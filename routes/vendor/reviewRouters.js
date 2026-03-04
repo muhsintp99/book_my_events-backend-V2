@@ -13,6 +13,9 @@ router
   .post(upload.fields([{ name: 'images' }, { name: 'videos' }]), reviewController.createReview)
   .get(reviewController.getReviewsWithComments);
 
+router.get('/vendor/:vendorId', reviewController.getReviewsByVendor);
+router.patch('/:reviewId/reply', reviewController.replyToReview);
+
 router.post('/:reviewId/comments', reviewController.addComment);
 router.delete('/:reviewId/comments/:commentId', reviewController.deleteComment);
 

@@ -34,7 +34,7 @@ exports.getAllVendors = async (req, res) => {
       .populate({
         path: "zone",
         select: "name description coordinates city country isActive isTopZone icon"
-       })
+      })
       .populate("services", "title")
       .populate("specialised", "title");
 
@@ -166,7 +166,7 @@ exports.getSingleVendor = async (req, res) => {
     const vendor = await VendorProfile.findOne({ user: providerId })
       .populate("user", "firstName lastName email phone role profilePhoto")
       .populate("module", "title moduleId icon")
-       .populate("services", "title")
+      .populate("services", "title")
       .populate("specialised", "title")
       .populate("zone", "name description coordinates city country isActive isTopZone icon");
 
@@ -616,7 +616,10 @@ exports.updateProfile = async (req, res) => {
       services,
       specialised,
       startingPrice,
-      minBookingPrice
+      minBookingPrice,
+      bioTitle,
+      bioSubtitle,
+      bioDescription
     } = req.body;
     const id = req.params.id; // Could be Profile ID or User ID
 
@@ -668,8 +671,17 @@ exports.updateProfile = async (req, res) => {
       if (mobileNumber) updatedData.mobileNumber = mobileNumber;
       if (latitude) updatedData.latitude = latitude;
       if (longitude) updatedData.longitude = longitude;
-        if (vendorType) updatedData.vendorType = vendorType;
+      if (vendorType) updatedData.vendorType = vendorType;
       if (maxBookings !== undefined) updatedData.maxBookings = maxBookings;
+
+      // Handle Bio fields
+      if (bioTitle !== undefined || bioSubtitle !== undefined || bioDescription !== undefined) {
+        updatedData.bio = {
+          title: bioTitle !== undefined ? bioTitle : (profile?.bio?.title || ""),
+          subtitle: bioSubtitle !== undefined ? bioSubtitle : (profile?.bio?.subtitle || ""),
+          description: bioDescription !== undefined ? bioDescription : (profile?.bio?.description || "")
+        };
+      }
 
       if (services) {
         try {
@@ -824,6 +836,7 @@ exports.updateProfile = async (req, res) => {
           ownerPhone: mobileNumber || profile.mobileNumber,
           latitude: latitude || updatedData.latitude,
           longitude: longitude || updatedData.longitude,
+          bio: updatedData.bio || profile.bio
         };
 
         // Handle businessAddress sync
@@ -1128,7 +1141,7 @@ exports.getVendorCollectionDetails = async (req, res) => {
       User.findById(providerId).select("firstName lastName email phone profilePhoto"),
       Profile.findOne({ userId: providerId }).select("-bankDetails -kycDetails"),
       VendorProfile.findOne({ user: providerId })
-      .populate("services", "title")
+        .populate("services", "title")
         .populate("specialised", "title")
         .populate("zone", "name description city country")
     ]);
