@@ -34,9 +34,16 @@ exports.createMehandiPackage = async (req, res) => {
     let parsedServices = [];
     if (services) {
       try {
-        if (typeof services === 'string') {
-          let clean = services.trim();
+        let rawSvc = services;
+        // If it's an array of length 1 containing a string that looks like a JSON array, unpack it
+        if (Array.isArray(rawSvc) && rawSvc.length === 1 && typeof rawSvc[0] === 'string' && rawSvc[0].trim().startsWith('[')) {
+          rawSvc = rawSvc[0];
+        }
+
+        if (typeof rawSvc === 'string') {
+          let clean = rawSvc.trim();
           if (clean.startsWith('[') && clean.endsWith(']')) {
+            // Replace single quotes with double quotes for valid JSON
             clean = clean.replace(/'/g, '"');
             parsedServices = JSON.parse(clean);
           } else if (clean.includes(',')) {
@@ -45,7 +52,7 @@ exports.createMehandiPackage = async (req, res) => {
             parsedServices = [clean];
           }
         } else {
-          parsedServices = Array.isArray(services) ? services : [services];
+          parsedServices = Array.isArray(rawSvc) ? rawSvc : [rawSvc];
         }
       } catch (e) {
         console.error("Services parsing error:", e);
@@ -765,9 +772,16 @@ exports.updateMehandiPackage = async (req, res) => {
     if (services) {
       let parsedServices = [];
       try {
-        if (typeof services === 'string') {
-          let clean = services.trim();
+        let rawSvc = services;
+        // If it's an array of length 1 containing a string that looks like a JSON array, unpack it
+        if (Array.isArray(rawSvc) && rawSvc.length === 1 && typeof rawSvc[0] === 'string' && rawSvc[0].trim().startsWith('[')) {
+          rawSvc = rawSvc[0];
+        }
+
+        if (typeof rawSvc === 'string') {
+          let clean = rawSvc.trim();
           if (clean.startsWith('[') && clean.endsWith(']')) {
+            // Replace single quotes with double quotes for valid JSON
             clean = clean.replace(/'/g, '"');
             parsedServices = JSON.parse(clean);
           } else if (clean.includes(',')) {
@@ -776,7 +790,7 @@ exports.updateMehandiPackage = async (req, res) => {
             parsedServices = [clean];
           }
         } else {
-          parsedServices = Array.isArray(services) ? services : [services];
+          parsedServices = Array.isArray(rawSvc) ? rawSvc : [rawSvc];
         }
       } catch (e) {
         console.error("Services parsing error:", e);
