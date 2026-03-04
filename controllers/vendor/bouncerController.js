@@ -31,6 +31,28 @@ exports.createBouncerPackage = async (req, res) => {
             services,
         } = req.body;
 
+        let parsedServices = [];
+        if (services) {
+            try {
+                if (typeof services === 'string') {
+                    let clean = services.trim();
+                    if (clean.startsWith('[') && clean.endsWith(']')) {
+                        clean = clean.replace(/'/g, '"');
+                        parsedServices = JSON.parse(clean);
+                    } else if (clean.includes(',')) {
+                        parsedServices = clean.split(',').map(s => s.trim());
+                    } else if (clean) {
+                        parsedServices = [clean];
+                    }
+                } else {
+                    parsedServices = Array.isArray(services) ? services : [services];
+                }
+            } catch (e) {
+                console.error("Services parsing error:", e);
+                parsedServices = [];
+            }
+        }
+
         if (!packageName)
             return res.status(400).json({ success: false, message: "Package name required" });
 
@@ -52,7 +74,7 @@ exports.createBouncerPackage = async (req, res) => {
             packagePrice,
             advanceBookingAmount,
             image,
-            services: (typeof services === 'string' ? JSON.parse(services) : services) || [],
+            services: parsedServices,
         });
 
         const populatedPkg = await Bouncer.findById(pkg._id)
@@ -496,7 +518,26 @@ exports.updateBouncerPackage = async (req, res) => {
         if (advanceBookingAmount) pkg.advanceBookingAmount = advanceBookingAmount;
 
         if (services) {
-            pkg.services = (typeof services === 'string' ? JSON.parse(services) : services) || [];
+            let parsedServices = [];
+            try {
+                if (typeof services === 'string') {
+                    let clean = services.trim();
+                    if (clean.startsWith('[') && clean.endsWith(']')) {
+                        clean = clean.replace(/'/g, '"');
+                        parsedServices = JSON.parse(clean);
+                    } else if (clean.includes(',')) {
+                        parsedServices = clean.split(',').map(s => s.trim());
+                    } else if (clean) {
+                        parsedServices = [clean];
+                    }
+                } else {
+                    parsedServices = Array.isArray(services) ? services : [services];
+                }
+            } catch (e) {
+                console.error("Services parsing error:", e);
+                parsedServices = [];
+            }
+            pkg.services = parsedServices;
         }
 
         if (req.file) {
