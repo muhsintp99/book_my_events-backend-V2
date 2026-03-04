@@ -58,7 +58,12 @@ const bouncerPackageSchema = new mongoose.Schema(
             default: false,
         },
 
-
+        services: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "Category",
+            },
+        ],
     },
     {
         timestamps: true,

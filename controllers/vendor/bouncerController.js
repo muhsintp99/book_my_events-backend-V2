@@ -24,10 +24,9 @@ exports.createBouncerPackage = async (req, res) => {
             secondaryModule,
             module,
             providerId,
-            packageName,
-            description,
             packagePrice,
             advanceBookingAmount,
+            services,
         } = req.body;
 
         if (!packageName)
@@ -51,11 +50,13 @@ exports.createBouncerPackage = async (req, res) => {
             packagePrice,
             advanceBookingAmount,
             image,
+            services: (typeof services === 'string' ? JSON.parse(services) : services) || [],
         });
 
         const populatedPkg = await Bouncer.findById(pkg._id)
             .populate("secondaryModule", "title")
-            .populate("provider", "firstName lastName email phone");
+            .populate("provider", "firstName lastName email phone")
+            .populate("services", "title image");
 
         res.status(201).json({
             success: true,
@@ -232,6 +233,15 @@ exports.getAllBouncerPackages = async (req, res) => {
             },
         });
 
+        pipeline.push({
+            $lookup: {
+                from: "categories",
+                localField: "services",
+                foreignField: "_id",
+                as: "services"
+            }
+        });
+
         const dataPipeline = [
             ...pipeline,
             { $sort: { createdAt: -1 } },
@@ -292,7 +302,8 @@ exports.getBouncerPackageById = async (req, res) => {
             .populate({
                 path: "secondaryModule",
                 select: "_id title icon"
-            });
+            })
+            .populate("services", "_id title image icon isActive");
 
         if (!pkg) {
             return res.status(404).json({
@@ -345,6 +356,7 @@ exports.getBouncerByVendor = async (req, res) => {
                 path: "secondaryModule",
                 select: "_id title icon"
             })
+            .populate("services", "title image icon")
             .sort({ createdAt: -1 });
 
         res.json({
@@ -468,10 +480,9 @@ exports.updateBouncerPackage = async (req, res) => {
             return res.status(404).json({ success: false, message: "Package not found" });
 
         const {
-            packageName,
-            description,
             packagePrice,
             advanceBookingAmount,
+            services,
             updatedBy,
         } = req.body;
 
@@ -479,6 +490,10 @@ exports.updateBouncerPackage = async (req, res) => {
         if (description) pkg.description = description;
         if (packagePrice) pkg.packagePrice = packagePrice;
         if (advanceBookingAmount) pkg.advanceBookingAmount = advanceBookingAmount;
+
+        if (services) {
+            pkg.services = (typeof services === 'string' ? JSON.parse(services) : services) || [];
+        }
 
         if (req.file) {
             deleteFileIfExists(path.join(__dirname, "../../", pkg.image));
@@ -491,7 +506,8 @@ exports.updateBouncerPackage = async (req, res) => {
 
         const populatedPkg = await Bouncer.findById(pkg._id)
             .populate("secondaryModule", "title")
-            .populate("provider", "firstName lastName email phone");
+            .populate("provider", "firstName lastName email phone")
+            .populate("services", "title image icon");
 
         res.json({
             success: true,
