@@ -24,6 +24,8 @@ exports.createBouncerPackage = async (req, res) => {
             secondaryModule,
             module,
             providerId,
+            packageName,
+            description,
             packagePrice,
             advanceBookingAmount,
             services,
@@ -480,6 +482,8 @@ exports.updateBouncerPackage = async (req, res) => {
             return res.status(404).json({ success: false, message: "Package not found" });
 
         const {
+            packageName,
+            description,
             packagePrice,
             advanceBookingAmount,
             services,
