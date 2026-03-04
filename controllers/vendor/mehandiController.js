@@ -28,7 +28,30 @@ exports.createMehandiPackage = async (req, res) => {
       description,
       packagePrice,
       advanceBookingAmount,
+      services,
     } = req.body;
+
+    let parsedServices = [];
+    if (services) {
+      try {
+        if (typeof services === 'string') {
+          let clean = services.trim();
+          if (clean.startsWith('[') && clean.endsWith(']')) {
+            clean = clean.replace(/'/g, '"');
+            parsedServices = JSON.parse(clean);
+          } else if (clean.includes(',')) {
+            parsedServices = clean.split(',').map(s => s.trim());
+          } else if (clean) {
+            parsedServices = [clean];
+          }
+        } else {
+          parsedServices = Array.isArray(services) ? services : [services];
+        }
+      } catch (e) {
+        console.error("Services parsing error:", e);
+        parsedServices = [];
+      }
+    }
 
     if (!packageName)
       return res.status(400).json({ success: false, message: "Package name required" });
@@ -50,11 +73,13 @@ exports.createMehandiPackage = async (req, res) => {
       description,
       packagePrice,
       advanceBookingAmount,
+      services: parsedServices,
       image,
     });
 
     const populatedPkg = await Mehandi.findById(pkg._id)
       .populate("secondaryModule", "title")
+      .populate("services", "title image icon")
       .populate("provider", "firstName lastName email phone");
 
     res.status(201).json({
@@ -134,6 +159,7 @@ exports.getAllMehandiPackages = async (req, res) => {
       zoneId,
       city,
       address,
+      serviceId,
       page = 1,
       limit = 10,
     } = req.query;
@@ -159,6 +185,10 @@ exports.getAllMehandiPackages = async (req, res) => {
 
     if (maxPrice) {
       matchStage.packagePrice = { ...matchStage.packagePrice, $lte: Number(maxPrice) };
+    }
+
+    if (serviceId && mongoose.Types.ObjectId.isValid(serviceId)) {
+      matchStage.services = new mongoose.Types.ObjectId(serviceId);
     }
 
     /* =====================================================
@@ -275,6 +305,16 @@ exports.getAllMehandiPackages = async (req, res) => {
         path: "$vendorProfile.zone",
         preserveNullAndEmptyArrays: true
       }
+    });
+
+    /* package services */
+    pipeline.push({
+      $lookup: {
+        from: "categories",
+        localField: "services",
+        foreignField: "_id",
+        as: "services",
+      },
     });
 
     /* services */
@@ -439,7 +479,8 @@ exports.getMehandiPackageById = async (req, res) => {
       .populate({
         path: "secondaryModule",
         select: "_id title icon"
-      });
+      })
+      .populate("services", "_id title image icon");
 
     if (!pkg) {
       return res.status(404).json({
@@ -525,6 +566,7 @@ exports.getMehandiByVendor = async (req, res) => {
         path: "secondaryModule",
         select: "_id title icon"
       })
+      .populate("services", "title image icon")
       .sort({ createdAt: -1 });
 
     res.json({
@@ -711,6 +753,7 @@ exports.updateMehandiPackage = async (req, res) => {
       description,
       packagePrice,
       advanceBookingAmount,
+      services,
       updatedBy,
     } = req.body;
 
@@ -718,6 +761,29 @@ exports.updateMehandiPackage = async (req, res) => {
     if (description) pkg.description = description;
     if (packagePrice) pkg.packagePrice = packagePrice;
     if (advanceBookingAmount) pkg.advanceBookingAmount = advanceBookingAmount;
+
+    if (services) {
+      let parsedServices = [];
+      try {
+        if (typeof services === 'string') {
+          let clean = services.trim();
+          if (clean.startsWith('[') && clean.endsWith(']')) {
+            clean = clean.replace(/'/g, '"');
+            parsedServices = JSON.parse(clean);
+          } else if (clean.includes(',')) {
+            parsedServices = clean.split(',').map(s => s.trim());
+          } else if (clean) {
+            parsedServices = [clean];
+          }
+        } else {
+          parsedServices = Array.isArray(services) ? services : [services];
+        }
+      } catch (e) {
+        console.error("Services parsing error:", e);
+        parsedServices = [];
+      }
+      pkg.services = parsedServices;
+    }
 
     if (req.file) {
       deleteFileIfExists(path.join(__dirname, "../../", pkg.image));
@@ -730,6 +796,7 @@ exports.updateMehandiPackage = async (req, res) => {
 
     const populatedPkg = await Mehandi.findById(pkg._id)
       .populate("secondaryModule", "title")
+      .populate("services", "title image icon")
       .populate("provider", "firstName lastName email phone");
 
     res.json({

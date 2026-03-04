@@ -57,7 +57,12 @@ const mehandiPackageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-
+    services: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Category",
+      },
+    ],
 
   },
   {
