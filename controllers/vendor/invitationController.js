@@ -384,12 +384,47 @@ exports.getInvitationVendors = async (req, res) => {
         }
 
         /* ================================
-           1️⃣ Get Providers With Packages
+           1️⃣ Find Vendor Profiles (Main Filter)
+        ================================= */
+        let profileMatch = {
+            module: new mongoose.Types.ObjectId(moduleId),
+            isActive: true
+        };
+
+        if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
+            profileMatch.zone = new mongoose.Types.ObjectId(zoneId);
+        }
+
+        if (city) {
+            profileMatch["storeAddress.city"] = { $regex: city, $options: "i" };
+        }
+
+        if (address) {
+            profileMatch["storeAddress.fullAddress"] = { $regex: address, $options: "i" };
+        }
+
+        const vendorProfiles = await VendorProfile.find(profileMatch)
+            .select("user storeName storeAddress zone services specialised latitude longitude status")
+            .lean();
+
+        if (!vendorProfiles.length) {
+            return res.json({
+                success: true,
+                count: 0,
+                data: []
+            });
+        }
+
+        const vendorIds = vendorProfiles.map((vp) => vp.user);
+
+        /* ================================
+           2️⃣ Get Package Counts for these Vendors
         ================================= */
         const vendorsAgg = await Invitation.aggregate([
             {
                 $match: {
                     secondaryModule: new mongoose.Types.ObjectId(moduleId),
+                    provider: { $in: vendorIds },
                     isActive: true
                 }
             },
@@ -401,63 +436,43 @@ exports.getInvitationVendors = async (req, res) => {
             }
         ]);
 
-        const vendorIds = vendorsAgg.map(v => v._id);
-
         /* ================================
-           2️⃣ Build Profile Filter
-        ================================= */
-        let profileMatch = {
-            status: "approved",
-            isActive: true
-        };
-
-        if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
-            profileMatch.zone = new mongoose.Types.ObjectId(zoneId);
-        }
-
-        if (city) {
-            profileMatch["storeAddress.city"] = {
-                $regex: city,
-                $options: "i"
-            };
-        }
-
-        if (address) {
-            profileMatch["storeAddress.fullAddress"] = {
-                $regex: address,
-                $options: "i"
-            };
-        }
-
-        /* ================================
-           3️⃣ Populate Vendor Profile
+           3️⃣ Fetch User Details and Combine
         ================================= */
         const users = await User.find({ _id: { $in: vendorIds } })
             .select("firstName lastName email phone profilePhoto")
             .populate({
                 path: "vendorProfile",
-                match: profileMatch,
                 populate: [
-                    {
-                        path: "zone",
-                        select: "name"
-                    },
-                    {
-                        path: "services",
-                        select: "title icon slug"
-                    },
-                    {
-                        path: "specialised",
-                        select: "title icon slug"
-                    }
+                    { path: "zone", select: "name" },
+                    { path: "services", select: "title icon slug" },
+                    { path: "specialised", select: "title icon slug" }
                 ]
-            });
+            })
+            .lean();
 
-        const filteredUsers = users.filter(u => u.vendorProfile);
+        /* ================================
+           4️⃣ Fetch Detailed Packages
+        ================================= */
+        const allPackages = await Invitation.find({
+            secondaryModule: new mongoose.Types.ObjectId(moduleId),
+            provider: { $in: vendorIds },
+            isActive: true
+        })
+            .select("provider packageId packageName description packagePrice thumbnail images isActive isTopPick services")
+            .populate("services", "title image icon")
+            .lean();
 
-        const final = filteredUsers.map(user => {
+        const final = users.map(user => {
             const countObj = vendorsAgg.find(
                 v => v._id.toString() === user._id.toString()
+            );
+
+            const vp = user.vendorProfile || {};
+
+            // ✅ Filter packages for THIS vendor
+            const vendorPackages = allPackages.filter(
+                p => p.provider?.toString() === user._id.toString()
             );
 
             return {
@@ -469,28 +484,33 @@ exports.getInvitationVendors = async (req, res) => {
                 profilePhoto: user.profilePhoto,
 
                 packageCount: countObj?.packageCount || 0,
+                status: vp.status,
+                packages: vendorPackages,
 
-                storeName: user.vendorProfile.storeName,
-
-                zone: user.vendorProfile.zone,
-                storeAddress: user.vendorProfile.storeAddress,
+                storeName: vp.storeName,
+                zone: vp.zone,
+                storeAddress: vp.storeAddress,
 
                 // ✅ Categories Added
-                categories: user.vendorProfile.services,
-                specialised: user.vendorProfile.specialised,
+                categories: vp.services,
+                specialised: vp.specialised,
 
-                latitude: user.vendorProfile.latitude,
-                longitude: user.vendorProfile.longitude
+                latitude: vp.latitude,
+                longitude: vp.longitude
             };
         });
 
+        // ✅ Only return vendors with packages
+        const filtered = final.filter(v => v.packageCount > 0);
+
         res.json({
             success: true,
-            count: final.length,
-            data: final
+            count: filtered.length,
+            data: filtered
         });
 
     } catch (err) {
+        console.error("❌ Get Invitation Vendors Error:", err);
         res.status(500).json({ success: false, message: err.message });
     }
 };
