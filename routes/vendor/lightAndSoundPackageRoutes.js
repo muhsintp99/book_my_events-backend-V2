@@ -19,7 +19,7 @@ const lightAndSoundUpload = upload.fields([
 ]);
 
 // =======================================================
-// ROUTES
+// ROUTES - ORDERED BY SPECIFICITY (Most specific first)
 // =======================================================
 
 // ✅ Create Light and Sound Package
@@ -29,22 +29,34 @@ router.post(
     controller.createLightAndSoundPackage
 );
 
-// ✅ Get All Packages
-router.get(
-    "/",
-    controller.getAllLightAndSoundPackages
+// ✅ Toggle Active Status (must come before /:id)
+router.patch(
+    "/toggle-active/:id",
+    controller.toggleActiveStatus
 );
 
-// ✅ Get Packages by Vendor
+// ✅ Toggle Top Pick (must come before /:id)
+router.patch(
+    "/toggle-top-pick/:id",
+    controller.toggleTopPickStatus
+);
+
+// ✅ Get Vendors with Package Count (must come before /:id)
+router.get(
+    "/vendors/:moduleId",
+    controller.getLightAndSoundVendors
+);
+
+// ✅ Get Packages by Vendor (must come before /:id)
 router.get(
     "/vendor/:vendorId",
     controller.getLightAndSoundByVendor
 );
 
-// ✅ Get Vendors with Package Count
+// ✅ Get All Packages
 router.get(
-    "/vendors/:moduleId",
-    controller.getLightAndSoundVendors
+    "/",
+    controller.getAllLightAndSoundPackages
 );
 
 // ✅ Get Single Package by ID
@@ -64,18 +76,6 @@ router.put(
 router.delete(
     "/:id",
     controller.deleteLightAndSoundPackage
-);
-
-// ✅ Toggle Active Status
-router.patch(
-    "/toggle-active/:id",
-    controller.toggleActiveStatus
-);
-
-// ✅ Toggle Top Pick
-router.patch(
-    "/toggle-top-pick/:id",
-    controller.toggleTopPickStatus
 );
 
 module.exports = router;
