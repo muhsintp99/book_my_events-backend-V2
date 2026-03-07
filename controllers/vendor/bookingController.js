@@ -2037,7 +2037,7 @@ exports.getBookingsByUser = async (req, res) => {
       .populate("bouncerId")
       .populate("emceeId")
       .populate("panthalId")
-
+      .populate("userId")
 
       .populate({
         path: "providerId",
@@ -2047,9 +2047,6 @@ exports.getBookingsByUser = async (req, res) => {
           { path: "vendorProfile" }
         ]
       })
-      .select(
-        "+paymentStatus +paymentType +status +bookingType +finalPrice +totalBeforeDiscount"
-      )
       .lean();
 
     return res.json({
