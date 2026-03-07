@@ -166,6 +166,17 @@ exports.getAllEmceePackages = async (req, res) => {
             },
             { $unwind: "$vendorProfile" },
             {
+                $addFields: {
+                    "provider.profilePhoto": {
+                        $cond: {
+                            if: { $or: [{ $eq: ["$provider.profilePhoto", ""] }, { $not: ["$provider.profilePhoto"] }] },
+                            then: { $ifNull: ["$vendorProfile.logo", ""] },
+                            else: "$provider.profilePhoto"
+                        }
+                    }
+                }
+            },
+            {
                 $match: {
                     // "vendorProfile.status": "approved", // Permanent fix like Bouncers
                     "vendorProfile.isActive": true,
@@ -282,6 +293,10 @@ exports.getEmceePackageById = async (req, res) => {
             return res.status(404).json({ success: false, message: "Package not found" });
         }
 
+        if (pkg && pkg.provider && !pkg.provider.profilePhoto && pkg.provider.vendorProfile?.logo) {
+            pkg.provider.profilePhoto = pkg.provider.vendorProfile.logo;
+        }
+
         res.json({ success: true, data: pkg });
 
     } catch (err) {
@@ -324,6 +339,12 @@ exports.getEmceeByVendor = async (req, res) => {
                 select: "_id title image"
             })
             .sort({ createdAt: -1 });
+
+        packages.forEach(pkg => {
+            if (pkg.provider && !pkg.provider.profilePhoto && pkg.provider.vendorProfile?.logo) {
+                pkg.provider.profilePhoto = pkg.provider.vendorProfile.logo;
+            }
+        });
 
         res.json({
             success: true,
@@ -416,7 +437,7 @@ exports.getEmceeVendors = async (req, res) => {
                 lastName: user.lastName,
                 email: user.email,
                 phone: user.phone,
-                profilePhoto: user.profilePhoto,
+                profilePhoto: user.profilePhoto || user.vendorProfile?.logo || "",
                 packageCount: countObj?.packageCount || 0,
                 storeName: user.vendorProfile.storeName,
                 zone: user.vendorProfile.zone,

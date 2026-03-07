@@ -151,6 +151,17 @@ exports.getAllBouncerPackages = async (req, res) => {
             },
             { $unwind: "$vendorProfile" },
             {
+                $addFields: {
+                    "provider.profilePhoto": {
+                        $cond: {
+                            if: { $or: [{ $eq: ["$provider.profilePhoto", ""] }, { $not: ["$provider.profilePhoto"] }] },
+                            then: { $ifNull: ["$vendorProfile.logo", ""] },
+                            else: "$provider.profilePhoto"
+                        }
+                    }
+                }
+            },
+            {
                 $match: {
                     // "vendorProfile.status": "approved", // Permanent fix for Bouncers
                     "vendorProfile.isActive": true,
@@ -336,6 +347,10 @@ exports.getBouncerPackageById = async (req, res) => {
             });
         }
 
+        if (pkg && pkg.provider && !pkg.provider.profilePhoto && pkg.provider.vendorProfile?.logo) {
+            pkg.provider.profilePhoto = pkg.provider.vendorProfile.logo;
+        }
+
         res.json({
             success: true,
             data: pkg
@@ -382,6 +397,12 @@ exports.getBouncerByVendor = async (req, res) => {
             })
             .populate("services", "title image icon")
             .sort({ createdAt: -1 });
+
+        packages.forEach(pkg => {
+            if (pkg.provider && !pkg.provider.profilePhoto && pkg.provider.vendorProfile?.logo) {
+                pkg.provider.profilePhoto = pkg.provider.vendorProfile.logo;
+            }
+        });
 
         res.json({
             success: true,
@@ -468,7 +489,7 @@ exports.getBouncerVendors = async (req, res) => {
                 lastName: user.lastName,
                 email: user.email,
                 phone: user.phone,
-                profilePhoto: user.profilePhoto,
+                profilePhoto: user.profilePhoto || user.vendorProfile?.logo || "",
 
                 packageCount: countObj?.packageCount || 0,
                 storeName: user.vendorProfile.storeName,
