@@ -15,6 +15,14 @@ const Package = require("../../models/admin/Package");
 const Booking = require("../../models/vendor/Booking");
 const Ornament = require("../../models/vendor/ornamentPackageModel");
 const Boutique = require("../../models/vendor/boutiquePackageModel");
+const Bouncers = require("../../models/vendor/bouncerPackageModel");
+const Emcee = require("../../models/vendor/emceePackageModel");
+const EventPro = require("../../models/vendor/eventProfessionalPackageModel");
+const Florist = require("../../models/vendor/floristPackageModel");
+const Invitation = require("../../models/vendor/invitationPackageModel");
+const LightAndSound = require("../../models/vendor/lightAndSoundPackageModel");
+const Mehandi = require("../../models/vendor/mehandiPackageModel");
+const Panthal = require("../../models/vendor/panthalDecorationPackageModel");
 
 // Create a new profile
 
@@ -44,7 +52,7 @@ exports.getAllVendors = async (req, res) => {
         const userRef = v.user?._id;
         const profileRef = v._id;
 
-        const [vehicles, cakes, catering, photography, venues, makeup, genericPackages, ornaments, boutiques, bookings] = await Promise.all([
+        const [vehicles, cakes, catering, photography, venues, makeup, genericPackages, ornaments, boutiques, bouncers, emcees, eventpros, florists, invitations, lights, mehandis, panthals, bookings] = await Promise.all([
           Vehicle.countDocuments({ provider: { $in: [userRef, profileRef] } }),
           Cake.countDocuments({ provider: { $in: [userRef, profileRef] } }),
           Catering.countDocuments({ provider: { $in: [userRef, profileRef] } }),
@@ -54,6 +62,14 @@ exports.getAllVendors = async (req, res) => {
           Package.countDocuments({ provider: { $in: [userRef, profileRef] } }),
           Ornament.countDocuments({ provider: { $in: [userRef, profileRef] } }),
           Boutique.countDocuments({ provider: { $in: [userRef, profileRef] } }),
+          Bouncers.countDocuments({ provider: { $in: [userRef, profileRef] } }),
+          Emcee.countDocuments({ provider: { $in: [userRef, profileRef] } }),
+          EventPro.countDocuments({ provider: { $in: [userRef, profileRef] } }),
+          Florist.countDocuments({ provider: { $in: [userRef, profileRef] } }),
+          Invitation.countDocuments({ provider: { $in: [userRef, profileRef] } }),
+          LightAndSound.countDocuments({ provider: { $in: [userRef, profileRef] } }),
+          Mehandi.countDocuments({ provider: { $in: [userRef, profileRef] } }),
+          Panthal.countDocuments({ provider: { $in: [userRef, profileRef] } }),
           Booking.countDocuments({ providerId: userRef })
         ]);
 
@@ -75,7 +91,7 @@ exports.getAllVendors = async (req, res) => {
 
         return {
           ...v.toObject(),
-          packageCount: vehicles + cakes + catering + photography + venues + makeup + genericPackages + ornaments + boutiques,
+          packageCount: vehicles + cakes + catering + photography + venues + makeup + genericPackages + ornaments + boutiques + bouncers + emcees + eventpros + florists + invitations + lights + mehandis + panthals,
           bookingCount: bookings
         };
       })
@@ -138,6 +154,14 @@ exports.deleteVendorOnly = async (req, res) => {
 
       Ornament.deleteMany({ provider: vendorId }),
       Boutique.deleteMany({ provider: vendorId }),
+      Bouncers.deleteMany({ provider: vendorId }),
+      Emcee.deleteMany({ provider: vendorId }),
+      EventPro.deleteMany({ provider: vendorId }),
+      Florist.deleteMany({ provider: vendorId }),
+      Invitation.deleteMany({ provider: vendorId }),
+      LightAndSound.deleteMany({ provider: vendorId }),
+      Mehandi.deleteMany({ provider: vendorId }),
+      Panthal.deleteMany({ provider: vendorId }),
       Booking.deleteMany({ providerId: vendorId }),
       Profile.findOneAndDelete({ userId: vendorId }),
       VendorProfile.findOneAndDelete({ user: vendorId }),
@@ -1057,7 +1081,7 @@ exports.getProviderAdminDetails = async (req, res) => {
     }
 
     // 2. Fetch Packages from all modules
-    const [vehicles, cakes, catering, photography, venues, makeup, genericPackages, ornaments, boutiques] = await Promise.all([
+    const [vehicles, cakes, catering, photography, venues, makeup, genericPackages, ornaments, boutiques, bouncers, emcees, eventpros, florists, invitations, lights, mehandis, panthals] = await Promise.all([
       Vehicle.find({ provider: providerId }).populate("category brand zone"),
       Cake.find({ provider: providerId }).populate("category module"),
       Catering.find({ provider: providerId }).populate("categories module"),
@@ -1067,7 +1091,15 @@ exports.getProviderAdminDetails = async (req, res) => {
 
       Package.find({ provider: providerId }).populate("categories module"),
       Ornament.find({ provider: providerId }).populate("category subCategory module"),
-      Boutique.find({ provider: providerId }).populate("category subCategory module")
+      Boutique.find({ provider: providerId }).populate("category subCategory module"),
+      Bouncers.find({ provider: providerId }).populate("services module"),
+      Emcee.find({ provider: providerId }).populate("services module"),
+      EventPro.find({ provider: providerId }).populate("services module"),
+      Florist.find({ provider: providerId }).populate("services module"),
+      Invitation.find({ provider: providerId }).populate("services module"),
+      LightAndSound.find({ provider: providerId }).populate("services module"),
+      Mehandi.find({ provider: providerId }).populate("services module"),
+      Panthal.find({ provider: providerId }).populate("services module")
     ]);
 
     // 3. Fetch Booking History
@@ -1101,7 +1133,15 @@ exports.getProviderAdminDetails = async (req, res) => {
 
       ...genericPackages.map(p => ({ ...p.toObject(), type: "Package" })),
       ...ornaments.map(p => ({ ...p.toObject(), type: "Ornament" })),
-      ...boutiques.map(p => ({ ...p.toObject(), type: "Boutique" }))
+      ...boutiques.map(p => ({ ...p.toObject(), type: "Boutique" })),
+      ...bouncers.map(p => ({ ...p.toObject(), type: "Bouncers" })),
+      ...emcees.map(p => ({ ...p.toObject(), type: "Emcee" })),
+      ...eventpros.map(p => ({ ...p.toObject(), type: "EventPro" })),
+      ...florists.map(p => ({ ...p.toObject(), type: "Florist" })),
+      ...invitations.map(p => ({ ...p.toObject(), type: "Invitation" })),
+      ...lights.map(p => ({ ...p.toObject(), type: "LightAndSound" })),
+      ...mehandis.map(p => ({ ...p.toObject(), type: "Mehandi" })),
+      ...panthals.map(p => ({ ...p.toObject(), type: "Panthal" }))
     ];
 
     return res.status(200).json({
