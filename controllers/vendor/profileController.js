@@ -1092,14 +1092,14 @@ exports.getProviderAdminDetails = async (req, res) => {
       Package.find({ provider: providerId }).populate("categories module"),
       Ornament.find({ provider: providerId }).populate("category subCategory module"),
       Boutique.find({ provider: providerId }).populate("category subCategory module"),
-      Bouncers.find({ provider: providerId }).populate("services module"),
-      Emcee.find({ provider: providerId }).populate("services module"),
-      EventPro.find({ provider: providerId }).populate("services module"),
-      Florist.find({ provider: providerId }).populate("services module"),
-      Invitation.find({ provider: providerId }).populate("services module"),
-      LightAndSound.find({ provider: providerId }).populate("services module"),
-      Mehandi.find({ provider: providerId }).populate("services module"),
-      Panthal.find({ provider: providerId }).populate("services module")
+      Bouncers.find({ provider: providerId }).populate("services secondaryModule"),
+      Emcee.find({ provider: providerId }).populate("services secondaryModule"),
+      EventPro.find({ provider: providerId }).populate("services secondaryModule"),
+      Florist.find({ provider: providerId }).populate("services secondaryModule"),
+      Invitation.find({ provider: providerId }).populate("services secondaryModule"),
+      LightAndSound.find({ provider: providerId }).populate("services secondaryModule"),
+      Mehandi.find({ provider: providerId }).populate("services secondaryModule"),
+      Panthal.find({ provider: providerId }).populate("services secondaryModule")
     ]);
 
     // 3. Fetch Booking History
