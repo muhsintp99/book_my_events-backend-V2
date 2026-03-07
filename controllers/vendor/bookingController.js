@@ -2013,8 +2013,8 @@ exports.getBookingsByUser = async (req, res) => {
     const matchQuery = {
       userId: mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : userId,
       $or: [
-        { paymentStatus: { $nin: [/pending/i, /initiated/i] } },
-        { status: { $in: ["Accepted", "Approved"] } }
+        { paymentStatus: { $nin: [/initiated/i] } },
+        { status: { $in: ["Accepted", "Approved", "Pending"] } }
       ]
     };
 
