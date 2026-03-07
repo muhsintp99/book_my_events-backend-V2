@@ -779,15 +779,35 @@ exports.createBooking = async (req, res) => {
     // MODULE VALIDATION (Supports both Module & SecondaryModule)
     let moduleData = await Module.findById(moduleId);
     if (!moduleData) {
-      console.log("🔍 Module not found, checking SecondaryModule...");
+      console.log("🔍 Module not found in primary, checking SecondaryModule:", moduleId);
       moduleData = await SecondaryModule.findById(moduleId);
     }
 
+    // 🔥 SMART FALLBACK: If moduleId is still not found but packageId exists, 
+    // try to resolve moduleId FROM the package document.
+    if (!moduleData && packageId && mongoose.Types.ObjectId.isValid(packageId)) {
+      console.log("🔍 Attempting to resolve moduleId from package:", packageId);
+      // Try known package models (Mehandi is the priority here)
+      const possiblePackages = [Mehandi, Florist, Bouncer, Emcee, Invitation, Cake, Ornament, Boutique];
+      for (const model of possiblePackages) {
+        try {
+          const pkg = await model.findById(packageId).lean();
+          if (pkg && (pkg.secondaryModule || pkg.module)) {
+            const resolvedId = pkg.secondaryModule || pkg.module;
+            console.log(`✅ AUTO-RESOLVED moduleId: ${resolvedId} from package in ${model.modelName}`);
+            moduleData = await SecondaryModule.findById(resolvedId) || await Module.findById(resolvedId);
+            if (moduleData) break;
+          }
+        } catch (e) { /* skip */ }
+      }
+    }
+
     if (!moduleData) {
-      console.error("❌ Module ID not found in any collection:", moduleId);
+      console.error("❌ Module ID not found in any collection. Provided ID:", moduleId);
       return res.status(400).json({
         success: false,
         message: "Invalid moduleId",
+        receivedId: moduleId
       });
     }
 
