@@ -180,6 +180,17 @@ exports.getAllFloristPackages = async (req, res) => {
             },
             { $unwind: "$vendorProfile" },
             {
+                $addFields: {
+                    "provider.profilePhoto": {
+                        $cond: {
+                            if: { $or: [{ $eq: ["$provider.profilePhoto", ""] }, { $not: ["$provider.profilePhoto"] }] },
+                            then: { $ifNull: ["$vendorProfile.logo", ""] },
+                            else: "$provider.profilePhoto"
+                        }
+                    }
+                }
+            },
+            {
                 $match: {
                     "vendorProfile.status": "approved",
                     "vendorProfile.isActive": true,
@@ -301,6 +312,10 @@ exports.getFloristPackageById = async (req, res) => {
             return res.status(404).json({ success: false, message: "Package not found" });
         }
 
+        if (pkg && pkg.provider && !pkg.provider.profilePhoto && pkg.provider.vendorProfile?.logo) {
+            pkg.provider.profilePhoto = pkg.provider.vendorProfile.logo;
+        }
+
         res.json({ success: true, data: pkg });
 
     } catch (err) {
@@ -345,6 +360,12 @@ exports.getFloristByVendor = async (req, res) => {
             })
             .populate("services", "title image icon")
             .sort({ createdAt: -1 });
+
+        packages.forEach(pkg => {
+            if (pkg.provider && !pkg.provider.profilePhoto && pkg.provider.vendorProfile?.logo) {
+                pkg.provider.profilePhoto = pkg.provider.vendorProfile.logo;
+            }
+        });
 
         res.json({
             success: true,
@@ -470,7 +491,7 @@ exports.getFloristVendors = async (req, res) => {
                 lastName: user.lastName,
                 email: user.email,
                 phone: user.phone,
-                profilePhoto: user.profilePhoto,
+                profilePhoto: user.profilePhoto || user.vendorProfile?.logo || "",
 
                 packageCount: countObj?.packageCount || 0,
                 status: vp.status,
