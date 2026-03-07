@@ -2012,10 +2012,7 @@ exports.getBookingsByUser = async (req, res) => {
 
     const matchQuery = {
       userId: mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : userId,
-      $or: [
-        { paymentStatus: { $nin: [/initiated/i] } },
-        { status: { $in: ["Accepted", "Approved", "Pending"] } }
-      ]
+      paymentStatus: { $nin: ["initiated", "Initiated", "failed", "Failed"] },
     };
 
     const bookings = await Booking.find(matchQuery)
