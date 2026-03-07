@@ -2039,6 +2039,7 @@ exports.getBookingsByUser = async (req, res) => {
       .populate("invitationId")
       .populate("bouncerId")
       .populate("emceeId")
+      .populate("panthalId")
 
 
       .populate({
