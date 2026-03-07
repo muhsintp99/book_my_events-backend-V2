@@ -1873,20 +1873,27 @@ exports.createBooking = async (req, res) => {
           : undefined,
       photographyId: moduleType === "Photography" ? photographyId : undefined,
       cateringId: moduleType === "Catering" ? cateringId : undefined,
-      floristId: moduleType === "Florist" ? (req.body.floristId || packageId) : undefined,
       boutiqueId: (moduleType === "Boutique" || moduleType === "Boutiques") ? req.body.boutiqueId : undefined,
+      floristId: (moduleType === "Florist" || moduleType === "Florist & Stage") ? (req.body.floristId || packageId) : undefined,
       mehandiId: (moduleType === "Mehandi" || moduleType === "Mehandi Artist") ? (req.body.mehandiId || packageId) : undefined,
+      invitationId: (moduleType === "Invitation & Printing" || moduleType === "Invitation" || moduleType === "Printing") ? (req.body.invitationId || packageId) : undefined,
+      lightAndSoundId: (moduleType === "Light and Sound" || moduleType === "Light & Sound") ? (req.body.lightAndSoundId || packageId) : undefined,
       bouncerId:
         (moduleType === "Bouncers & Security" ||
           moduleType === "Bouncers" ||
           moduleType === "Security")
-          ? bouncerId
+          ? (req.body.bouncerId || bouncerId || packageId)
           : undefined,
       emceeId:
         (moduleType === "Event Host / Emcee" ||
           moduleType === "Emcee" ||
           moduleType === "Event Host")
-          ? emceeId
+          ? (req.body.emceeId || emceeId || packageId)
+          : undefined,
+      panthalId:
+        (moduleType === "Panthal & Decorations" ||
+          moduleType === "Panthal")
+          ? (req.body.panthalId || packageId)
           : undefined,
 
 
