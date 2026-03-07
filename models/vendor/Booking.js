@@ -300,7 +300,7 @@ const bookingSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "FloristPackage",
       required: function () {
-        return this.moduleType === "Florist";
+        return this.moduleType === "Florist" || this.moduleType === "Florist & Stage";
       },
       default: null,
     },

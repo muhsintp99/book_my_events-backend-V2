@@ -866,7 +866,7 @@ exports.createBooking = async (req, res) => {
       conflictQuery.cateringId = toId(cateringId || packageId);
     } else if (invitationId || title === "Invitation & Printing" || title === "Invitation" || title === "Printing") {
       conflictQuery.invitationId = toId(invitationId || packageId);
-    } else if (floristId || title === "Florist") {
+    } else if (floristId || title === "Florist" || title === "Florist & Stage") {
       conflictQuery.floristId = toId(floristId || packageId);
     } else if (req.body.bouncerId || title === "Bouncers & Security" || title === "Bouncers" || title === "Security") {
       conflictQuery.bouncerId = toId(req.body.bouncerId || packageId);
