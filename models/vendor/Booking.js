@@ -339,6 +339,11 @@ const bookingSchema = new mongoose.Schema(
       },
       default: null,
     },
+    panthalId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "PanthalDecorationPackage",
+      default: null,
+    },
 
     packageId: {
       type: mongoose.Schema.Types.ObjectId,
