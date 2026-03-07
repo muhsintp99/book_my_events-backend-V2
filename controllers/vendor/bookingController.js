@@ -19,7 +19,7 @@ const Invitation = require("../../models/vendor/invitationPackageModel");
 const Florist = require("../../models/vendor/floristPackageModel");
 const Bouncer = require("../../models/vendor/bouncerPackageModel");
 const Emcee = require("../../models/vendor/emceePackageModel");
-
+const SecondaryModule = require("../../models/admin/secondarymodule");
 
 
 const AUTH_API_URL = "https://api.bookmyevent.ae/api/auth/login";
@@ -776,9 +776,15 @@ exports.createBooking = async (req, res) => {
     const normalizedDate = new Date(bookingDate);
     normalizedDate.setUTCHours(0, 0, 0, 0);
 
-    // MODULE
-    const moduleData = await Module.findById(moduleId);
+    // MODULE VALIDATION (Supports both Module & SecondaryModule)
+    let moduleData = await Module.findById(moduleId);
     if (!moduleData) {
+      console.log("🔍 Module not found, checking SecondaryModule...");
+      moduleData = await SecondaryModule.findById(moduleId);
+    }
+
+    if (!moduleData) {
+      console.error("❌ Module ID not found in any collection:", moduleId);
       return res.status(400).json({
         success: false,
         message: "Invalid moduleId",
@@ -1378,8 +1384,29 @@ exports.createBooking = async (req, res) => {
         break;
 
       case "Florist":
+      case "Florist & Stage":
         serviceProvider = await Florist.findById(floristId || req.body.floristId || packageId).lean();
         if (!serviceProvider) throw new Error("Florist package not found");
+        pricing.basePrice = Number(serviceProvider.packagePrice) || 0;
+        pricing.advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
+        break;
+
+      case "Panthal & Decorations":
+      case "Panthal":
+      case "Decorations":
+        const Panthal = require("../../models/vendor/panthalDecorationPackageModel"); // Auto-detect if missing
+        serviceProvider = await Panthal.findById(req.body.panthalId || packageId).lean();
+        if (!serviceProvider) throw new Error("Panthal package not found");
+        pricing.basePrice = Number(serviceProvider.packagePrice) || 0;
+        pricing.advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
+        break;
+
+      case "Light & Sounds":
+      case "Light and Sound":
+      case "Light & Sound":
+        const LightSound = require("../../models/vendor/lightAndSoundPackageModel");
+        serviceProvider = await LightSound.findById(req.body.lightAndSoundId || packageId).lean();
+        if (!serviceProvider) throw new Error("Light & Sound package not found");
         pricing.basePrice = Number(serviceProvider.packagePrice) || 0;
         pricing.advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
         break;
@@ -1389,6 +1416,15 @@ exports.createBooking = async (req, res) => {
       case "Security":
         serviceProvider = await Bouncer.findById(req.body.bouncerId || packageId).lean();
         if (!serviceProvider) throw new Error("Bouncer package not found");
+        pricing.basePrice = Number(serviceProvider.packagePrice) || 0;
+        pricing.advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
+        break;
+
+      case "Event Professionals":
+      case "Event Professional":
+        const Professional = require("../../models/vendor/eventProfessionalPackageModel");
+        serviceProvider = await Professional.findById(req.body.professionalId || packageId).lean();
+        if (!serviceProvider) throw new Error("Event Professional package not found");
         pricing.basePrice = Number(serviceProvider.packagePrice) || 0;
         pricing.advanceAmount = Number(serviceProvider.advanceBookingAmount) || 0;
         break;
