@@ -6,7 +6,19 @@ const reviewSchema = new mongoose.Schema(
     targetType: {
       type: String,
       required: true,
-      enum: ["Venue", "Vehicle", "Product", "Service"],
+      enum: [
+        "Venue",
+        "Vehicle",
+        "Product",
+        "Service",
+        "Makeup Artist",
+        "Photography",
+        "Catering",
+        "Cake",
+        "Boutique",
+        "Ornaments",
+        "makeup-artist",
+      ],
     },
 
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
