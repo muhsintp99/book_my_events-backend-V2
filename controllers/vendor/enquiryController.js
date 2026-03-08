@@ -9,6 +9,12 @@ const Ornament = require("../../models/vendor/ornamentPackageModel");
 const Boutique = require("../../models/vendor/boutiquePackageModel");
 const Invitation = require("../../models/vendor/invitationPackageModel");
 const LightAndSound = require("../../models/vendor/lightAndSoundPackageModel");
+const Mehandi = require("../../models/vendor/mehandiPackageModel");
+const Florist = require("../../models/vendor/floristPackageModel");
+const PanthalDecoration = require("../../models/vendor/panthalDecorationPackageModel");
+const Bouncer = require("../../models/vendor/bouncerPackageModel");
+const Emcee = require("../../models/vendor/emceePackageModel");
+const EventProfessional = require("../../models/vendor/eventProfessionalPackageModel");
 
 
 /* ======================================================
@@ -73,6 +79,36 @@ const resolvePackageDetails = async (moduleTitle, packageId) => {
 
     if (moduleTitle === "Light and Sound" || moduleTitle === "Light & Sound") {
       return await LightAndSound.findById(packageId)
+        .populate("provider", "userId firstName lastName email profile");
+    }
+
+    if (moduleTitle === "Mehandi") {
+      return await Mehandi.findById(packageId)
+        .populate("provider", "userId firstName lastName email profile");
+    }
+
+    if (moduleTitle === "Florist") {
+      return await Florist.findById(packageId)
+        .populate("provider", "userId firstName lastName email profile");
+    }
+
+    if (moduleTitle === "Panthal Decoration") {
+      return await PanthalDecoration.findById(packageId)
+        .populate("provider", "userId firstName lastName email profile");
+    }
+
+    if (moduleTitle === "Bouncers") {
+      return await Bouncer.findById(packageId)
+        .populate("provider", "userId firstName lastName email profile");
+    }
+
+    if (moduleTitle === "Emcee") {
+      return await Emcee.findById(packageId)
+        .populate("provider", "userId firstName lastName email profile");
+    }
+
+    if (moduleTitle === "Event Professionals") {
+      return await EventProfessional.findById(packageId)
         .populate("provider", "userId firstName lastName email profile");
     }
 
