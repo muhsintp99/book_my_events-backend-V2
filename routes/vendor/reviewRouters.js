@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const createUpload = require('../../middlewares/upload');
 const reviewController = require('../../controllers/vendor/reviewController');
+const { protect } = require('../../middlewares/authMiddleware');
 
 const upload = createUpload('reviews', {
   fileSizeMB: 5,
@@ -10,11 +11,12 @@ const upload = createUpload('reviews', {
 
 router
   .route('/')
-  .post(upload.fields([{ name: 'images' }, { name: 'videos' }]), reviewController.createReview)
+  .post(protect, upload.fields([{ name: 'images' }, { name: 'videos' }]), reviewController.createReview)
   .get(reviewController.getReviewsWithComments);
 
 router.get('/vendor/:vendorId', reviewController.getReviewsByVendor);
-router.patch('/:reviewId/reply', reviewController.replyToReview);
+router.patch('/:reviewId', protect, reviewController.updateReview);
+router.patch('/:reviewId/reply', protect, reviewController.replyToReview);
 
 router.post('/:reviewId/comments', reviewController.addComment);
 router.delete('/:reviewId/comments/:commentId', reviewController.deleteComment);

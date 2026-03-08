@@ -110,3 +110,29 @@ exports.replyToReview = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+exports.updateReview = async (req, res) => {
+  try {
+    const { rating, comment } = req.body;
+
+    // Find the review first to check ownership
+    const review = await Review.findById(req.params.reviewId);
+
+    if (!review) {
+      return res.status(404).json({ success: false, message: "Review not found" });
+    }
+
+    // Check if the user is the owner of the review
+    if (review.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: "Not authorized to update this review" });
+    }
+
+    review.rating = rating || review.rating;
+    review.comment = comment || review.comment;
+    await review.save();
+
+    res.status(200).json({ success: true, data: review });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
