@@ -11,18 +11,29 @@ const SecondaryModule = require("../../models/admin/secondarymodule");
  */
 exports.getRequests = async (req, res) => {
   try {
-    // 🛠️ PATCH: Ensure all requests have a moduleModel
-    await SubscriptionRequest.updateMany(
-      { moduleModel: { $exists: false } },
-      { $set: { moduleModel: 'Module' } }
-    );
-
     const requests = await SubscriptionRequest.find()
       .populate("userId", "firstName lastName email phone")
       .populate("vendorProfileId")
-      .populate("moduleId")
       .populate("planId", "name price durationInDays")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Manual population for moduleId
+    for (let req of requests) {
+      if (req.moduleId) {
+        const mainMod = await Module.findById(req.moduleId).lean();
+        if (mainMod) {
+          req.moduleId = mainMod;
+          req.moduleModel = 'Module';
+        } else {
+          const secMod = await SecondaryModule.findById(req.moduleId).lean();
+          if (secMod) {
+            req.moduleId = secMod;
+            req.moduleModel = 'SecondaryModule';
+          }
+        }
+      }
+    }
 
     res.status(200).json({
       success: true,

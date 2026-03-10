@@ -697,17 +697,29 @@ exports.createPlan = async (req, res) => {
 
 exports.getPlans = async (req, res) => {
   try {
-    // 🛠️ PATCH: Ensure all plans have a moduleModel (for older plans)
-    await Plan.updateMany(
-      { moduleModel: { $exists: false } },
-      { $set: { moduleModel: 'Module' } }
-    );
-
-    const plans = await Plan.find()
-      .populate("moduleId")
-      .lean();
+    // Get all plans WITHOUT refPath population (manual population instead)
+    const plans = await Plan.find().lean();
 
     for (let plan of plans) {
+      // Manual population: try Module first, then SecondaryModule
+      const mainMod = await Module.findById(plan.moduleId).lean();
+      if (mainMod) {
+        plan.moduleId = mainMod;
+        if (plan.moduleModel !== 'Module') {
+          await Plan.updateOne({ _id: plan._id }, { moduleModel: 'Module' });
+        }
+        plan.moduleModel = 'Module';
+      } else {
+        const secMod = await SecondaryModule.findById(plan.moduleId).lean();
+        if (secMod) {
+          plan.moduleId = secMod;
+          if (plan.moduleModel !== 'SecondaryModule') {
+            await Plan.updateOne({ _id: plan._id }, { moduleModel: 'SecondaryModule' });
+          }
+          plan.moduleModel = 'SecondaryModule';
+        }
+      }
+
       plan.subscriberCount = await Subscription.countDocuments({ planId: plan._id });
     }
 
@@ -795,15 +807,22 @@ exports.getPlansByModule = async (req, res) => {
       });
     }
 
-    // 🛠️ PATCH: Ensure consistency
-    await Plan.updateMany(
-      { moduleId, moduleModel: { $exists: false } },
-      { $set: { moduleModel: 'Module' } }
-    );
+    const plans = await Plan.find({ moduleId }).lean();
 
-    const plans = await Plan.find({ moduleId })
-      .populate("moduleId")
-      .lean();
+    // Manual population for each plan
+    for (let plan of plans) {
+      const mainMod = await Module.findById(plan.moduleId).lean();
+      if (mainMod) {
+        plan.moduleId = mainMod;
+        plan.moduleModel = 'Module';
+      } else {
+        const secMod = await SecondaryModule.findById(plan.moduleId).lean();
+        if (secMod) {
+          plan.moduleId = secMod;
+          plan.moduleModel = 'SecondaryModule';
+        }
+      }
+    }
 
     res.json({
       success: true,
@@ -830,13 +849,32 @@ exports.deletePlan = async (req, res) => {
 
 exports.getSinglePlan = async (req, res) => {
   try {
-    const plan = await Plan.findById(req.params.id).populate("moduleId");
+    const plan = await Plan.findById(req.params.id).lean();
 
     if (!plan) {
       return res.status(404).json({
         success: false,
         message: "Plan not found",
       });
+    }
+
+    // Manual population: try Module first, then SecondaryModule
+    const mainMod = await Module.findById(plan.moduleId).lean();
+    if (mainMod) {
+      plan.moduleId = mainMod;
+      if (plan.moduleModel !== 'Module') {
+        await Plan.updateOne({ _id: plan._id }, { moduleModel: 'Module' });
+        plan.moduleModel = 'Module';
+      }
+    } else {
+      const secMod = await SecondaryModule.findById(plan.moduleId).lean();
+      if (secMod) {
+        plan.moduleId = secMod;
+        if (plan.moduleModel !== 'SecondaryModule') {
+          await Plan.updateOne({ _id: plan._id }, { moduleModel: 'SecondaryModule' });
+          plan.moduleModel = 'SecondaryModule';
+        }
+      }
     }
 
     res.json({ success: true, plan });
@@ -1072,17 +1110,28 @@ exports.cancelSubscription = async (req, res) => {
 // --------------------------------------------------------
 exports.getAllSubscriptions = async (req, res) => {
   try {
-    // 🛠️ PATCH: Ensure all subscriptions have a moduleModel
-    await Subscription.updateMany(
-      { moduleModel: { $exists: false } },
-      { $set: { moduleModel: 'Module' } }
-    );
-
     const subs = await Subscription.find()
       .populate("userId")
       .populate("planId")
-      .populate("moduleId")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Manual population for moduleId
+    for (let sub of subs) {
+      if (sub.moduleId) {
+        const mainMod = await Module.findById(sub.moduleId).lean();
+        if (mainMod) {
+          sub.moduleId = mainMod;
+          sub.moduleModel = 'Module';
+        } else {
+          const secMod = await SecondaryModule.findById(sub.moduleId).lean();
+          if (secMod) {
+            sub.moduleId = secMod;
+            sub.moduleModel = 'SecondaryModule';
+          }
+        }
+      }
+    }
 
     res.json({ success: true, subscriptions: subs });
   } catch (err) {
