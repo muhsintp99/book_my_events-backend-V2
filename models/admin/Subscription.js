@@ -41,8 +41,14 @@ const subscriptionSchema = new mongoose.Schema(
 
     moduleId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Module",
-      required: true
+      required: true,
+      refPath: 'moduleModel'
+    },
+    moduleModel: {
+      type: String,
+      required: true,
+      enum: ['Module', 'SecondaryModule'],
+      default: 'Module'
     },
 
     startDate: Date,
@@ -54,11 +60,11 @@ const subscriptionSchema = new mongoose.Schema(
       default: "pending"
     },
 
-paymentId: {
-  type: String,
-  default: null,     // ✅ BEST PRACTICE
-  index: true        // ✅ Optional but recommended
-},
+    paymentId: {
+      type: String,
+      default: null,     // ✅ BEST PRACTICE
+      index: true        // ✅ Optional but recommended
+    },
 
 
 
@@ -79,16 +85,16 @@ paymentId: {
       type: Boolean,
       default: true
     },
-// Razorpay subscription id
-razorpaySubscriptionId: {
-  type: String,
-  index: true
-},
+    // Razorpay subscription id
+    razorpaySubscriptionId: {
+      type: String,
+      index: true
+    },
 
-// Razorpay payment id
-razorpayPaymentId: {
-  type: String
-},
+    // Razorpay payment id
+    razorpayPaymentId: {
+      type: String
+    },
 
     autoRenew: {
       type: Boolean,

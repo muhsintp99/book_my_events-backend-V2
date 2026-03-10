@@ -16,8 +16,14 @@ const subscriptionRequestSchema = new mongoose.Schema(
 
     moduleId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Module",
-      required: true
+      required: true,
+      refPath: 'moduleModel'
+    },
+    moduleModel: {
+      type: String,
+      required: true,
+      enum: ['Module', 'SecondaryModule'],
+      default: 'Module'
     },
 
     planId: {

@@ -69,6 +69,7 @@ exports.initiateSubscriptionRequestPayment = async (req, res) => {
             userId: user._id,
             planId: plan._id,
             moduleId: request.moduleId._id,
+            moduleModel: request.moduleModel || 'Module',
             paymentId: orderId,
             status: "pending",
             isCurrent: false,

@@ -1,6 +1,8 @@
 const SubscriptionRequest = require("../../models/admin/SubscriptionRequest");
 const Subscription = require("../../models/admin/Subscription");
 const Plan = require("../../models/admin/Plan");
+const Module = require("../../models/admin/module");
+const SecondaryModule = require("../../models/admin/secondarymodule");
 
 /**
  * ======================================
@@ -9,10 +11,16 @@ const Plan = require("../../models/admin/Plan");
  */
 exports.getRequests = async (req, res) => {
   try {
+    // 🛠️ PATCH: Ensure all requests have a moduleModel
+    await SubscriptionRequest.updateMany(
+      { moduleModel: { $exists: false } },
+      { $set: { moduleModel: 'Module' } }
+    );
+
     const requests = await SubscriptionRequest.find()
       .populate("userId", "firstName lastName email phone")
       .populate("vendorProfileId")
-      .populate("moduleId", "title icon")
+      .populate("moduleId")
       .populate("planId", "name price durationInDays")
       .sort({ createdAt: -1 });
 
@@ -74,6 +82,7 @@ exports.approveRequest = async (req, res) => {
     const subscription = await Subscription.create({
       userId: request.userId,
       moduleId: request.moduleId,
+      moduleModel: request.moduleModel || 'Module',
       planId: request.planId._id,
       startDate,
       endDate,

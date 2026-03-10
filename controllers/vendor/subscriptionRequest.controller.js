@@ -1,6 +1,7 @@
 const SubscriptionRequest = require("../../models/admin/SubscriptionRequest");
 const VendorProfile = require("../../models/vendor/vendorProfile");
 const User = require("../../models/User");
+const Plan = require("../../models/admin/Plan");
 
 exports.createSubscriptionRequest = async (req, res) => {
   try {
@@ -77,10 +78,17 @@ exports.createSubscriptionRequest = async (req, res) => {
       });
     }
 
+    // 4️⃣ Get plan for moduleModel
+    const plan = await Plan.findById(planId);
+    if (!plan) {
+      return res.status(404).json({ success: false, message: "Plan not found" });
+    }
+
     // 4️⃣ Create request
     const request = await SubscriptionRequest.create({
       userId,
       moduleId,
+      moduleModel: plan.moduleModel || 'Module',
       planId,
       vendorProfileId: vendorProfileId || null
     });

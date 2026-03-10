@@ -539,6 +539,8 @@
 
 const Plan = require("../../models/admin/Plan");
 const Subscription = require("../../models/admin/Subscription");
+const Module = require("../../models/admin/module");
+const SecondaryModule = require("../../models/admin/secondarymodule");
 const mongoose = require("mongoose");
 
 
@@ -620,6 +622,7 @@ exports.createPlan = async (req, res) => {
   try {
     const {
       moduleId,
+      moduleModel,
       name,
       description,
       price,
@@ -649,6 +652,7 @@ exports.createPlan = async (req, res) => {
 
     const plan = await Plan.create({
       moduleId,
+      moduleModel,
       name,
       description,
       price,
@@ -693,8 +697,14 @@ exports.createPlan = async (req, res) => {
 
 exports.getPlans = async (req, res) => {
   try {
+    // 🛠️ PATCH: Ensure all plans have a moduleModel (for older plans)
+    await Plan.updateMany(
+      { moduleModel: { $exists: false } },
+      { $set: { moduleModel: 'Module' } }
+    );
+
     const plans = await Plan.find()
-      .populate("moduleId", "title icon") // NOW VALID
+      .populate("moduleId")
       .lean();
 
     for (let plan of plans) {
@@ -745,6 +755,7 @@ exports.subscribeUser = async (req, res) => {
       userId,
       planId,
       moduleId,
+      moduleModel: plan.moduleModel || 'Module',
       paymentId,
       status: "pending" // ✅ VERY IMPORTANT
     });
@@ -784,8 +795,14 @@ exports.getPlansByModule = async (req, res) => {
       });
     }
 
+    // 🛠️ PATCH: Ensure consistency
+    await Plan.updateMany(
+      { moduleId, moduleModel: { $exists: false } },
+      { $set: { moduleModel: 'Module' } }
+    );
+
     const plans = await Plan.find({ moduleId })
-      .populate("moduleId", "title icon")
+      .populate("moduleId")
       .lean();
 
     res.json({
@@ -963,6 +980,7 @@ exports.upgradePlan = async (req, res) => {
       userId,
       planId,
       moduleId,
+      moduleModel: plan.moduleModel || 'Module',
       paymentId: paymentSession.order_id,
       paymentSession,
       status: "pending",
@@ -1054,10 +1072,16 @@ exports.cancelSubscription = async (req, res) => {
 // --------------------------------------------------------
 exports.getAllSubscriptions = async (req, res) => {
   try {
+    // 🛠️ PATCH: Ensure all subscriptions have a moduleModel
+    await Subscription.updateMany(
+      { moduleModel: { $exists: false } },
+      { $set: { moduleModel: 'Module' } }
+    );
+
     const subs = await Subscription.find()
       .populate("userId")
       .populate("planId")
-      .populate("moduleId", "title icon")
+      .populate("moduleId")
       .sort({ createdAt: -1 });
 
     res.json({ success: true, subscriptions: subs });

@@ -46,21 +46,21 @@ exports.createSubscription = async (req, res) => {
     const isLive = process.env.RAZORPAY_KEY_ID.startsWith("rzp_live");
 
     // 🔁 Pick correct Razorpay plan ID (TEST vs LIVE)
-   let razorpayPlanId = isLive
-  ? plan.razorpayPlanIdLive
-  : plan.razorpayPlanIdTest;
+    let razorpayPlanId = isLive
+      ? plan.razorpayPlanIdLive
+      : plan.razorpayPlanIdTest;
 
-// FORCE new plan if price changed
-const expectedAmount = Math.round(Number(plan.price) * 100);
+    // FORCE new plan if price changed
+    const expectedAmount = Math.round(Number(plan.price) * 100);
 
-if (razorpayPlanId) {
-  const rpPlan = await razorpay.plans.fetch(razorpayPlanId);
+    if (razorpayPlanId) {
+      const rpPlan = await razorpay.plans.fetch(razorpayPlanId);
 
-  if (rpPlan.item.amount !== expectedAmount) {
-    console.log("⚠️ Price changed. Creating new Razorpay plan...");
-    razorpayPlanId = null;
-  }
-}
+      if (rpPlan.item.amount !== expectedAmount) {
+        console.log("⚠️ Price changed. Creating new Razorpay plan...");
+        razorpayPlanId = null;
+      }
+    }
 
     /**
      * =====================================================
@@ -133,6 +133,7 @@ if (razorpayPlanId) {
       userId: providerId,
       planId: plan._id,
       moduleId: plan.moduleId,
+      moduleModel: plan.moduleModel || 'Module',
       razorpaySubscriptionId: razorpaySubscription.id,
       status: "pending",
       isCurrent: false,

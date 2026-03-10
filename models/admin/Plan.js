@@ -4,7 +4,14 @@ const planSchema = new mongoose.Schema(
   {
     moduleId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Module",
+      required: true,
+      refPath: 'moduleModel'
+    },
+    moduleModel: {
+      type: String,
+      required: true,
+      enum: ['Module', 'SecondaryModule'],
+      default: 'Module'
     },
 
     name: { type: String, required: true },
