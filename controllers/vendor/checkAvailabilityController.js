@@ -1,6 +1,10 @@
 
 const Booking = require("../../models/vendor/Booking");
 const Module = require("../../models/admin/module");
+const VendorProfile = require("../../models/vendor/vendorProfile");
+const Invitation = require("../../models/vendor/invitationPackageModel");
+const Florist = require("../../models/vendor/floristPackageModel");
+const Mehandi = require("../../models/vendor/mehandiPackageModel");
 const mongoose = require("mongoose");
 
 /**
@@ -351,6 +355,52 @@ exports.checkAvailability = async (req, res) => {
         message: "This date has a pending request. You can still submit your interest/enquiry, and the vendor will review all requests.",
         conflict: pendingConflict
       });
+    }
+
+    /* =========================
+       MAX BOOKINGS CHECK (PROVIDER LEVEL)
+    ========================= */
+    const bookingModules = ["Invitation & Printing", "Florist & Stage", "Mehandi Artist"];
+    if (bookingModules.includes(title)) {
+      let provId = req.body.providerId;
+
+      // If no providerId, try to get it from the package
+      if (!provId && packageId && mongoose.Types.ObjectId.isValid(packageId)) {
+        let pkg = null;
+        if (title === "Invitation & Printing") {
+          pkg = await Invitation.findById(packageId).select("provider").lean();
+        } else if (title === "Florist & Stage") {
+          pkg = await Florist.findById(packageId).select("provider").lean();
+        } else if (title === "Mehandi Artist") {
+          pkg = await Mehandi.findById(packageId).select("provider").lean();
+        }
+        if (pkg && pkg.provider) provId = pkg.provider;
+      }
+
+      if (provId && mongoose.Types.ObjectId.isValid(provId)) {
+        const profile = await VendorProfile.findOne({ user: provId })
+          .select("maxBookings")
+          .lean();
+
+        if (profile && profile.maxBookings && profile.maxBookings > 0) {
+          // Count existing Accepted/Confirmed bookings for this provider on this date
+          const dailyBookingCount = await Booking.countDocuments({
+            providerId: new mongoose.Types.ObjectId(provId),
+            bookingDate: { $gte: startOfDay, $lte: endOfDay },
+            status: { $in: ["Accepted", "Confirmed"] },
+            paymentStatus: { $nin: ["failed", "cancelled"] }
+          });
+
+          if (dailyBookingCount >= profile.maxBookings) {
+            return res.json({
+              success: true,
+              available: false,
+              availabilityStatus: "Booked",
+              message: `The vendor has reached their maximum booking limit of ${profile.maxBookings} for this date.`
+            });
+          }
+        }
+      }
     }
 
     /* =========================

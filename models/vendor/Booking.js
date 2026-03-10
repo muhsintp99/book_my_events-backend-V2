@@ -296,6 +296,15 @@ const bookingSchema = new mongoose.Schema(
       },
       default: null,
     },
+    invitationDetails: {
+      eventTitle: { type: String },
+      mainNames: { type: String },
+      quantity: { type: Number },
+      venueDetails: { type: String },
+      instructions: { type: String },
+      eventDate: { type: Date },
+      capturedAt: { type: Date }
+    },
     floristId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "FloristPackage",

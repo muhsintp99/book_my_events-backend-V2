@@ -610,6 +610,7 @@ exports.createBooking = async (req, res) => {
       mehandiId,
       bouncerId,
       emceeId,
+      invitationDetails, // ✅ NEW: Captured invitation content
     } = req.body;
 
 
@@ -1923,6 +1924,11 @@ exports.createBooking = async (req, res) => {
       rentalDays: Number(days) > 0 ? Number(days) : undefined,
 
       securityDeposit: securityDeposit || 0,
+
+      // ================= INVITATION =================
+      invitationDetails: (moduleType === "Invitation & Printing" || moduleType === "Invitation" || moduleType === "Printing")
+        ? invitationDetails
+        : undefined,
     };
 
     console.log("💾 Creating booking...");
