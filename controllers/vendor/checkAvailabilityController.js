@@ -1,6 +1,7 @@
 
 const Booking = require("../../models/vendor/Booking");
 const Module = require("../../models/admin/module");
+const SecondaryModule = require("../../models/admin/secondarymodule");
 const VendorProfile = require("../../models/vendor/vendorProfile");
 const Invitation = require("../../models/vendor/invitationPackageModel");
 const Florist = require("../../models/vendor/floristPackageModel");
@@ -56,11 +57,17 @@ exports.checkAvailability = async (req, res) => {
     }
 
     /* =========================
-       CHECK MODULE EXISTS
+       CHECK MODULE EXISTS (Primary or Secondary)
     ========================= */
-    const moduleExists = await Module.findById(moduleId)
+    let moduleExists = await Module.findById(moduleId)
       .select("_id title isActive")
       .lean();
+
+    if (!moduleExists) {
+      moduleExists = await SecondaryModule.findById(moduleId)
+        .select("_id title isActive")
+        .lean();
+    }
 
     if (!moduleExists) {
       return res.status(404).json({
