@@ -23,7 +23,7 @@ const enquirySchema = new mongoose.Schema(
 
     packageId: {
       type: mongoose.Schema.Types.ObjectId,
-      required: true,
+      required: false,
     },
 
     bookingDate: Date,
