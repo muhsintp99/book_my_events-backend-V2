@@ -59,9 +59,15 @@ exports.getVendor = async (req, res) => {
 exports.findVendorProfile = async (req, res) => {
     try {
         const id = req.params.id;
+        const moduleId = req.query.moduleId || req.query.moduleid;
 
         // 1. Try finding by the 'user' field reference
-        let vendor = await VendorProfile.findOne({ user: id }).populate(populateFields);
+        let query = { user: id };
+        if (moduleId && mongoose.Types.ObjectId.isValid(moduleId)) {
+            query.module = moduleId;
+        }
+        
+        let vendor = await VendorProfile.findOne(query).populate(populateFields);
 
         // 2. Fallback: Try finding by the vendor profile's own _id
         if (!vendor) {

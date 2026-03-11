@@ -763,7 +763,7 @@ exports.getVendorsForCakeModule = async (req, res) => {
     }
 
     const vendorProfiles = await VendorProfile.find(query)
-      .select("user storeName logo coverImage subscriptionStatus isFreeTrial zone")
+      .select("user storeName logo coverImage subscriptionStatus isFreeTrial zone latitude longitude")
       .populate("zone", "name")
       .lean();
 
@@ -839,6 +839,8 @@ exports.getVendorsForCakeModule = async (req, res) => {
         coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
         hasVendorProfile: true,
         zone: vp?.zone || null,
+        latitude: vp?.latitude || null,
+        longitude: vp?.longitude || null,
         packageCount, // ✅ ADD PACKAGE COUNT TO RESPONSE
         subscription: sub
           ? {
