@@ -205,7 +205,7 @@ const sanitizeCakeData = (body) => {
 
   // Delivery Mode - No longer restricted to enum so custom modes work
   if (!data.deliveryMode) {
-    data.deliveryMode = 'standard';
+    data.deliveryMode = 'Standard package delivery';
   }
 
   return data;
