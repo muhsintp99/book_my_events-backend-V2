@@ -1898,7 +1898,39 @@ exports.login = async (req, res) => {
     }
 
 
+        // 🛡️ ROLE-BASED ACCESS CONTROL (Strict separation of Customer and Vendor Portals)
+    const referer = (req.headers.referer || "").toLowerCase();
+    const origin = (req.headers.origin || "").toLowerCase();
     
+    // Detect if the request is coming from the Vendor Panel based on URL or common dev ports
+    const isVendorPanel = referer.includes("vendor") || 
+                         origin.includes("vendor") || 
+                         referer.includes(":5173") || 
+                         referer.includes(":5174") ||
+                         req.body.loginType === "vendor";
+
+    // 1. Admins & Superadmins: Allowed to log in to all portals
+    if (user.role === "admin" || user.role === "superadmin" || user.role === "superadmin") {
+      // Access granted
+    } 
+    // 2. Vendor Panel: ONLY allow vendors
+    else if (isVendorPanel) {
+      if (user.role !== "vendor") {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Only vendor accounts can log in to the Vendor Panel.",
+        });
+      }
+    } 
+    // 3. Main Website / Customer Portal: ONLY allow customers (role "user")
+    else {
+      if (user.role !== "user") {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. This login is for customers only. Vendors please log in via the Vendor Panel.",
+        });
+      }
+    }
 
     const refreshToken = crypto.randomBytes(32).toString("hex");
     user.refreshToken = refreshToken;
