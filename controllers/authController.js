@@ -1898,7 +1898,24 @@ exports.login = async (req, res) => {
     }
 
 
+     // ❌ Block customers (role "user") from logging into the vendor panel
+    // We check the 'referer' or 'origin' header to see if the request is coming from the Vendor Panel
+    const referer = req.headers.referer || "";
+    const origin = req.headers.origin || "";
     
+    // Check if the request is coming from the vendor dashboard URL pattern
+    const isVendorPanel = referer.includes("/dashboard") || 
+                         referer.includes("vendor") || 
+                         origin.includes("vendor") ||
+                         referer.includes(":5173") || // Local dev for React
+                         req.body.loginType === "vendor";
+
+    if (isVendorPanel && user.role === "user") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Customer accounts cannot log in to the Vendor Panel.",
+      });
+    }
 
     const refreshToken = crypto.randomBytes(32).toString("hex");
     user.refreshToken = refreshToken;
