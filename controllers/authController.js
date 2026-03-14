@@ -1899,21 +1899,7 @@ exports.login = async (req, res) => {
 
 
     
-// ❌ Block customers (role "user") from logging into the vendor panel
-    if (loginType === "vendor" && user.role === "user") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Customers are not allowed to log in to the Vendor Panel.",
-      });
-    }
 
-    // ❌ Block customers and vendors from logging into the admin panel
-    if (loginType === "admin" && (user.role === "user" || user.role === "vendor")) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Only administrators can access this portal.",
-      });
-    }
     const refreshToken = crypto.randomBytes(32).toString("hex");
     user.refreshToken = refreshToken;
     user.lastLogin = new Date();
