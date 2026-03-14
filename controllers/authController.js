@@ -1897,6 +1897,14 @@ exports.login = async (req, res) => {
       });
     }
 
+
+     if (user.role === "user") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. This login is for vendors only. Please use the customer app to log in.",
+      });
+    }
+
     const refreshToken = crypto.randomBytes(32).toString("hex");
     user.refreshToken = refreshToken;
     user.lastLogin = new Date();
