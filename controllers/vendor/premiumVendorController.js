@@ -67,7 +67,7 @@ exports.getPremiumHighlights = async (req, res) => {
                     provider: { $in: premiumProviders }
                 };
 
-                const items = await model.find(query)
+                const allItems = await model.find(query)
                     .populate({
                         path: "provider",
                         select: "firstName lastName email phone role",
@@ -78,7 +78,22 @@ exports.getPremiumHighlights = async (req, res) => {
                     })
                     .lean();
 
-                // Manually populate module/secondaryModule to avoid Mongoose virtual errors
+                // Deduplicate by Provider (Show only one package per vendor)
+                const uniqueVendors = new Map();
+                for (const item of allItems) {
+                    const providerId = item.provider?._id?.toString() || item.provider?.toString();
+                    if (!providerId) continue;
+
+                    // If we haven't seen this vendor, or if this new item is a "Top Pick" 
+                    // and the stored one isn't, prefer this one.
+                    if (!uniqueVendors.has(providerId) || (item.isTopPick && !uniqueVendors.get(providerId).isTopPick)) {
+                        uniqueVendors.set(providerId, item);
+                    }
+                }
+
+                const items = Array.from(uniqueVendors.values());
+
+                // Manually populate module/secondaryModule
                 for (let item of items) {
                     if (pType === 'module' && item.module) {
                         item.module = await Module.findById(item.module).select("title icon moduleId").lean();
