@@ -1907,6 +1907,8 @@ exports.login = async (req, res) => {
                          origin.includes("vendor") || 
                          referer.includes(":5173") || 
                          referer.includes(":5174") ||
+                         referer.includes(":5002") ||
+
                          req.body.loginType === "vendor";
 
     // 1. Admins & Superadmins: Allowed to log in to all portals
