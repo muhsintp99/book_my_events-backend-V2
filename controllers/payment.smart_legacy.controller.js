@@ -346,6 +346,8 @@ const config = require("../config/smartgateway_config.json");
 const Subscription = require("../models/admin/Subscription");
 const Plan = require("../models/admin/Plan");
 const User = require("../models/User");
+const VendorProfile = require("../models/vendor/vendorProfile");
+
 
 
 // Initialize SmartGateway with BASIC Authentication (API Key)
@@ -665,7 +667,22 @@ exports.verifySubscriptionPayment = async (req, res) => {
       subscription.isCurrent = true;
       await subscription.save();
 
+      // Update VendorProfile
+      const vendorProfile = await VendorProfile.findOne({ user: subscription.userId });
+      if (vendorProfile) {
+        vendorProfile.subscriptionStatus = "active";
+        vendorProfile.subscriptionPlan = plan._id;
+        vendorProfile.subscriptionStartDate = startDate;
+        vendorProfile.subscriptionEndDate = endDate;
+        vendorProfile.isFreeTrial = false;
+        vendorProfile.lastPaymentDate = new Date();
+        
+        await vendorProfile.save();
+        console.log(`✅ VendorProfile updated for user: ${subscription.userId}`);
+      }
+
       return res.json({
+
         success: true,
         status: "completed",
         message: "Subscription activated successfully",
