@@ -401,14 +401,16 @@ const populateCake = async (id, req = null) => {
 
   // Fetch VendorProfile linked to provider
   const vendorProfile = await VendorProfile.findOne({ user: cake.provider._id })
-    .select("storeName logo coverImage latitude longitude zone")
+    .select("storeName logo coverImage latitude longitude zones")
     .lean();
 
   if (vendorProfile) {
     cake.provider.storeName = vendorProfile.storeName;
     cake.provider.latitude = vendorProfile.latitude;
     cake.provider.longitude = vendorProfile.longitude;
-    cake.provider.vendor_zone = vendorProfile.zone;
+    cake.provider.zone = vendorProfile.zones?.[0] || null;
+    cake.provider.zones = vendorProfile.zones || [];
+    cake.provider.vendor_zone = vendorProfile.zones?.[0] || null;
     cake.provider.logo = vendorProfile.logo
       ? `${baseUrl}${vendorProfile.logo}`
       : null;

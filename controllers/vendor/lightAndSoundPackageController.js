@@ -182,7 +182,7 @@ exports.getAllLightAndSoundPackages = async (req, res) => {
         if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
             pipeline.push({
                 $match: {
-                    "vendorProfile.zone": new mongoose.Types.ObjectId(zoneId),
+                    "vendorProfile.zones": new mongoose.Types.ObjectId(zoneId),
                 },
             });
         }
@@ -277,7 +277,7 @@ exports.getLightAndSoundPackageById = async (req, res) => {
                     path: "vendorProfile",
                     match: { status: "approved", isActive: true },
                     populate: [
-                        { path: "zone", select: "_id name city country" },
+                        { path: "zones", select: "_id name city country" },
                         { path: "services", select: "_id title image" },
                         { path: "specialised", select: "_id title image" }
                     ]
@@ -299,6 +299,10 @@ exports.getLightAndSoundPackageById = async (req, res) => {
 
         if (pkg && pkg.provider && !pkg.provider.profilePhoto && pkg.provider.vendorProfile?.logo) {
             pkg.provider.profilePhoto = pkg.provider.vendorProfile.logo;
+        }
+
+        if (pkg && pkg.provider && pkg.provider.vendorProfile) {
+            pkg.provider.vendorProfile.zone = pkg.provider.vendorProfile.zones?.[0] || null;
         }
 
         res.json({ success: true, data: pkg });
@@ -333,7 +337,7 @@ exports.getLightAndSoundByVendor = async (req, res) => {
                 populate: {
                     path: "vendorProfile",
                     populate: [
-                        { path: "zone", select: "_id name city country" },
+                        { path: "zones", select: "_id name city country" },
                         { path: "services", select: "_id title image" },
                         { path: "specialised", select: "_id title image" }
                     ]
@@ -352,6 +356,9 @@ exports.getLightAndSoundByVendor = async (req, res) => {
         packages.forEach(pkg => {
             if (pkg.provider && !pkg.provider.profilePhoto && pkg.provider.vendorProfile?.logo) {
                 pkg.provider.profilePhoto = pkg.provider.vendorProfile.logo;
+            }
+            if (pkg.provider && pkg.provider.vendorProfile) {
+                pkg.provider.vendorProfile.zone = pkg.provider.vendorProfile.zones?.[0] || null;
             }
         });
 
@@ -390,7 +397,7 @@ exports.getLightAndSoundVendors = async (req, res) => {
         };
 
         if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
-            profileMatch.zone = new mongoose.Types.ObjectId(zoneId);
+            profileMatch.zones = new mongoose.Types.ObjectId(zoneId);
         }
 
         if (city) {
@@ -442,7 +449,7 @@ exports.getLightAndSoundVendors = async (req, res) => {
             .populate({
                 path: "vendorProfile",
                 populate: [
-                    { path: "zone", select: "name" },
+                    { path: "zones", select: "name" },
                     { path: "services", select: "title icon slug" },
                     { path: "specialised", select: "title icon slug" }
                 ]
@@ -486,7 +493,8 @@ exports.getLightAndSoundVendors = async (req, res) => {
                 packages: vendorPackages, // ✅ Added detailed packages
 
                 storeName: vp.storeName,
-                zone: vp.zone,
+                zone: vp.zones?.[0] || null,
+                zones: vp.zones || [],
                 storeAddress: vp.storeAddress,
 
                 // ✅ Categories Added

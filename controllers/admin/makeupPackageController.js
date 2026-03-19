@@ -439,7 +439,7 @@ exports.getVendorsForMakeupModule = async (req, res) => {
     }
 
     if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
-      query.zone = zoneId;
+      query.zones = zoneId;
     }
 
     const vendorProfiles = await VendorProfile.find(query)

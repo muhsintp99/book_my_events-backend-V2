@@ -248,7 +248,7 @@ exports.getAllMehandiPackages = async (req, res) => {
         if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
             pipeline.push({
                 $match: {
-                    "vendorProfile.zone": new mongoose.Types.ObjectId(zoneId),
+                    "vendorProfile.zones": new mongoose.Types.ObjectId(zoneId),
                 },
             });
         }
@@ -292,15 +292,15 @@ exports.getAllMehandiPackages = async (req, res) => {
         });
         pipeline.push({ $unwind: "$secondaryModule" });
 
-        /* zone */
+        /* zones */
         pipeline.push({
             $lookup: {
                 from: "zones",
-                let: { zoneId: "$vendorProfile.zone" },
+                let: { zoneIds: "$vendorProfile.zones" },
                 pipeline: [
                     {
                         $match: {
-                            $expr: { $eq: ["$_id", "$$zoneId"] }
+                            $expr: { $in: ["$_id", { $ifNull: ["$$zoneIds", []] }] }
                         }
                     },
                     {
@@ -312,14 +312,14 @@ exports.getAllMehandiPackages = async (req, res) => {
                         }
                     }
                 ],
-                as: "vendorProfile.zone"
+                as: "vendorProfile.zones"
             }
         });
 
+        // For backward compatibility, pick the first zone as 'zone'
         pipeline.push({
-            $unwind: {
-                path: "$vendorProfile.zone",
-                preserveNullAndEmptyArrays: true
+            $addFields: {
+                "vendorProfile.zone": { $arrayElemAt: ["$vendorProfile.zones", 0] }
             }
         });
 
@@ -478,7 +478,7 @@ exports.getMehandiPackageById = async (req, res) => {
                     match: { status: "approved", isActive: true },
                     populate: [
                         {
-                            path: "zone",
+                            path: "zones",
                             select: "_id name city country"
                         },
                         {
@@ -507,6 +507,10 @@ exports.getMehandiPackageById = async (req, res) => {
 
         if (pkg && pkg.provider && !pkg.provider.profilePhoto && pkg.provider.vendorProfile?.logo) {
             pkg.provider.profilePhoto = pkg.provider.vendorProfile.logo;
+        }
+
+        if (pkg && pkg.provider && pkg.provider.vendorProfile) {
+            pkg.provider.vendorProfile.zone = pkg.provider.vendorProfile.zones?.[0] || null;
         }
 
         res.json({
@@ -568,7 +572,7 @@ exports.getMehandiByVendor = async (req, res) => {
                     path: "vendorProfile",
                     populate: [
                         {
-                            path: "zone",
+                            path: "zones",
                             select: "_id name city country"
                         },
                         {
@@ -592,6 +596,9 @@ exports.getMehandiByVendor = async (req, res) => {
         packages.forEach(pkg => {
             if (pkg.provider && !pkg.provider.profilePhoto && pkg.provider.vendorProfile?.logo) {
                 pkg.provider.profilePhoto = pkg.provider.vendorProfile.logo;
+            }
+            if (pkg.provider && pkg.provider.vendorProfile) {
+                pkg.provider.vendorProfile.zone = pkg.provider.vendorProfile.zones?.[0] || null;
             }
         });
 
@@ -683,7 +690,7 @@ exports.getMehandiVendors = async (req, res) => {
         };
 
         if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
-            profileMatch.zone = new mongoose.Types.ObjectId(zoneId);
+            profileMatch.zones = new mongoose.Types.ObjectId(zoneId);
         }
 
         if (city) {
@@ -710,7 +717,7 @@ exports.getMehandiVendors = async (req, res) => {
                 match: profileMatch,
                 populate: [
                     {
-                        path: "zone",
+                        path: "zones",
                         select: "name"
                     },
                     {
@@ -743,7 +750,8 @@ exports.getMehandiVendors = async (req, res) => {
 
                 storeName: user.vendorProfile.storeName,
 
-                zone: user.vendorProfile.zone,
+                zone: user.vendorProfile.zones?.[0] || null,
+                zones: user.vendorProfile.zones || [],
                 storeAddress: user.vendorProfile.storeAddress,
 
                 // ✅ Categories Added

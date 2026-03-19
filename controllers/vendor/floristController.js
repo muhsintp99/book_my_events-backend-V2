@@ -201,7 +201,7 @@ exports.getAllFloristPackages = async (req, res) => {
         if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
             pipeline.push({
                 $match: {
-                    "vendorProfile.zone": new mongoose.Types.ObjectId(zoneId),
+                    "vendorProfile.zones": new mongoose.Types.ObjectId(zoneId),
                 },
             });
         }
@@ -295,7 +295,7 @@ exports.getFloristPackageById = async (req, res) => {
                     path: "vendorProfile",
                     match: { status: "approved", isActive: true },
                     populate: [
-                        { path: "zone", select: "_id name city country" },
+                        { path: "zones", select: "_id name city country" },
                         { path: "services", select: "_id title image" },
                         { path: "specialised", select: "_id title image" }
                     ]
@@ -314,6 +314,10 @@ exports.getFloristPackageById = async (req, res) => {
 
         if (pkg && pkg.provider && !pkg.provider.profilePhoto && pkg.provider.vendorProfile?.logo) {
             pkg.provider.profilePhoto = pkg.provider.vendorProfile.logo;
+        }
+
+        if (pkg && pkg.provider && pkg.provider.vendorProfile) {
+            pkg.provider.vendorProfile.zone = pkg.provider.vendorProfile.zones?.[0] || null;
         }
 
         res.json({ success: true, data: pkg });
@@ -365,6 +369,9 @@ exports.getFloristByVendor = async (req, res) => {
             if (pkg.provider && !pkg.provider.profilePhoto && pkg.provider.vendorProfile?.logo) {
                 pkg.provider.profilePhoto = pkg.provider.vendorProfile.logo;
             }
+            if (pkg.provider && pkg.provider.vendorProfile) {
+                pkg.provider.vendorProfile.zone = pkg.provider.vendorProfile.zones?.[0] || null;
+            }
         });
 
         res.json({
@@ -402,7 +409,7 @@ exports.getFloristVendors = async (req, res) => {
         };
 
         if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
-            profileMatch.zone = new mongoose.Types.ObjectId(zoneId);
+            profileMatch.zones = new mongoose.Types.ObjectId(zoneId);
         }
 
         if (city) {
@@ -454,7 +461,7 @@ exports.getFloristVendors = async (req, res) => {
             .populate({
                 path: "vendorProfile",
                 populate: [
-                    { path: "zone", select: "name" },
+                    { path: "zones", select: "name" },
                     { path: "services", select: "title icon slug" },
                     { path: "specialised", select: "title icon slug" }
                 ]
@@ -498,7 +505,8 @@ exports.getFloristVendors = async (req, res) => {
                 packages: vendorPackages,
 
                 storeName: vp.storeName,
-                zone: vp.zone,
+                zone: vp.zones?.[0] || null,
+                zones: vp.zones || [],
                 storeAddress: vp.storeAddress,
 
                 // ✅ Categories Added
