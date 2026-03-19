@@ -185,7 +185,7 @@
 //           },
 //         },
 //         {
-//           path: "zone",
+//           path: "zones",
 //           select: "name description coordinates city country isActive",
 //         },
 //       ]);
@@ -678,7 +678,7 @@
 //           },
 //         },
 //         {
-//           path: "zone",
+//           path: "zones",
 //           select: "name description city country isActive",
 //         },
 //       ]);
@@ -1422,7 +1422,7 @@
 //     //       },
 //     //     },
 //     //     {
-//     //       path: "zone",
+//     //       path: "zones",
 //     //       select: "name description city country isActive",
 //     //     },
 //     //   ]);
@@ -1476,7 +1476,7 @@
 //       },
 //     },
 //     {
-//       path: "zone",
+//       path: "zones",
 //       select: "name description city country isActive",
 //     },
 //   ]);
@@ -1951,7 +1951,7 @@ exports.login = async (req, res) => {
           },
         },
         {
-          path: "zone",
+          path: "zones",
           select: "name description coordinates city country isActive isTopZone icon",
         },
       ]);
@@ -2105,6 +2105,7 @@ exports.register = async (req, res) => {
       req.body.tinExpireDate = undefined;
       req.body.module = undefined;
       req.body.zone = undefined;
+      req.body.zones = undefined;
       req.body.subscriptionPlan = undefined;
        req.body.services = undefined;
       req.body.specialised = undefined;
@@ -2320,9 +2321,19 @@ exports.register = async (req, res) => {
               : null,
                moduleType: mType,
 
-            zone: mongoose.Types.ObjectId.isValid(zone?.toString().trim())
-              ? new mongoose.Types.ObjectId(zone.toString().trim())
-              : null,
+            zones: (function() {
+              const zoneInput = zone || req.body.zones;
+              if (Array.isArray(zoneInput)) {
+                return zoneInput.filter(z => mongoose.Types.ObjectId.isValid(z?.toString().trim()))
+                               .map(z => new mongoose.Types.ObjectId(z.toString().trim()));
+              } else if (zoneInput && typeof zoneInput === 'string' && zoneInput.includes(',')) {
+                return zoneInput.split(',').map(z => z.trim()).filter(z => mongoose.Types.ObjectId.isValid(z))
+                               .map(z => new mongoose.Types.ObjectId(z));
+              } else if (zoneInput && mongoose.Types.ObjectId.isValid(zoneInput.toString().trim())) {
+                return [new mongoose.Types.ObjectId(zoneInput.toString().trim())];
+              }
+              return [];
+            })(),
             user: user[0]._id,
             status: "pending",
             registrationSource: isAdminAddedVendor ? "admin" : "website",
@@ -2373,7 +2384,7 @@ exports.register = async (req, res) => {
         .populate("module", "title")
         .populate("services", "title")
         .populate("specialised", "title")
-        .populate("zone", "name description coordinates city country isActive isTopZone icon");    }
+        .populate("zones", "name description coordinates city country isActive isTopZone icon");    }
 
     const responseData = {
       success: true,
@@ -2415,6 +2426,8 @@ exports.register = async (req, res) => {
         specialised: vendorProfile?.specialised || null,
         startingPrice: vendorProfile?.startingPrice || null,
         minBookingPrice: vendorProfile?.minBookingPrice || null,
+        zones: vendorProfile?.zones || [],
+        zone: vendorProfile?.zones?.[0] || null,
       },
     };
 
@@ -2536,7 +2549,7 @@ exports.listMakeupVendors = async (req, res) => {
 //           },
 //         },
 //         {
-//           path: "zone",
+//           path: "zones",
 //           select: "name description city country isActive",
 //         },
 //       ]);

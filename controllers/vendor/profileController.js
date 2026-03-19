@@ -40,7 +40,7 @@ exports.getAllVendors = async (req, res) => {
         select: "title moduleId icon"
       })
       .populate({
-        path: "zone",
+        path: "zones",
         select: "name description coordinates city country isActive isTopZone icon"
       })
       .populate("services", "title")
@@ -192,7 +192,7 @@ exports.getSingleVendor = async (req, res) => {
       .populate("module", "title moduleId icon")
       .populate("services", "title")
       .populate("specialised", "title")
-      .populate("zone", "name description coordinates city country isActive isTopZone icon");
+      .populate("zones", "name description coordinates city country isActive isTopZone icon");
 
     if (!vendor) {
       return res.status(404).json({
@@ -1073,7 +1073,7 @@ exports.getProviderAdminDetails = async (req, res) => {
         .populate("module", "title moduleId icon")
         .populate("services", "title")
         .populate("specialised", "title")
-        .populate("zone", "name description coordinates city country isActive isTopZone icon")
+        .populate("zones", "name description coordinates city country isActive isTopZone icon")
     ]);
 
     if (!user) {
@@ -1183,7 +1183,7 @@ exports.getVendorCollectionDetails = async (req, res) => {
       VendorProfile.findOne({ user: providerId })
         .populate("services", "title")
         .populate("specialised", "title")
-        .populate("zone", "name description city country")
+        .populate("zones", "name description city country")
     ]);
 
     if (!user) {
@@ -1214,7 +1214,8 @@ exports.getVendorCollectionDetails = async (req, res) => {
         coverImage: vendorProfile.coverImage || "",
         latitude: vendorProfile.latitude,
         longitude: vendorProfile.longitude,
-        zone: vendorProfile.zone,
+        zones: vendorProfile.zones,
+        zone: vendorProfile.zones?.[0] || null,
         subscriptionStatus: vendorProfile.subscriptionStatus
       } : null
     };

@@ -14,7 +14,7 @@ exports.getPendingRegistrations = async (req, res) => {
         })
             .populate("user", "firstName lastName email phone userId")
             .populate("module", "title")
-            .populate("zone", "name")
+            .populate("zones", "name")
             .sort({ createdAt: -1 });
 
         res.status(200).json({
@@ -39,7 +39,7 @@ exports.getRegistrationDetail = async (req, res) => {
         const registration = await VendorProfile.findById(req.params.id)
             .populate("user", "firstName lastName email phone userId role isActive isVerified")
             .populate("module")
-            .populate("zone");
+            .populate("zones");
 
         if (!registration) {
             return res.status(404).json({

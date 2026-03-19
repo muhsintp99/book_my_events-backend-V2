@@ -869,11 +869,10 @@ const vendorProfileSchema = new mongoose.Schema(
       default: "Module"
     },
 
-    zone: {
+    zones: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: "Zone",
-      default: null
-    },
+    }],
 
     // ----------------------- SUBSCRIPTION FIELDS -----------------------
     isFreeTrial: {

@@ -10,7 +10,7 @@ const populateFields = [
         },
     },
     {
-        path: "zone",
+        path: "zones",
         select: "name description coordinates city country isActive",
     },
     { path: "reviewedBy", select: "userId firstName lastName email role" },
