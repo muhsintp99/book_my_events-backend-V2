@@ -31,11 +31,19 @@ const enhanceProviderDetails = async (providerInput, req = null) => {
 
     if (!providerId) return providerObj;
 
-    // 2. Fetch VendorProfile linked to this user
-    const vendorProfile = await VendorProfile.findOne({ user: providerId })
-        .select("storeName logo coverImage zones storeAddress latitude longitude")
-        .populate("zones", "name description icon")
-        .lean();
+    // 2. Fetch ANY approved VendorProfile linked to this user
+    // We fetch all approved ones and prioritize the one that has zones populated
+    const vendorProfiles = await VendorProfile.find({ 
+        user: providerId,
+        status: "approved",
+        isActive: true
+    })
+    .select("storeName logo coverImage zones storeAddress latitude longitude")
+    .populate("zones", "name description icon")
+    .lean();
+
+    // Prioritize a profile that has zones, otherwise take the first one
+    const vendorProfile = vendorProfiles.find(p => p.zones && p.zones.length > 0) || vendorProfiles[0];
 
     if (vendorProfile) {
         providerObj.storeName = vendorProfile.storeName || `${providerObj.firstName || ""} ${providerObj.lastName || ""}`.trim();

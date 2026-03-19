@@ -759,9 +759,40 @@ exports.getMehandiVendors = async (req, res) => {
                 specialised: user.vendorProfile.specialised,
 
                 latitude: user.vendorProfile.latitude,
-                longitude: user.vendorProfile.longitude
+                longitude: user.vendorProfile.longitude,
+                _needsZoneLookup: (!user.vendorProfile.zones || user.vendorProfile.zones.length === 0)
             };
         });
+
+        // ✅ ZONE FALLBACK: Search for zones in ANY other approved profile for these vendors
+        const vendorsNeedingZones = final.filter(v => v._needsZoneLookup);
+        if (vendorsNeedingZones.length > 0) {
+            const idsNeedingZones = vendorsNeedingZones.map(v => v._id);
+            const otherProfiles = await VendorProfile.find({
+                user: { $in: idsNeedingZones },
+                status: "approved",
+                isActive: true,
+                zones: { $exists: true, $ne: [] }
+            })
+            .select("user zones storeAddress")
+            .populate("zones", "name")
+            .lean();
+
+            for (const vendor of vendorsNeedingZones) {
+                const otherVp = otherProfiles.find(p => p.user.toString() === vendor._id.toString());
+                if (otherVp && otherVp.zones && otherVp.zones.length > 0) {
+                    vendor.zone = otherVp.zones[0];
+                    vendor.zones = otherVp.zones;
+                }
+                // Fallback for address as well if primary one is mostly empty
+                if ((!vendor.storeAddress || !vendor.storeAddress.city) && otherVp?.storeAddress?.city) {
+                    vendor.storeAddress = otherVp.storeAddress;
+                }
+            }
+        }
+
+        // Cleanup internal flag
+        final.forEach(v => delete v._needsZoneLookup);
 
         res.json({
             success: true,

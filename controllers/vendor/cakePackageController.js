@@ -765,7 +765,7 @@ exports.getVendorsForCakeModule = async (req, res) => {
     }
 
     const vendorProfiles = await VendorProfile.find(query)
-      .select("user storeName logo coverImage subscriptionStatus isFreeTrial zones latitude longitude")
+      .select("user storeName logo coverImage subscriptionStatus isFreeTrial zones storeAddress latitude longitude")
       .populate("zones", "name")
       .lean();
 
@@ -840,10 +840,12 @@ exports.getVendorsForCakeModule = async (req, res) => {
         logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
         coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
         hasVendorProfile: true,
+        storeAddress: vp?.storeAddress || null,
         zone: vp?.zones?.[0] || null,
         zones: vp?.zones || [],
         latitude: vp?.latitude || null,
         longitude: vp?.longitude || null,
+        _needsZoneLookup: (!vp?.zones || vp.zones.length === 0),
         packageCount, // ✅ ADD PACKAGE COUNT TO RESPONSE
         subscription: sub
           ? {
@@ -877,6 +879,35 @@ exports.getVendorsForCakeModule = async (req, res) => {
           },
       };
     });
+
+    // ✅ ZONE FALLBACK: Search for zones in ANY other approved profile for these vendors
+    const vendorsNeedingZones = final.filter(v => v._needsZoneLookup);
+    if (vendorsNeedingZones.length > 0) {
+      const idsNeedingZones = vendorsNeedingZones.map(v => v._id);
+      const otherProfiles = await VendorProfile.find({
+        user: { $in: idsNeedingZones },
+        status: "approved",
+        isActive: true,
+        zones: { $exists: true, $ne: [] }
+      })
+      .select("user zones storeAddress")
+      .populate("zones", "name")
+      .lean();
+
+      for (const vendor of vendorsNeedingZones) {
+        const otherVp = otherProfiles.find(p => p.user.toString() === vendor._id.toString());
+        if (otherVp && otherVp.zones && otherVp.zones.length > 0) {
+          vendor.zone = otherVp.zones[0];
+          vendor.zones = otherVp.zones;
+        }
+        if (!vendor.storeAddress && otherVp?.storeAddress) {
+          vendor.storeAddress = otherVp.storeAddress;
+        }
+      }
+    }
+
+    // Cleanup internal flag
+    final.forEach(v => delete v._needsZoneLookup);
 
     // ✅ SINGLE VENDOR (don't filter for single vendor query)
     if (providerId) {
