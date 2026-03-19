@@ -33,8 +33,8 @@ const enhanceProviderDetails = async (providerInput, req = null) => {
 
     // 2. Fetch VendorProfile linked to this user
     const vendorProfile = await VendorProfile.findOne({ user: providerId })
-        .select("storeName logo coverImage zone storeAddress latitude longitude")
-        .populate("zone", "name description icon")
+        .select("storeName logo coverImage zones storeAddress latitude longitude")
+        .populate("zones", "name description icon")
         .lean();
 
     if (vendorProfile) {
@@ -47,7 +47,8 @@ const enhanceProviderDetails = async (providerInput, req = null) => {
             ? (vendorProfile.coverImage.startsWith("http") ? vendorProfile.coverImage : `${baseUrl}${vendorProfile.coverImage}`)
             : null;
 
-        providerObj.zone = vendorProfile.zone;
+        providerObj.zone = vendorProfile.zones?.[0] || null;
+        providerObj.zones = vendorProfile.zones || [];
         providerObj.storeAddress = vendorProfile.storeAddress;
         providerObj.latitude = vendorProfile.latitude;
         providerObj.longitude = vendorProfile.longitude;

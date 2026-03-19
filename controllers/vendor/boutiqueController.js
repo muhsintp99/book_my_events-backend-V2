@@ -363,6 +363,7 @@ exports.getVendorsForBoutiqueModule = async (req, res) => {
     try {
         const { moduleId } = req.params;
         const providerId = req.query.providerId || req.query.providerid || null;
+        const zoneId = req.query.zoneId || req.query.zoneid || null;
 
         if (!mongoose.Types.ObjectId.isValid(moduleId)) {
             return sendResponse(res, 400, false, "Invalid module ID");
@@ -373,8 +374,12 @@ exports.getVendorsForBoutiqueModule = async (req, res) => {
             query.user = providerId;
         }
 
+        if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
+            query.zones = zoneId;
+        }
+
         const vendorProfiles = await VendorProfile.find(query)
-            .select("user storeName logo coverImage")
+            .select("user storeName logo coverImage zones")
             .lean();
 
         if (!vendorProfiles.length) {

@@ -452,13 +452,13 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
     }
 
     if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
-      vpQuery.zone = zoneId;
+      vpQuery.zones = zoneId;
     }
 
-    // 🔹 Get vendor profiles with zone populated
+    // 🔹 Get vendor profiles with zones populated
     const vendorProfiles = await VendorProfile.find(vpQuery)
-      .select("user storeName logo coverImage zone")
-      .populate("zone", "name")
+      .select("user storeName logo coverImage zones")
+      .populate("zones", "name")
       .lean();
 
     if (!vendorProfiles.length) {
@@ -539,7 +539,8 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
         logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
         coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
         hasVendorProfile: !!vp,
-        zone: vp?.zone || null,
+        zone: vp?.zones?.[0] || null,
+        zones: vp?.zones || [],
         packageCount,
 
         // 🔥 SUBSCRIPTION

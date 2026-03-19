@@ -443,8 +443,8 @@ exports.getVendorsForMakeupModule = async (req, res) => {
     }
 
     const vendorProfiles = await VendorProfile.find(query)
-      .select("user storeName logo coverImage subscriptionStatus isFreeTrial zone")
-      .populate("zone", "name")
+      .select("user storeName logo coverImage subscriptionStatus isFreeTrial zones")
+      .populate("zones", "name")
       .lean();
 
     if (!vendorProfiles.length) {
@@ -511,7 +511,8 @@ exports.getVendorsForMakeupModule = async (req, res) => {
         logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
         coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
         hasVendorProfile: true,
-        zone: vp?.zone || null,
+        zone: vp?.zones?.[0] || null,
+        zones: vp?.zones || [],
         packageCount, // ✅ ADD PACKAGE COUNT TO RESPONSE
         subscription: sub
           ? {

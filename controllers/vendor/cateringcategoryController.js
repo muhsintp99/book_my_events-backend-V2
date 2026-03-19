@@ -616,12 +616,13 @@ exports.getVendorsForCateringModule = async (req, res) => {
 
     // ✅ Add zone filtering
     if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
-      query.zone = zoneId;
+      query.zones = zoneId;
     }
 
     // 🔥 Fetch VendorProfiles
     const vendorProfiles = await VendorProfile.find(query)
-      .select("user storeName logo coverImage zone")
+      .select("user storeName logo coverImage zones")
+      .populate("zones", "name")
       .lean();
 
     if (!vendorProfiles.length) {

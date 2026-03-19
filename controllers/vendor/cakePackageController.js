@@ -759,12 +759,12 @@ exports.getVendorsForCakeModule = async (req, res) => {
     }
 
     if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
-      query.zone = zoneId;
+      query.zones = zoneId;
     }
 
     const vendorProfiles = await VendorProfile.find(query)
-      .select("user storeName logo coverImage subscriptionStatus isFreeTrial zone latitude longitude")
-      .populate("zone", "name")
+      .select("user storeName logo coverImage subscriptionStatus isFreeTrial zones latitude longitude")
+      .populate("zones", "name")
       .lean();
 
     if (!vendorProfiles.length) {
@@ -838,7 +838,8 @@ exports.getVendorsForCakeModule = async (req, res) => {
         logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
         coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
         hasVendorProfile: true,
-        zone: vp?.zone || null,
+        zone: vp?.zones?.[0] || null,
+        zones: vp?.zones || [],
         latitude: vp?.latitude || null,
         longitude: vp?.longitude || null,
         packageCount, // ✅ ADD PACKAGE COUNT TO RESPONSE

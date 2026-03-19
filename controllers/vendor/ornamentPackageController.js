@@ -404,9 +404,8 @@ exports.deleteOrnament = async (req, res) => {
 exports.getVendorsForOrnamentModule = async (req, res) => {
     try {
         const { moduleId } = req.params;
-
-        // Support both providerId & providerid
         const providerId = req.query.providerId || req.query.providerid || null;
+        const zoneId = req.query.zoneId || req.query.zoneid || null;
 
         if (!mongoose.Types.ObjectId.isValid(moduleId)) {
             return sendResponse(res, 400, false, "Invalid module ID");
@@ -414,15 +413,17 @@ exports.getVendorsForOrnamentModule = async (req, res) => {
 
         // Base query
         let query = { module: moduleId };
-
-        // If providerId passed -> fetch only that vendor
         if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
             query.user = providerId;
         }
 
+        if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
+            query.zones = zoneId;
+        }
+
         // Fetch VendorProfiles
         const vendorProfiles = await VendorProfile.find(query)
-            .select("user storeName logo coverImage")
+            .select("user storeName logo coverImage zones")
             .lean();
 
         if (!vendorProfiles.length) {
