@@ -171,7 +171,8 @@ exports.getSingleVendorForPhotographyModule = async (req, res) => {
       .lean();
 
     const vendorProfile = await VendorProfile.findOne({ user: providerid })
-      .select("storeName logo coverImage")
+      .select("storeName logo coverImage zones storeAddress latitude longitude")
+      .populate("zones", "name")
       .lean();
 
     const subscription = await Subscription.findOne({
@@ -203,6 +204,11 @@ exports.getSingleVendorForPhotographyModule = async (req, res) => {
         logo: vendorProfile?.logo ? `${baseUrl}${vendorProfile.logo}` : null,
         coverImage: vendorProfile?.coverImage ? `${baseUrl}${vendorProfile.coverImage}` : null,
         hasVendorProfile: !!vendorProfile,
+        storeAddress: vendorProfile?.storeAddress || null,
+        zone: vendorProfile?.zones?.[0] || null,
+        zones: vendorProfile?.zones || [],
+        latitude: vendorProfile?.latitude || null,
+        longitude: vendorProfile?.longitude || null,
 
         subscription: subscription
           ? {
@@ -457,7 +463,7 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
 
     // 🔹 Get vendor profiles with zones populated
     const vendorProfiles = await VendorProfile.find(vpQuery)
-      .select("user storeName logo coverImage zones")
+      .select("user storeName logo coverImage zones storeAddress latitude longitude")
       .populate("zones", "name")
       .lean();
 
@@ -539,8 +545,11 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
         logo: vp?.logo ? `${baseUrl}${vp.logo}` : null,
         coverImage: vp?.coverImage ? `${baseUrl}${vp.coverImage}` : null,
         hasVendorProfile: !!vp,
+        storeAddress: vp?.storeAddress || null,
         zone: vp?.zones?.[0] || null,
         zones: vp?.zones || [],
+        latitude: vp?.latitude || null,
+        longitude: vp?.longitude || null,
         packageCount,
 
         // 🔥 SUBSCRIPTION

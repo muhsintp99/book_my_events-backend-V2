@@ -409,7 +409,7 @@ exports.getLightAndSoundVendors = async (req, res) => {
         }
 
         const vendorProfiles = await VendorProfile.find(profileMatch)
-            .select("user storeName storeAddress zone services specialised latitude longitude status")
+            .select("user storeName storeAddress zones services specialised latitude longitude status")
             .lean();
 
         if (!vendorProfiles.length) {

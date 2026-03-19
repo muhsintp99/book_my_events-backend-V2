@@ -69,13 +69,17 @@ const populateMakeup = async (id, req = null) => {
 
   // Fetch VendorProfile linked to provider
   const vendorProfile = await VendorProfile.findOne({ user: makeup.provider._id })
-    .select("storeName logo coverImage")
+    .select("storeName logo coverImage zones latitude longitude")
     .lean();
 
   if (vendorProfile) {
     makeup.provider.storeName = vendorProfile.storeName;
     makeup.provider.logo = vendorProfile.logo ? baseUrl + vendorProfile.logo : null;
     makeup.provider.coverImage = vendorProfile.coverImage ? baseUrl + vendorProfile.coverImage : null;
+    makeup.provider.zones = vendorProfile.zones || [];
+    makeup.provider.zone = vendorProfile.zones?.[0] || null;
+    makeup.provider.latitude = vendorProfile.latitude || null;
+    makeup.provider.longitude = vendorProfile.longitude || null;
     makeup.provider.hasVendorProfile = true;
   } else {
     makeup.provider.storeName =
@@ -443,7 +447,7 @@ exports.getVendorsForMakeupModule = async (req, res) => {
     }
 
     const vendorProfiles = await VendorProfile.find(query)
-      .select("user storeName logo coverImage subscriptionStatus isFreeTrial zones")
+      .select("user storeName logo coverImage subscriptionStatus isFreeTrial zones latitude longitude")
       .populate("zones", "name")
       .lean();
 
@@ -513,6 +517,8 @@ exports.getVendorsForMakeupModule = async (req, res) => {
         hasVendorProfile: true,
         zone: vp?.zones?.[0] || null,
         zones: vp?.zones || [],
+        latitude: vp?.latitude || null,
+        longitude: vp?.longitude || null,
         packageCount, // ✅ ADD PACKAGE COUNT TO RESPONSE
         subscription: sub
           ? {

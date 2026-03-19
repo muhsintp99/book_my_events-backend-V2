@@ -360,7 +360,7 @@ exports.getInvitationByVendor = async (req, res) => {
                 populate: {
                     path: "vendorProfile",
                     populate: [
-                        { path: "zone", select: "_id name city country" },
+                        { path: "zones", select: "_id name city country" },
                         { path: "services", select: "_id title image" },
                         { path: "specialised", select: "_id title image" }
                     ]
@@ -432,7 +432,7 @@ exports.getInvitationVendors = async (req, res) => {
         }
 
         const vendorProfiles = await VendorProfile.find(profileMatch)
-            .select("user storeName storeAddress zone services specialised latitude longitude status")
+            .select("user storeName storeAddress zones services specialised latitude longitude status")
             .lean();
 
         if (!vendorProfiles.length) {
