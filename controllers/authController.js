@@ -2322,7 +2322,8 @@ exports.register = async (req, res) => {
                moduleType: mType,
 
             zones: (function() {
-              const zoneInput = zone || req.body.zones;
+              // Use multi-zones (req.body.zones) first since it already includes the primary zone
+              const zoneInput = req.body.zones || zone;
               if (Array.isArray(zoneInput)) {
                 return zoneInput.filter(z => mongoose.Types.ObjectId.isValid(z?.toString().trim()))
                                .map(z => new mongoose.Types.ObjectId(z.toString().trim()));
