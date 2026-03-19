@@ -550,6 +550,7 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
         zones: vp?.zones || [],
         latitude: vp?.latitude || null,
         longitude: vp?.longitude || null,
+        _needsZoneLookup: (!vp?.zones || vp.zones.length === 0),
         packageCount,
 
         // 🔥 SUBSCRIPTION
@@ -585,6 +586,36 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
           }
       };
     });
+
+    // ✅ ZONE FALLBACK: For vendors with no zones in their Photography profile,
+    // try to find zones from ANY of their other VendorProfiles
+    const vendorsNeedingZones = final.filter(v => v._needsZoneLookup);
+    if (vendorsNeedingZones.length > 0) {
+      const idsNeedingZones = vendorsNeedingZones.map(v => v._id);
+      const otherProfiles = await VendorProfile.find({
+        user: { $in: idsNeedingZones },
+        zones: { $exists: true, $ne: [] }
+      })
+        .select("user zones storeAddress")
+        .populate("zones", "name")
+        .lean();
+
+      for (const vendor of vendorsNeedingZones) {
+        const otherVp = otherProfiles.find(
+          p => p.user.toString() === vendor._id.toString()
+        );
+        if (otherVp && otherVp.zones && otherVp.zones.length > 0) {
+          vendor.zone = otherVp.zones[0];
+          vendor.zones = otherVp.zones;
+        }
+        if (!vendor.storeAddress && otherVp?.storeAddress) {
+          vendor.storeAddress = otherVp.storeAddress;
+        }
+      }
+    }
+
+    // Remove internal flag before sending response
+    final.forEach(v => delete v._needsZoneLookup);
 
     // ✅ SINGLE VENDOR RESPONSE
     if (providerId) {
