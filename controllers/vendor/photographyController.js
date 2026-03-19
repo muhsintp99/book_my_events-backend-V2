@@ -6,6 +6,7 @@ const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
 const Subscription = require("../../models/admin/Subscription");
+const Pincode = require("../../models/vendor/Pincode");
 const { enhanceProviderDetails } = require("../../utils/providerHelper");
 
 
@@ -616,6 +617,59 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
 
     // Remove internal flag before sending response
     final.forEach(v => delete v._needsZoneLookup);
+
+    // ✅ GEOGRAPHIC FALLBACK: If zone is STILL null, try to find nearest district by coordinates
+    const stillMissingZones = final.filter(v => !v.zone && v.latitude && v.longitude);
+    if (stillMissingZones.length > 0) {
+      const Zone = mongoose.model("Zone");
+      for (const vendor of stillMissingZones) {
+        try {
+          const nearestPincode = await Pincode.findOne({
+            location: {
+              $near: {
+                $geometry: {
+                  type: "Point",
+                  coordinates: [parseFloat(vendor.longitude), parseFloat(vendor.latitude)],
+                },
+                $maxDistance: 50000, // 50km radius
+              },
+            },
+          })
+            .populate("zone_id", "name")
+            .lean();
+
+          if (nearestPincode) {
+            if (nearestPincode.zone_id) {
+              vendor.zone = nearestPincode.zone_id;
+            } else {
+              // Try to match zone name with city or state
+              const possibleName = nearestPincode.city || nearestPincode.state;
+              if (possibleName) {
+                const matchedZone = await Zone.findOne({
+                  name: { $regex: new RegExp(`^${possibleName}$`, "i") }
+                }).select("name").lean();
+
+                if (matchedZone) {
+                  vendor.zone = matchedZone;
+                } else {
+                  vendor.zone = { _id: null, name: possibleName };
+                }
+              }
+            }
+
+            // Update address city if missing
+            if (!vendor.storeAddress || !vendor.storeAddress.city) {
+              vendor.storeAddress = {
+                ...vendor.storeAddress,
+                city: nearestPincode.city || vendor.zone?.name
+              };
+            }
+          }
+        } catch (geoErr) {
+          console.error("Geo fallback error for photography vendor:", vendor._id, geoErr.message);
+        }
+      }
+    }
 
     // ✅ SINGLE VENDOR RESPONSE
     if (providerId) {
