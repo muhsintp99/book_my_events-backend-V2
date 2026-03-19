@@ -1032,8 +1032,8 @@ exports.getKyc = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    if (!userId) {
-      return res.status(400).json({ success: false, message: "User ID is required" });
+     if (!userId) {
+      return res.status(400).json({ success: false, message: "Provider ID is required" });
     }
 
     const profile = await Profile.findOne({ userId });

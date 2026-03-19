@@ -551,10 +551,10 @@ exports.createSmartGatewayPayment = async (req, res) => {
 exports.createSubscriptionPayment = async (req, res) => {
   try {
     const { planId } = req.body;
-    const userId = req.user?._id || req.body.userId;
+    const providerId = req.user?._id || req.body.providerId || req.body.userId;
 
-    if (!userId) {
-      return res.status(400).json({ success: false, message: "User ID is required" });
+    if (!providerId) {
+      return res.status(400).json({ success: false, message: "Provider ID is required" });
     }
 
     if (!planId) {
@@ -566,11 +566,20 @@ exports.createSubscriptionPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Plan not found" });
     }
 
-    const user = await User.findById(userId);
+    // Resolve User: try providerId as User ID first, then as VendorProfile ID
+    let user = await User.findById(providerId);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      const vProfile = await VendorProfile.findById(providerId);
+      if (vProfile && vProfile.user) {
+        user = await User.findById(vProfile.user);
+      }
     }
 
+    if (!user) {
+      return res.status(404).json({ success: false, message: "Provider (User) not found" });
+    }
+
+    const userId = user._id;
     const amount = Number(plan.price).toFixed(2);
     const orderId = `SUB_${userId}_${Date.now()}`;
     const returnUrl = `${req.headers.origin || 'https://vendor.bookmyevent.ae'}/upgrade-success`;
@@ -608,7 +617,7 @@ exports.createSubscriptionPayment = async (req, res) => {
 
     /* ================= SAVE PENDING SUBSCRIPTION ================= */
     await Subscription.create({
-      userId,
+      userId: userId,
       planId: plan._id,
       moduleId: plan.moduleId,
       moduleModel: plan.moduleModel || 'Module',
