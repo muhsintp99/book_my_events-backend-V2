@@ -2395,7 +2395,11 @@ exports.register = async (req, res) => {
       _id: user[0]._id.toString(),
       id: user[0]._id.toString(),
       user: user[0].toJSON(),
-      profile: vendorProfile ? vendorProfile.toJSON() : null,
+      profile: vendorProfile ? {
+        ...vendorProfile.toJSON(),
+        zone: vendorProfile.zones?.[0] || null,
+        multiZones: vendorProfile.zones?.slice(1) || [],
+      } : null,
       token,
       refreshToken,
       data: {
@@ -2427,8 +2431,9 @@ exports.register = async (req, res) => {
         specialised: vendorProfile?.specialised || null,
         startingPrice: vendorProfile?.startingPrice || null,
         minBookingPrice: vendorProfile?.minBookingPrice || null,
-        zones: vendorProfile?.zones || [],
         zone: vendorProfile?.zones?.[0] || null,
+        multiZones: vendorProfile?.zones?.slice(1) || [],
+        zones: vendorProfile?.zones || [],
       },
     };
 
