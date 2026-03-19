@@ -1,4 +1,5 @@
 const VendorProfile = require("../../models/vendor/vendorProfile");
+const mongoose = require("mongoose");
 
 const populateFields = [
     {
