@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const VendorProfile = require("../models/vendor/vendorProfile");
+const Pincode = require("../models/vendor/Pincode");
 
 /**
  * Standardizes provider data with full store and location details.
@@ -43,7 +44,62 @@ const enhanceProviderDetails = async (providerInput, req = null) => {
     .lean();
 
     // Prioritize a profile that has zones, otherwise take the first one
-    const vendorProfile = vendorProfiles.find(p => p.zones && p.zones.length > 0) || vendorProfiles[0];
+    let vendorProfile = vendorProfiles.find(p => p.zones && p.zones.length > 0) || vendorProfiles[0];
+
+    // ✅ GEOGRAPHIC & ADDRESS FALLBACK: If NO profiles have zones, try nearest district by coordinates or address text
+    if ((!vendorProfile || !vendorProfile.zones || vendorProfile.zones.length === 0)) {
+        try {
+            const Zone = mongoose.model("Zone");
+            const allZones = await Zone.find({ isActive: true }).select("name").lean();
+            let guessedZone = null;
+
+            // A. Geography matching (Priority)
+            if (providerObj.latitude && providerObj.longitude) {
+                const nearestPincode = await Pincode.findOne({
+                    location: {
+                        $near: {
+                            $geometry: {
+                                type: "Point",
+                                coordinates: [parseFloat(providerObj.longitude), parseFloat(providerObj.latitude)],
+                            },
+                            $maxDistance: 50000,
+                        },
+                    },
+                })
+                .populate("zone_id", "name")
+                .lean();
+
+                if (nearestPincode) {
+                    if (nearestPincode.zone_id) {
+                        guessedZone = nearestPincode.zone_id;
+                    } else {
+                        const possibleName = nearestPincode.city || nearestPincode.state;
+                        guessedZone = allZones.find(z => z.name.toLowerCase() === possibleName?.toLowerCase());
+                        if (!guessedZone && possibleName) guessedZone = { _id: null, name: possibleName };
+                    }
+                    if (!vendorProfile) vendorProfile = { storeAddress: { city: nearestPincode.city } };
+                }
+            }
+
+            // B. Address text matching (Fallback if Geography failed or missing)
+            if (!guessedZone) {
+                const addressText = `${vendorProfile?.storeAddress?.fullAddress || ""} ${vendorProfile?.storeAddress?.city || ""} ${providerObj.storeAddress?.fullAddress || ""}`.toLowerCase();
+                let searchStr = addressText;
+                if (searchStr.includes("calicut")) searchStr += " kozhikode";
+                if (searchStr.includes("kochi") || searchStr.includes("cochin")) searchStr += " ernakulam";
+                if (searchStr.includes("trivandrum")) searchStr += " thiruvananthapuram";
+
+                guessedZone = allZones.find(z => searchStr.includes(z.name.toLowerCase()));
+            }
+
+            if (guessedZone) {
+                if (!vendorProfile) vendorProfile = { zones: [] };
+                vendorProfile.zones = [guessedZone];
+            }
+        } catch (e) {
+            console.error("Advanced fallback error in helper:", e.message);
+        }
+    }
 
     if (vendorProfile) {
         providerObj.storeName = vendorProfile.storeName || `${providerObj.firstName || ""} ${providerObj.lastName || ""}`.trim();

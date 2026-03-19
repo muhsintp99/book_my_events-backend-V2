@@ -775,9 +775,9 @@ exports.getMehandiVendors = async (req, res) => {
                 isActive: true,
                 zones: { $exists: true, $ne: [] }
             })
-            .select("user zones storeAddress")
-            .populate("zones", "name")
-            .lean();
+                .select("user zones storeAddress")
+                .populate("zones", "name")
+                .lean();
 
             for (const vendor of vendorsNeedingZones) {
                 const otherVp = otherProfiles.find(p => p.user.toString() === vendor._id.toString());
@@ -812,8 +812,8 @@ exports.getMehandiVendors = async (req, res) => {
                             },
                         },
                     })
-                    .populate("zone_id", "name")
-                    .lean();
+                        .populate("zone_id", "name")
+                        .lean();
 
                     if (nearestPincode) {
                         if (nearestPincode.zone_id) {
@@ -833,7 +833,7 @@ exports.getMehandiVendors = async (req, res) => {
                                 }
                             }
                         }
-                        
+
                         // Update address city if missing
                         if (!vendor.storeAddress || !vendor.storeAddress.city) {
                             vendor.storeAddress = {

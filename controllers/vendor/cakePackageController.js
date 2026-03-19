@@ -1,4 +1,5 @@
 const Cake = require("../../models/vendor/cakePackageModel");
+const Pincode = require("../../models/vendor/Pincode");
 const mongoose = require("mongoose");
 const fs = require("fs").promises;
 const path = require("path");
@@ -906,8 +907,77 @@ exports.getVendorsForCakeModule = async (req, res) => {
       }
     }
 
-    // Cleanup internal flag
+    // Remove internal flag
     final.forEach(v => delete v._needsZoneLookup);
+
+    // ✅ STAGE 3: FINAL FALLBACKS (Geography and Address Parsing)
+    const zoneMissing = final.filter(v => !v.zone);
+    if (zoneMissing.length > 0) {
+      const Zone = mongoose.model("Zone");
+      const allZones = await Zone.find({ isActive: true }).select("name").lean();
+      
+      for (const vendor of zoneMissing) {
+        try {
+          // A. GEOGRAPHIC FALLBACK (requires coordinates)
+          if (vendor.latitude && vendor.longitude) {
+            const nearestPincode = await Pincode.findOne({
+              location: {
+                $near: {
+                  $geometry: {
+                    type: "Point",
+                    coordinates: [parseFloat(vendor.longitude), parseFloat(vendor.latitude)],
+                  },
+                  $maxDistance: 50000,
+                },
+              },
+            })
+              .populate("zone_id", "name")
+              .lean();
+
+            if (nearestPincode) {
+              if (nearestPincode.zone_id) {
+                vendor.zone = nearestPincode.zone_id;
+              } else {
+                const possibleName = nearestPincode.city || nearestPincode.state;
+                if (possibleName) {
+                  const matchedZone = allZones.find(z => 
+                    z.name.toLowerCase() === possibleName.toLowerCase()
+                  );
+                  vendor.zone = matchedZone || { _id: null, name: possibleName };
+                }
+              }
+              if (!vendor.storeAddress || !vendor.storeAddress.city) {
+                vendor.storeAddress = {
+                  ...vendor.storeAddress,
+                  city: nearestPincode.city || vendor.zone?.name
+                };
+              }
+            }
+          }
+
+          // B. ADDRESS STRING MATCHING (If still null, search in address text)
+          if (!vendor.zone) {
+            const addressText = `${vendor.storeAddress?.fullAddress || ""} ${vendor.storeAddress?.city || ""} ${vendor.storeAddress?.street || ""}`.toLowerCase();
+            
+            // Handle common synonyms
+            let searchStr = addressText;
+            if (searchStr.includes("calicut")) searchStr += " kozhikode";
+            if (searchStr.includes("kochi") || searchStr.includes("cochin")) searchStr += " ernakulam";
+            if (searchStr.includes("trivandrum")) searchStr += " thiruvananthapuram";
+
+            const matchedZone = allZones.find(z => 
+              searchStr.includes(z.name.toLowerCase())
+            );
+
+            if (matchedZone) {
+              vendor.zone = matchedZone;
+            }
+          }
+        } catch (err) {
+          console.error("Final fallback error for vendor:", vendor._id, err.message);
+        }
+      }
+    }
 
     // ✅ SINGLE VENDOR (don't filter for single vendor query)
     if (providerId) {

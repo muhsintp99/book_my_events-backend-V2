@@ -618,55 +618,71 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
     // Remove internal flag before sending response
     final.forEach(v => delete v._needsZoneLookup);
 
-    // ✅ GEOGRAPHIC FALLBACK: If zone is STILL null, try to find nearest district by coordinates
-    const stillMissingZones = final.filter(v => !v.zone && v.latitude && v.longitude);
-    if (stillMissingZones.length > 0) {
+    // ✅ FINAL FALLBACKS: Geography and Address Parsing
+    const zoneMissing = final.filter(v => !v.zone);
+    if (zoneMissing.length > 0) {
       const Zone = mongoose.model("Zone");
-      for (const vendor of stillMissingZones) {
+      const allZones = await Zone.find({ isActive: true }).select("name").lean();
+      
+      for (const vendor of zoneMissing) {
         try {
-          const nearestPincode = await Pincode.findOne({
-            location: {
-              $near: {
-                $geometry: {
-                  type: "Point",
-                  coordinates: [parseFloat(vendor.longitude), parseFloat(vendor.latitude)],
+          // A. GEOGRAPHIC FALLBACK (requires coordinates)
+          if (vendor.latitude && vendor.longitude) {
+            const nearestPincode = await Pincode.findOne({
+              location: {
+                $near: {
+                  $geometry: {
+                    type: "Point",
+                    coordinates: [parseFloat(vendor.longitude), parseFloat(vendor.latitude)],
+                  },
+                  $maxDistance: 50000,
                 },
-                $maxDistance: 50000, // 50km radius
               },
-            },
-          })
-            .populate("zone_id", "name")
-            .lean();
+            })
+              .populate("zone_id", "name")
+              .lean();
 
-          if (nearestPincode) {
-            if (nearestPincode.zone_id) {
-              vendor.zone = nearestPincode.zone_id;
-            } else {
-              // Try to match zone name with city or state
-              const possibleName = nearestPincode.city || nearestPincode.state;
-              if (possibleName) {
-                const matchedZone = await Zone.findOne({
-                  name: { $regex: new RegExp(`^${possibleName}$`, "i") }
-                }).select("name").lean();
-
-                if (matchedZone) {
-                  vendor.zone = matchedZone;
-                } else {
-                  vendor.zone = { _id: null, name: possibleName };
+            if (nearestPincode) {
+              if (nearestPincode.zone_id) {
+                vendor.zone = nearestPincode.zone_id;
+              } else {
+                const possibleName = nearestPincode.city || nearestPincode.state;
+                if (possibleName) {
+                  const matchedZone = allZones.find(z => 
+                    z.name.toLowerCase() === possibleName.toLowerCase()
+                  );
+                  vendor.zone = matchedZone || { _id: null, name: possibleName };
                 }
               }
+              if (!vendor.storeAddress || !vendor.storeAddress.city) {
+                vendor.storeAddress = {
+                  ...vendor.storeAddress,
+                  city: nearestPincode.city || vendor.zone?.name
+                };
+              }
             }
+          }
 
-            // Update address city if missing
-            if (!vendor.storeAddress || !vendor.storeAddress.city) {
-              vendor.storeAddress = {
-                ...vendor.storeAddress,
-                city: nearestPincode.city || vendor.zone?.name
-              };
+          // B. ADDRESS STRING MATCHING (If still null, search in address text)
+          if (!vendor.zone) {
+            const addressText = `${vendor.storeAddress?.fullAddress || ""} ${vendor.storeAddress?.city || ""} ${vendor.storeAddress?.street || ""}`.toLowerCase();
+            
+            // Handle common synonyms
+            let searchStr = addressText;
+            if (searchStr.includes("calicut")) searchStr += " kozhikode";
+            if (searchStr.includes("kochi") || searchStr.includes("cochin")) searchStr += " ernakulam";
+            if (searchStr.includes("trivandrum")) searchStr += " thiruvananthapuram";
+
+            const matchedZone = allZones.find(z => 
+              searchStr.includes(z.name.toLowerCase())
+            );
+
+            if (matchedZone) {
+              vendor.zone = matchedZone;
             }
           }
         } catch (geoErr) {
-          console.error("Geo fallback error for photography vendor:", vendor._id, geoErr.message);
+          console.error("Fallback error for vendor:", vendor._id, geoErr.message);
         }
       }
     }
