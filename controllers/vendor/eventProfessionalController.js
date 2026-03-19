@@ -1,6 +1,7 @@
 const EventProfessional = require("../../models/vendor/eventProfessionalPackageModel");
 const VendorProfile = require("../../models/vendor/vendorProfile");
 const User = require("../../models/User");
+const Pincode = require("../../models/vendor/Pincode");
 const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
@@ -435,24 +436,108 @@ exports.getEventProfessionalVendors = async (req, res) => {
                 v => v._id.toString() === user._id.toString()
             );
 
+            const vp = user.vendorProfile || {};
             return {
                 _id: user._id,
                 firstName: user.firstName,
                 lastName: user.lastName,
                 email: user.email,
                 phone: user.phone,
-                profilePhoto: user.profilePhoto || user.vendorProfile?.logo || "",
+                profilePhoto: user.profilePhoto || vp.logo || "",
                 packageCount: countObj?.packageCount || 0,
-                storeName: user.vendorProfile.storeName,
-                zone: user.vendorProfile.zones?.[0] || null,
-                zones: user.vendorProfile.zones || [],
-                storeAddress: user.vendorProfile.storeAddress,
-                categories: user.vendorProfile.services,
-                specialised: user.vendorProfile.specialised,
-                latitude: user.vendorProfile.latitude,
-                longitude: user.vendorProfile.longitude
+                storeName: vp.storeName,
+                zone: vp.zones?.[0] || null,
+                zones: vp.zones || [],
+                storeAddress: vp.storeAddress,
+                categories: vp.services,
+                specialised: vp.specialised,
+                latitude: vp.latitude,
+                longitude: vp.longitude,
+                _needsZoneLookup: !vp.zones || vp.zones.length === 0
             };
         });
+
+        // ✅ STAGE 2: CROSS-PROFILE FALLBACK
+        const vendorsNeedingZones = final.filter(v => v._needsZoneLookup);
+        if (vendorsNeedingZones.length > 0) {
+            const idsNeedingZones = vendorsNeedingZones.map(v => v._id);
+            const otherProfiles = await VendorProfile.find({
+                user: { $in: idsNeedingZones },
+                status: "approved",
+                isActive: true,
+                zones: { $exists: true, $ne: [] }
+            })
+            .select("user zones storeAddress")
+            .populate("zones", "name")
+            .lean();
+
+            for (const vendor of vendorsNeedingZones) {
+                const otherVp = otherProfiles.find(p => p.user.toString() === vendor._id.toString());
+                if (otherVp && otherVp.zones && otherVp.zones.length > 0) {
+                    vendor.zone = otherVp.zones[0];
+                    vendor.zones = otherVp.zones;
+                }
+                if (!vendor.storeAddress && otherVp?.storeAddress) {
+                    vendor.storeAddress = otherVp.storeAddress;
+                }
+            }
+        }
+
+        // Remove internal flag
+        final.forEach(v => delete v._needsZoneLookup);
+
+        // ✅ STAGE 3: FINAL FALLBACKS (Geography and Address Parsing)
+        const zoneMissing = final.filter(v => !v.zone);
+        if (zoneMissing.length > 0) {
+            const Zone = mongoose.model("Zone");
+            const allZones = await Zone.find({ isActive: true }).select("name").lean();
+            
+            for (const vendor of zoneMissing) {
+                try {
+                    if (vendor.latitude && vendor.longitude) {
+                        const nearestPincode = await Pincode.findOne({
+                            location: {
+                                $near: {
+                                    $geometry: {
+                                        type: "Point",
+                                        coordinates: [parseFloat(vendor.longitude), parseFloat(vendor.latitude)],
+                                    },
+                                    $maxDistance: 50000,
+                                },
+                            },
+                        })
+                        .populate("zone_id", "name")
+                        .lean();
+
+                        if (nearestPincode) {
+                            if (nearestPincode.zone_id) {
+                                vendor.zone = nearestPincode.zone_id;
+                            } else {
+                                const possibleName = nearestPincode.city || nearestPincode.state;
+                                const matchedZone = allZones.find(z => z.name.toLowerCase() === possibleName?.toLowerCase());
+                                vendor.zone = matchedZone || { _id: null, name: possibleName };
+                            }
+                            if (!vendor.storeAddress || !vendor.storeAddress.city) {
+                                vendor.storeAddress = { ...vendor.storeAddress, city: nearestPincode.city || vendor.zone?.name };
+                            }
+                        }
+                    }
+
+                    if (!vendor.zone) {
+                        const addressText = `${vendor.storeAddress?.fullAddress || ""} ${vendor.storeAddress?.city || ""} ${vendor.storeAddress?.street || ""}`.toLowerCase();
+                        let searchStr = addressText;
+                        if (searchStr.includes("calicut")) searchStr += " kozhikode";
+                        if (searchStr.includes("kochi") || searchStr.includes("cochin")) searchStr += " ernakulam";
+                        if (searchStr.includes("trivandrum")) searchStr += " thiruvananthapuram";
+
+                        const matchedZone = allZones.find(z => searchStr.includes(z.name.toLowerCase()));
+                        if (matchedZone) vendor.zone = matchedZone;
+                    }
+                } catch (err) {
+                    console.error("Final fallback error for event-prof vendor:", vendor._id, err.message);
+                }
+            }
+        }
 
         res.json({
             success: true,
