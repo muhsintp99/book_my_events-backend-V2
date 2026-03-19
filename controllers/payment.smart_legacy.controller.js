@@ -345,6 +345,8 @@ const Booking = require("../models/vendor/Booking");
 const config = require("../config/smartgateway_config.json");
 const Subscription = require("../models/admin/Subscription");
 const Plan = require("../models/admin/Plan");
+const User = require("../models/User");
+
 
 // Initialize SmartGateway with BASIC Authentication (API Key)
 const juspay = new Juspay({
@@ -538,6 +540,148 @@ exports.createSmartGatewayPayment = async (req, res) => {
       success: false,
       message: err.message,
     });
+  }
+};
+
+/**
+ * CREATE SUBSCRIPTION PAYMENT SESSION
+ */
+exports.createSubscriptionPayment = async (req, res) => {
+  try {
+    const { planId } = req.body;
+    const userId = req.user?._id || req.body.userId;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
+
+    if (!planId) {
+      return res.status(400).json({ success: false, message: "Plan ID is required" });
+    }
+
+    const plan = await Plan.findById(planId);
+    if (!plan) {
+      return res.status(404).json({ success: false, message: "Plan not found" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const amount = Number(plan.price).toFixed(2);
+    const orderId = `SUB_${userId}_${Date.now()}`;
+    const returnUrl = `${req.headers.origin || 'https://vendor.bookmyevent.ae'}/upgrade-success`;
+
+    /* ================= CREATE ORDER ================= */
+
+    await juspay.order.create({
+      order_id: orderId,
+      amount,
+      currency: "INR",
+      customer_id: userId.toString(),
+      customer_email: user.email,
+      customer_phone: user.mobile || "9999999999",
+      description: `Upgrade to ${plan.name} - ₹${amount}`,
+      return_url: returnUrl,
+      udf1: planId.toString(),
+      udf2: "subscription",
+      udf3: userId.toString(),
+    });
+
+    /* ================= CREATE SESSION ================= */
+    const session = await juspay.orderSession.create({
+      order_id: orderId,
+      action: "paymentPage",
+      amount,
+      currency: "INR",
+      customer_id: userId.toString(),
+      customer_email: user.email,
+      customer_phone: user.mobile || "9999999999",
+      payment_page_client_id: "hdfcmaster",
+      return_url: returnUrl,
+      redirect: true,
+      auto_redirect: true,
+    });
+
+    /* ================= SAVE PENDING SUBSCRIPTION ================= */
+    await Subscription.create({
+      userId,
+      planId: plan._id,
+      moduleId: plan.moduleId,
+      moduleModel: plan.moduleModel || 'Module',
+      paymentId: orderId,
+      status: "pending",
+      isCurrent: false,
+    });
+
+    return res.json({
+      success: true,
+      order_id: orderId,
+      payableAmount: amount,
+      payment_links: session.payment_links,
+      return_url: returnUrl,
+    });
+
+  } catch (err) {
+    console.error("❌ Subscription Payment Error:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * VERIFY SUBSCRIPTION PAYMENT
+ */
+exports.verifySubscriptionPayment = async (req, res) => {
+  try {
+    const { orderId } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: "Order ID is required" });
+    }
+
+    const order = await juspay.order.status(orderId);
+    const subscription = await Subscription.findOne({ paymentId: orderId }).populate("planId");
+
+    if (!subscription) {
+      return res.status(404).json({ success: false, message: "Subscription not found" });
+    }
+
+    if (order.status === "CHARGED") {
+      const plan = subscription.planId;
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + plan.durationInDays);
+
+      // Cancel other current subscriptions for same module
+      await Subscription.updateMany(
+        { userId: subscription.userId, moduleId: subscription.moduleId, _id: { $ne: subscription._id } },
+        { status: "cancelled", isCurrent: false }
+      );
+
+      subscription.status = "active";
+      subscription.startDate = startDate;
+      subscription.endDate = endDate;
+      subscription.isCurrent = true;
+      await subscription.save();
+
+      return res.json({
+        success: true,
+        status: "completed",
+        message: "Subscription activated successfully",
+        subscription
+      });
+    }
+
+    return res.json({
+      success: false,
+      status: order.status,
+      message: `Payment status: ${order.status}`
+    });
+
+  } catch (err) {
+    console.error("❌ Subscription Verification Error:", err);
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
 
