@@ -36,14 +36,14 @@ exports.getPremiumHighlights = async (req, res) => {
 
         // Source A: VendorProfile with active/trial subscriptionStatus
         const vpPremiumIds = await VendorProfile.find({
-            subscriptionStatus: { $in: ["active", "trial"] },
-            isActive: true
+            subscriptionStatus: { $in: ["active", "trial", "pending"] },
+            isActive: { $ne: false }
         }).distinct("user");
 
-        // Source B: Subscription model with active status & isCurrent
+        // Source B: Subscription model with active/trial status & isCurrent
         const subPremiumIds = await Subscription.find({
-            status: "active",
-            isCurrent: true
+            status: { $in: ["active", "trial"] },
+            isCurrent: { $ne: false }
         }).distinct("userId");
 
         // Merge both sets (deduplicate using a Set of string IDs)
@@ -101,8 +101,9 @@ exports.getPremiumHighlights = async (req, res) => {
                 if (!model) return;
 
                 // Query packages belonging to premium providers
+                // Use $ne: false instead of true so docs without isActive field are included
                 const query = { 
-                    isActive: true,
+                    isActive: { $ne: false },
                     provider: { $in: premiumProviders }
                 };
 
