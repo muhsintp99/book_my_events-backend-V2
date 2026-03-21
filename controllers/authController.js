@@ -2801,9 +2801,11 @@ exports.forgotPassword = async (req, res) => {
     user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
     await user.save();
 
-    const resetURL = `${req.protocol}://${req.get(
-      "host"
-    )}/api/auth/reset-password/${resetToken}`;
+    // const resetURL = `${req.protocol}://${req.get(
+    //   "host"
+    // )}/api/auth/reset-password/${resetToken}`;
+     const API_BASE_URL = process.env.API_BASE_URL || "https://api.bookmyevent.ae";
+    const resetURL = `${API_BASE_URL}/api/auth/reset-password/${resetToken}`;
 
     try {
       await sendEmail(email, "Password Reset", resetPasswordEmail(resetURL));
