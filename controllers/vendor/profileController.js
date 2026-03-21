@@ -834,6 +834,7 @@ exports.updateProfile = async (req, res) => {
         // Ensure lastName is at least a space to satisfy 'required' validation if name is single word
         if (!lastNameSync) lastNameSync = " ";
 
+        // Update User Model and Handle Password/Email Updates
         try {
           const userObj = await User.findById(targetUserId);
           if (userObj) {
@@ -887,25 +888,42 @@ exports.updateProfile = async (req, res) => {
               userFieldUpdated = true;
             }
 
+            let loginNotificationSent = false;
             if (userFieldUpdated) {
-              // .save() ensures pre-save hooks (like password hashing) run
               await userObj.save();
               console.log(`[updateProfile] Synced data to User: ${targetUserId} (${userObj.firstName} ${userObj.lastName})`);
 
-              // If the email was updated, shoot them an email with their new credentials
+              // If the email was updated, send credentials
               if (emailChanged) {
                 try {
                   const sendEmail = require("../../utils/sendEmail");
-                  const { vendorEmail } = require("../../utils/sentEmail");
+                  const { vendorUpdateEmail } = require("../../utils/sentEmail");
                   await sendEmail(
                     userObj.email,
                     "Your BookMyEvent Portal Access Credentials (Updated)",
-                    vendorEmail(userObj, newPassword)
+                    vendorUpdateEmail(userObj, newPassword)
                   );
                   console.log(`[updateProfile] Sent updated credentials to ${userObj.email}`);
+                  loginNotificationSent = true;
                 } catch (emailErr) {
-                  console.error(`[updateProfile] Failed to send credentials email to updated address:`, emailErr.message);
+                  console.error(`[updateProfile] Failed to send credentials email:`, emailErr.message);
                 }
+              }
+            }
+
+            // Always send a notification if not already sent (only for vendors)
+            if (!loginNotificationSent) {
+              try {
+                const sendEmail = require("../../utils/sendEmail");
+                const { vendorProfileUpdateNotification } = require("../../utils/sentEmail");
+                await sendEmail(
+                  userObj.email,
+                  "Profile Updated Successfully",
+                  vendorProfileUpdateNotification(userObj)
+                );
+                console.log(`[updateProfile] Sent profile update notification to ${userObj.email}`);
+              } catch (emailErr) {
+                console.error(`[updateProfile] Failed to send profile update notification:`, emailErr.message);
               }
             }
           } else {

@@ -140,6 +140,28 @@ exports.vendorUpdateEmail = (user, password) => `
 `;
 
 
+exports.vendorProfileUpdateNotification = (user) => `
+  <div style="font-family:Arial,sans-serif;line-height:1.6">
+    <h2>Vendor Profile Updated 🎉</h2>
+    <p>Hi <strong>${user.firstName}</strong>,</p>
+    <p>Your vendor profile settings have been successfully updated.</p>
+
+    <p>If you did not make these changes, please contact our support team immediately.</p>
+    <br/>
+
+    <p>
+      <a href="https://vendor.bookmyevent.ae/"
+         style="display:inline-block;background-color:#007bff;color:#fff;
+                padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold;">
+         Access Your Dashboard
+      </a>
+    </p>
+
+    <br/>
+    <p>Regards,<br/>BookMyEvent Team</p>
+  </div>
+`;
+
 exports.otpEmail = (otp) => `
   <div style="font-family:Arial,sans-serif;line-height:1.6">
     <h2>Your OTP Code</h2>
