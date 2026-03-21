@@ -3,6 +3,7 @@ const VendorProfile = require("../../models/vendor/vendorProfile");
 const User = require("../../models/User");
 const mongoose = require("mongoose");
 const Pincode = require("../../models/vendor/Pincode");
+const Subscription = require("../../models/admin/Subscription");
 const { v4: uuidv4 } = require("uuid");
 const fs = require("fs");
 const path = require("path");
@@ -738,12 +739,33 @@ exports.getMehandiVendors = async (req, res) => {
             .lean();
 
         /* ================================
+           4.5️⃣ Get Subscriptions (for premium/multi-zone)
+        ================================= */
+        const subscriptions = await Subscription.find({
+            userId: { $in: vendorIds },
+            isCurrent: true
+        })
+            .populate("planId")
+            .populate("moduleId", "title icon")
+            .lean();
+
+        /* ================================
            5️⃣ Assemble Final Response
         ================================= */
         const final = users.map(user => {
             const vp = vendorProfiles.find(v => v.user.toString() === user._id.toString());
             const pkgCountItem = packageCountsAgg.find(p => p._id.toString() === user._id.toString());
             const packageCount = pkgCountItem ? pkgCountItem.count : 0;
+
+            const sub = subscriptions.find(
+                s => s.userId.toString() === user._id.toString()
+            );
+
+            const now = new Date();
+            const isExpired = sub ? sub.endDate < now : true;
+            const daysLeft = sub
+                ? Math.max(0, Math.ceil((sub.endDate - now) / (1000 * 60 * 60 * 24)))
+                : 0;
 
             return {
                 _id: user._id,
@@ -761,7 +783,39 @@ exports.getMehandiVendors = async (req, res) => {
                 specialised: vp?.specialised || null,
                 latitude: vp?.latitude || null,
                 longitude: vp?.longitude || null,
-                _needsZoneLookup: (!vp?.zones || vp.zones.length === 0)
+                _needsZoneLookup: (!vp?.zones || vp.zones.length === 0),
+
+                // 🔥 SUBSCRIPTION (for premium multi-zone display)
+                subscription: sub
+                    ? {
+                        isSubscribed: sub.status === "active",
+                        status: sub.status,
+                        plan: sub.planId,
+                        module: sub.moduleId,
+                        billing: {
+                            startDate: sub.startDate,
+                            endDate: sub.endDate,
+                            paymentId: sub.paymentId,
+                            autoRenew: sub.autoRenew
+                        },
+                        access: {
+                            canAccess: sub.status === "active" && !isExpired,
+                            isExpired,
+                            daysLeft
+                        }
+                    }
+                    : {
+                        isSubscribed: false,
+                        status: "none",
+                        plan: null,
+                        module: null,
+                        billing: null,
+                        access: {
+                            canAccess: false,
+                            isExpired: true,
+                            daysLeft: 0
+                        }
+                    }
             };
         });
 
