@@ -643,7 +643,10 @@ exports.updateProfile = async (req, res) => {
       minBookingPrice,
       bioTitle,
       bioSubtitle,
-      bioDescription
+      bioDescription,
+      zone,
+      zones,
+      module
     } = req.body;
     const id = req.params.id; // Could be Profile ID or User ID
 
@@ -853,16 +856,30 @@ exports.updateProfile = async (req, res) => {
         }
 
         // Update VendorProfile Model
-        const vendorUpdateFields = {
+         const vendorUpdateFields = {
           storeName: rawName,
           ownerFirstName: firstNameSync,
           ownerLastName: lastNameSync,
           ownerPhone: mobileNumber || profile.mobileNumber,
           latitude: latitude || updatedData.latitude,
           longitude: longitude || updatedData.longitude,
-          bio: updatedData.bio || profile.bio
+          bio: updatedData.bio || profile.bio,
+          module: module || updatedData.module
         };
 
+        // Handle Zones sync
+        if (zones || zone) {
+          let zonesArray = [];
+          if (zones) {
+            zonesArray = typeof zones === 'string' ? zones.split(',') : zones;
+          }
+          if (zone && !zonesArray.includes(zone)) {
+            zonesArray.push(zone);
+          }
+          // Filter out invalid IDs
+          vendorUpdateFields.zones = zonesArray.filter(z => mongoose.Types.ObjectId.isValid(z));
+        }
+        
         // Handle businessAddress sync
         if (businessAddress || profile.businessAddress) {
           vendorUpdateFields.storeAddress = {
