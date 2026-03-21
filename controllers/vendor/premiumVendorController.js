@@ -18,23 +18,60 @@ const User = require("../../models/User");
 const Module = require("../../models/admin/module");
 const SecondaryModule = require("../../models/admin/secondarymodule");
 const VendorProfile = require("../../models/vendor/vendorProfile");
+const Subscription = require("../../models/admin/Subscription");
 
 /**
  * ➤ Get Premium Vendors (Aggregated from all modules)
+ * 
+ * Checks BOTH sources of subscription truth:
+ *   1. VendorProfile.subscriptionStatus ("active" or "trial")
+ *   2. Subscription model (status: "active", isCurrent: true)
+ * Merges results so ALL premium vendors are included.
  */
 exports.getPremiumHighlights = async (req, res) => {
     try {
-        // 1. Identify all premium providers
-        const premiumProvidersRaw = await VendorProfile.find({
+        // ──────────────────────────────────────────────────────────────
+        // 1. Identify ALL premium providers from BOTH sources
+        // ──────────────────────────────────────────────────────────────
+
+        // Source A: VendorProfile with active/trial subscriptionStatus
+        const vpPremiumIds = await VendorProfile.find({
             subscriptionStatus: { $in: ["active", "trial"] },
             isActive: true
         }).distinct("user");
-        
-        const premiumProviders = premiumProvidersRaw.filter(id => id);
+
+        // Source B: Subscription model with active status & isCurrent
+        const subPremiumIds = await Subscription.find({
+            status: "active",
+            isCurrent: true
+        }).distinct("userId");
+
+        // Merge both sets (deduplicate using a Set of string IDs)
+        const mergedIdSet = new Set();
+        vpPremiumIds.filter(id => id).forEach(id => mergedIdSet.add(id.toString()));
+        subPremiumIds.filter(id => id).forEach(id => mergedIdSet.add(id.toString()));
+
+        // Convert back to ObjectId-compatible array
+        const mongoose = require("mongoose");
+        const premiumProviders = Array.from(mergedIdSet).map(
+            id => new mongoose.Types.ObjectId(id)
+        );
 
         console.log(`📡 [PremiumHighlights] Found ${premiumProviders.length} active premium vendors.`);
+        console.log(`   ↳ From VendorProfile: ${vpPremiumIds.length}, From Subscription: ${subPremiumIds.length}`);
 
+        if (premiumProviders.length === 0) {
+            return res.status(200).json({
+                success: true,
+                message: "No premium vendors found",
+                count: 0,
+                data: {}
+            });
+        }
+
+        // ──────────────────────────────────────────────────────────────
         // 2. Define modules to check
+        // ──────────────────────────────────────────────────────────────
         const modulesToCheck = [
             { model: Venue, name: "Venues", pType: 'module' },
             { model: Photography, name: "Photography", pType: 'module' },
@@ -56,12 +93,14 @@ exports.getPremiumHighlights = async (req, res) => {
 
         const premiumData = {};
 
-        // 3. Parallel fetch
+        // ──────────────────────────────────────────────────────────────
+        // 3. Parallel fetch across all modules
+        // ──────────────────────────────────────────────────────────────
         await Promise.all(modulesToCheck.map(async ({ model, name, pType }) => {
             try {
                 if (!model) return;
 
-                // Build query - STRICTLY only vendors with active/trial subscriptions
+                // Query packages belonging to premium providers
                 const query = { 
                     isActive: true,
                     provider: { $in: premiumProviders }
@@ -78,14 +117,13 @@ exports.getPremiumHighlights = async (req, res) => {
                     })
                     .lean();
 
-                // Deduplicate by Provider (Show only one package per vendor)
+                // Deduplicate by Provider (show only one package per vendor)
                 const uniqueVendors = new Map();
                 for (const item of allItems) {
                     const providerId = item.provider?._id?.toString() || item.provider?.toString();
                     if (!providerId) continue;
 
-                    // If we haven't seen this vendor, or if this new item is a "Top Pick" 
-                    // and the stored one isn't, prefer this one.
+                    // Prefer "Top Pick" items when deduplicating
                     if (!uniqueVendors.has(providerId) || (item.isTopPick && !uniqueVendors.get(providerId).isTopPick)) {
                         uniqueVendors.set(providerId, item);
                     }
