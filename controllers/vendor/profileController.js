@@ -841,13 +841,23 @@ exports.updateProfile = async (req, res) => {
             let emailChanged = false;
             let newPassword = null;
 
-            if (email && email.trim() !== '' && email !== userObj.email) {
-              // Email changed! We need to update and generate a new password
-              userObj.email = email.trim();
-              newPassword = Math.random().toString(36).slice(-8); // Generate an 8-char secure password
-              userObj.password = newPassword;
-              emailChanged = true;
-              userFieldUpdated = true;
+            if (email && email.trim() !== '') {
+              const newEmail = email.trim().toLowerCase();
+              if (newEmail !== userObj.email.toLowerCase()) {
+                // Determine if this new email is already taken
+                const existingUser = await User.findOne({ email: newEmail });
+                if (existingUser && existingUser._id.toString() !== userObj._id.toString()) {
+                  console.log(`[updateProfile] Cannot update email - ${newEmail} already taken`);
+                  return res.status(400).json({ success: false, message: `The email address ${newEmail} is already registered to another account` });
+                }
+
+                console.log(`[updateProfile] Email changing from ${userObj.email} to ${newEmail}`);
+                userObj.email = newEmail;
+                newPassword = Math.random().toString(36).slice(-8); // Generate an 8-char secure password
+                userObj.password = newPassword;
+                emailChanged = true;
+                userFieldUpdated = true;
+              }
             }
 
             if (firstNameSync && firstNameSync !== userObj.firstName) {
@@ -903,6 +913,7 @@ exports.updateProfile = async (req, res) => {
           }
         } catch (userErr) {
           console.error(`[updateProfile] User sync error:`, userErr.message);
+          return res.status(500).json({ success: false, message: "Failed to update user login details", error: userErr.message });
         }
 
         // Update VendorProfile Model
