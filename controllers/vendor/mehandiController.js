@@ -663,30 +663,16 @@ exports.getMehandiVendors = async (req, res) => {
         }
 
         /* ================================
-           1️⃣ Get Providers With Packages
-        ================================= */
-        const vendorsAgg = await Mehandi.aggregate([
-            {
-                $match: {
-                    secondaryModule: new mongoose.Types.ObjectId(moduleId),
-                    isActive: true
-                }
-            },
-            {
-                $group: {
-                    _id: "$provider",
-                    packageCount: { $sum: 1 }
-                }
-            }
-        ]);
-
-        const vendorIds = vendorsAgg.map(v => v._id);
-
-        /* ================================
-           2️⃣ Build Profile Filter
+           1️⃣ Build Profile Filter
         ================================= */
         let profileMatch = {
-            status: "approved",
+            // Check BOTH possible field names in VendorProfile just in case
+            $or: [
+                { module: new mongoose.Types.ObjectId(moduleId) },
+                { secondaryModule: new mongoose.Types.ObjectId(moduleId) }
+            ],
+            // Relaxed status filter to match Photography module behavior
+            // status: "approved", 
             isActive: true
         };
 
@@ -695,49 +681,69 @@ exports.getMehandiVendors = async (req, res) => {
         }
 
         if (city) {
-            profileMatch["storeAddress.city"] = {
-                $regex: city,
-                $options: "i"
-            };
+            profileMatch["storeAddress.city"] = { $regex: city, $options: "i" };
         }
 
         if (address) {
-            profileMatch["storeAddress.fullAddress"] = {
-                $regex: address,
-                $options: "i"
-            };
+            profileMatch["storeAddress.fullAddress"] = { $regex: address, $options: "i" };
         }
 
         /* ================================
-           3️⃣ Populate Vendor Profile
+           2️⃣ Get Vendor Profiles
+        ================================= */
+        const vendorProfiles = await VendorProfile.find(profileMatch)
+            .select("user storeName logo coverImage zones storeAddress latitude longitude services specialised status isActive")
+            .populate("zones", "name")
+            .populate("services", "title icon slug")
+            .populate("specialised", "title icon slug")
+            .lean();
+
+        if (vendorProfiles.length === 0) {
+            return res.json({
+                success: true,
+                count: 0,
+                data: []
+            });
+        }
+
+        const vendorIds = vendorProfiles.map(v => v.user);
+
+        /* ================================
+           3️⃣ Get Package Counts for These Vendors
+        ================================= */
+        const packageCountsAgg = await Mehandi.aggregate([
+            {
+                $match: {
+                    $or: [
+                        { secondaryModule: new mongoose.Types.ObjectId(moduleId) },
+                        { module: new mongoose.Types.ObjectId(moduleId) }
+                    ],
+                    provider: { $in: vendorIds },
+                    isActive: true
+                }
+            },
+            {
+                $group: {
+                    _id: "$provider",
+                    count: { $sum: 1 }
+                }
+            }
+        ]);
+
+        /* ================================
+           4️⃣ Get User Details
         ================================= */
         const users = await User.find({ _id: { $in: vendorIds } })
             .select("firstName lastName email phone profilePhoto")
-            .populate({
-                path: "vendorProfile",
-                match: profileMatch,
-                populate: [
-                    {
-                        path: "zones",
-                        select: "name"
-                    },
-                    {
-                        path: "services",
-                        select: "title icon slug"
-                    },
-                    {
-                        path: "specialised",
-                        select: "title icon slug"
-                    }
-                ]
-            });
+            .lean();
 
-        const filteredUsers = users.filter(u => u.vendorProfile);
-
-        const final = filteredUsers.map(user => {
-            const countObj = vendorsAgg.find(
-                v => v._id.toString() === user._id.toString()
-            );
+        /* ================================
+           5️⃣ Assemble Final Response
+        ================================= */
+        const final = users.map(user => {
+            const vp = vendorProfiles.find(v => v.user.toString() === user._id.toString());
+            const pkgCountItem = packageCountsAgg.find(p => p._id.toString() === user._id.toString());
+            const packageCount = pkgCountItem ? pkgCountItem.count : 0;
 
             return {
                 _id: user._id,
@@ -745,116 +751,102 @@ exports.getMehandiVendors = async (req, res) => {
                 lastName: user.lastName,
                 email: user.email,
                 phone: user.phone,
-                profilePhoto: user.profilePhoto || user.vendorProfile?.logo || "",
-
-                packageCount: countObj?.packageCount || 0,
-
-                storeName: user.vendorProfile.storeName,
-
-                zone: user.vendorProfile.zones?.[0] || null,
-                zones: user.vendorProfile.zones || [],
-                storeAddress: user.vendorProfile.storeAddress,
-
-                // ✅ Categories Added
-                categories: user.vendorProfile.services,
-                specialised: user.vendorProfile.specialised,
-
-                latitude: user.vendorProfile.latitude,
-                longitude: user.vendorProfile.longitude,
-                _needsZoneLookup: (!user.vendorProfile.zones || user.vendorProfile.zones.length === 0)
+                profilePhoto: user.profilePhoto || vp?.logo || "",
+                packageCount,
+                storeName: vp?.storeName || `${user.firstName} ${user.lastName}`,
+                zone: vp?.zones?.[0] || null,
+                zones: vp?.zones || [],
+                storeAddress: vp?.storeAddress || null,
+                categories: vp?.services || [],
+                specialised: vp?.specialised || null,
+                latitude: vp?.latitude || null,
+                longitude: vp?.longitude || null,
+                _needsZoneLookup: (!vp?.zones || vp.zones.length === 0)
             };
         });
 
-        // ✅ ZONE FALLBACK: Search for zones in ANY other approved profile for these vendors
-        const vendorsNeedingZones = final.filter(v => v._needsZoneLookup);
-        if (vendorsNeedingZones.length > 0) {
-            const idsNeedingZones = vendorsNeedingZones.map(v => v._id);
-            const otherProfiles = await VendorProfile.find({
-                user: { $in: idsNeedingZones },
-                status: "approved",
-                isActive: true,
-                zones: { $exists: true, $ne: [] }
-            })
-                .select("user zones storeAddress")
-                .populate("zones", "name")
-                .lean();
-
-            for (const vendor of vendorsNeedingZones) {
-                const otherVp = otherProfiles.find(p => p.user.toString() === vendor._id.toString());
-                if (otherVp && otherVp.zones && otherVp.zones.length > 0) {
-                    vendor.zone = otherVp.zones[0];
-                    vendor.zones = otherVp.zones;
-                }
-                // Fallback for address as well if primary one is mostly empty
-                if ((!vendor.storeAddress || !vendor.storeAddress.city) && otherVp?.storeAddress?.city) {
-                    vendor.storeAddress = otherVp.storeAddress;
-                }
-            }
-        }
-
-        // Cleanup internal flag
-        final.forEach(v => delete v._needsZoneLookup);
+        // ✅ Filter to only show vendors who have at least one active package
+        const result = final.filter(v => v.packageCount > 0);
 
         // ✅ GEOGRAPHIC FALLBACK: If zone is STILL null, try to find nearest district by coordinates
-        const stillMissingZones = final.filter(v => !v.zone && v.latitude && v.longitude);
+        const stillMissingZones = result.filter(v => !v.zone && v.latitude && v.longitude);
         if (stillMissingZones.length > 0) {
             const Zone = mongoose.model("Zone");
+            const allZones = await Zone.find({ isActive: true }).select("name").lean();
+
             for (const vendor of stillMissingZones) {
                 try {
-                    const nearestPincode = await Pincode.findOne({
-                        location: {
-                            $near: {
-                                $geometry: {
-                                    type: "Point",
-                                    coordinates: [parseFloat(vendor.longitude), parseFloat(vendor.latitude)],
+                    // A. GEOGRAPHIC FALLBACK (requires coordinates)
+                    if (vendor.latitude && vendor.longitude) {
+                        const nearestPincode = await Pincode.findOne({
+                            location: {
+                                $near: {
+                                    $geometry: {
+                                        type: "Point",
+                                        coordinates: [parseFloat(vendor.longitude), parseFloat(vendor.latitude)],
+                                    },
+                                    $maxDistance: 50000,
                                 },
-                                $maxDistance: 50000, // 50km radius
                             },
-                        },
-                    })
-                        .populate("zone_id", "name")
-                        .lean();
+                        })
+                            .populate("zone_id", "name")
+                            .lean();
 
-                    if (nearestPincode) {
-                        if (nearestPincode.zone_id) {
-                            vendor.zone = nearestPincode.zone_id;
-                        } else {
-                            // Try to match zone name with city or state
-                            const possibleName = nearestPincode.city || nearestPincode.state;
-                            if (possibleName) {
-                                const matchedZone = await Zone.findOne({
-                                    name: { $regex: new RegExp(`^${possibleName}$`, "i") }
-                                }).select("name").lean();
-
-                                if (matchedZone) {
-                                    vendor.zone = matchedZone;
-                                } else {
-                                    vendor.zone = { _id: null, name: possibleName };
+                        if (nearestPincode) {
+                            if (nearestPincode.zone_id) {
+                                vendor.zone = nearestPincode.zone_id;
+                            } else {
+                                const possibleName = nearestPincode.city || nearestPincode.state;
+                                if (possibleName) {
+                                    const matchedZone = allZones.find(z =>
+                                        z.name.toLowerCase() === possibleName.toLowerCase()
+                                    );
+                                    vendor.zone = matchedZone || { _id: null, name: possibleName };
                                 }
                             }
+                            if (!vendor.storeAddress || !vendor.storeAddress.city) {
+                                vendor.storeAddress = {
+                                    ...vendor.storeAddress,
+                                    city: nearestPincode.city || vendor.zone?.name
+                                };
+                            }
                         }
+                    }
 
-                        // Update address city if missing
-                        if (!vendor.storeAddress || !vendor.storeAddress.city) {
-                            vendor.storeAddress = {
-                                ...vendor.storeAddress,
-                                city: nearestPincode.city || vendor.zone?.name
-                            };
+                    // B. ADDRESS STRING MATCHING (If still null, search in address text)
+                    if (!vendor.zone) {
+                        const addressText = `${vendor.storeAddress?.fullAddress || ""} ${vendor.storeAddress?.city || ""} ${vendor.storeAddress?.street || ""}`.toLowerCase();
+                        
+                        let searchStr = addressText;
+                        if (searchStr.includes("calicut")) searchStr += " kozhikode";
+                        if (searchStr.includes("kochi") || searchStr.includes("cochin")) searchStr += " ernakulam";
+                        if (searchStr.includes("trivandrum")) searchStr += " thiruvananthapuram";
+
+                        const matchedZone = allZones.find(z => 
+                            searchStr.includes(z.name.toLowerCase())
+                        );
+
+                        if (matchedZone) {
+                            vendor.zone = matchedZone;
                         }
                     }
                 } catch (geoErr) {
-                    console.error("Geo fallback error for vendor:", vendor._id, geoErr.message);
+                    console.error("Fallback error for vendor:", vendor._id, geoErr.message);
                 }
             }
         }
 
+        // Cleanup internal flags
+        result.forEach(v => delete v._needsZoneLookup);
+
         res.json({
             success: true,
-            count: final.length,
-            data: final
+            count: result.length,
+            data: result,
         });
 
     } catch (err) {
+        console.error("Get Mehandi Vendors Error:", err);
         res.status(500).json({ success: false, message: err.message });
     }
 };
