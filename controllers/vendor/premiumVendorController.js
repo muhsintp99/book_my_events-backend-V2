@@ -142,6 +142,18 @@ exports.getPremiumHighlights = async (req, res) => {
                 }
 
                 if (items.length > 0) {
+                    // Stamp isPremium flag on every item so the frontend
+                    // always shows the premium badge (these are all premium by definition)
+                    items.forEach(item => {
+                        item.isPremium = true;
+                        if (item.provider && typeof item.provider === 'object') {
+                            item.provider.isPremium = true;
+                            item.provider.subscriptionStatus = "active";
+                            if (item.provider.vendorProfile && typeof item.provider.vendorProfile === 'object') {
+                                item.provider.vendorProfile.subscriptionStatus = "active";
+                            }
+                        }
+                    });
                     premiumData[name] = items;
                     console.log(`✅ [PremiumHighlights] ${name}: ${items.length} items found.`);
                 }
