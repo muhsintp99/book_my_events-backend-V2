@@ -114,6 +114,31 @@ exports.vendorEmail = (user, password) => `
   </div>
 `;
 
+exports.vendorUpdateEmail = (user, password) => `
+  <div style="font-family:Arial,sans-serif;line-height:1.6">
+    <h2>Vendor Credentials Updated 🎉</h2>
+    <p>Hi <strong>${user.firstName}</strong>,</p>
+    <p>Your vendor account login email has been updated. Please find your new credentials below:</p>
+
+    <p><strong>Email:</strong> ${user.email}</p>
+    <p><strong>New Password:</strong> ${password}</p>
+
+    <p style="color:red;">⚠️ Please change your password after logging in with these new credentials.</p>
+    <br/>
+
+    <p>
+      <a href="https://vendor.bookmyevent.ae/"
+         style="display:inline-block;background-color:#E15B65;color:#fff;
+                padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold;">
+         Login to Your Account
+      </a>
+    </p>
+
+    <br/>
+    <p>Regards,<br/>BookMyEvent Team</p>
+  </div>
+`;
+
 
 exports.otpEmail = (otp) => `
   <div style="font-family:Arial,sans-serif;line-height:1.6">
