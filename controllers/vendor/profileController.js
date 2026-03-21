@@ -628,6 +628,7 @@ exports.updateProfile = async (req, res) => {
       vendorName,
       firstName,
       lastName,
+      email,
       businessAddress,
       mobileNumber,
       socialLinks,
@@ -833,21 +834,70 @@ exports.updateProfile = async (req, res) => {
         // Ensure lastName is at least a space to satisfy 'required' validation if name is single word
         if (!lastNameSync) lastNameSync = " ";
 
-        // Update User Model
-        const userUpdateFields = {
-          firstName: firstNameSync,
-          lastName: lastNameSync,
-          phone: mobileNumber || profile.mobileNumber,
-          mobile: mobileNumber || profile.mobileNumber,
-        };
-
-        if (updatedData.socialLinks) userUpdateFields.socialMedia = updatedData.socialLinks;
-        if (updatedData.profilePhoto) userUpdateFields.profilePhoto = updatedData.profilePhoto;
-
         try {
-          const updatedUser = await User.findByIdAndUpdate(targetUserId, { $set: userUpdateFields }, { new: true });
-          if (updatedUser) {
-            console.log(`[updateProfile] Synced data to User: ${targetUserId} (${updatedUser.firstName} ${updatedUser.lastName})`);
+          const userObj = await User.findById(targetUserId);
+          if (userObj) {
+            let userFieldUpdated = false;
+            let emailChanged = false;
+            let newPassword = null;
+
+            if (email && email.trim() !== '' && email !== userObj.email) {
+              // Email changed! We need to update and generate a new password
+              userObj.email = email.trim();
+              newPassword = Math.random().toString(36).slice(-8); // Generate an 8-char secure password
+              userObj.password = newPassword;
+              emailChanged = true;
+              userFieldUpdated = true;
+            }
+
+            if (firstNameSync && firstNameSync !== userObj.firstName) {
+              userObj.firstName = firstNameSync;
+              userFieldUpdated = true;
+            }
+
+            if (lastNameSync !== undefined && lastNameSync !== userObj.lastName) {
+              userObj.lastName = lastNameSync;
+              userFieldUpdated = true;
+            }
+
+            const mobileInput = mobileNumber || profile.mobileNumber;
+            if (mobileInput && mobileInput !== userObj.phone) {
+              userObj.phone = mobileInput;
+              userObj.mobile = mobileInput;
+              userFieldUpdated = true;
+            }
+
+            if (updatedData.socialLinks) {
+              userObj.socialMedia = updatedData.socialLinks;
+              userFieldUpdated = true;
+            }
+
+            if (updatedData.profilePhoto) {
+              userObj.profilePhoto = updatedData.profilePhoto;
+              userFieldUpdated = true;
+            }
+
+            if (userFieldUpdated) {
+              // .save() ensures pre-save hooks (like password hashing) run
+              await userObj.save();
+              console.log(`[updateProfile] Synced data to User: ${targetUserId} (${userObj.firstName} ${userObj.lastName})`);
+
+              // If the email was updated, shoot them an email with their new credentials
+              if (emailChanged) {
+                try {
+                  const sendEmail = require("../../utils/sendEmail");
+                  const { vendorEmail } = require("../../utils/sentEmail");
+                  await sendEmail(
+                    userObj.email,
+                    "Your BookMyEvent Portal Access Credentials (Updated)",
+                    vendorEmail(userObj, newPassword)
+                  );
+                  console.log(`[updateProfile] Sent updated credentials to ${userObj.email}`);
+                } catch (emailErr) {
+                  console.error(`[updateProfile] Failed to send credentials email to updated address:`, emailErr.message);
+                }
+              }
+            }
           } else {
             console.warn(`[updateProfile] User not found for sync: ${targetUserId}`);
           }
@@ -879,7 +929,7 @@ exports.updateProfile = async (req, res) => {
           // Filter out invalid IDs
           vendorUpdateFields.zones = zonesArray.filter(z => mongoose.Types.ObjectId.isValid(z));
         }
-        
+
         // Handle businessAddress sync
         if (businessAddress || profile.businessAddress) {
           vendorUpdateFields.storeAddress = {
