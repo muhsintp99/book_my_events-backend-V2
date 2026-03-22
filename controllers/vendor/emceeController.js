@@ -432,6 +432,8 @@ exports.getEmceeVendors = async (req, res) => {
                 ]
             });
 
+        const filteredUsers = users.filter(u => u.vendorProfile);
+
         const final = filteredUsers.map(user => {
             const countObj = vendorsAgg.find(
                 v => v._id.toString() === user._id.toString()
