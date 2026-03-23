@@ -657,6 +657,12 @@ exports.createBooking = async (req, res) => {
       "Evening Section": "6:00 PM - 10:00 PM",
       "evening section": "6:00 PM - 10:00 PM",
       "EVENING SECTION": "6:00 PM - 10:00 PM",
+
+      // Mehandi specific
+      "Morning (9AM-12PM)": "9:00 AM - 12:00 PM",
+      "Afternoon (12PM-4PM)": "12:00 PM - 4:00 PM",
+      "Evening (4PM-8PM)": "4:00 PM - 8:00 PM",
+      "Night (8PM-12AM)": "8:00 PM - 12:00 AM",
     };
 
     let normalizedTimeSlot = [];
@@ -693,9 +699,11 @@ exports.createBooking = async (req, res) => {
             TIME_SLOT_MAP[trimmed.toUpperCase()];
 
           if (!mappedTime) {
-            console.error(`  ❌ No mapping for: "${trimmed}"`);
-            console.error(`  Available keys:`, Object.keys(TIME_SLOT_MAP));
-            throw new Error(`Invalid timeSlot: "${trimmed}"`);
+            console.warn(`  ⚠️ No standard mapping for: "${trimmed}". Using as direct time.`);
+            return {
+                label: "Selected Time",
+                time: trimmed,
+            };
           }
 
           console.log(`  ✅ Mapped "${trimmed}" → "${mappedTime}"`);
