@@ -389,8 +389,7 @@ exports.getBouncerByVendor = async (req, res) => {
                 populate: {
                     path: "vendorProfile",
                     populate: [
-                        { path: "zone", select: "_id name city country" },
-                        { path: "services", select: "_id title image" },
+               { path: "zones", select: "_id name city country" },                        { path: "services", select: "_id title image" },
                         { path: "specialised", select: "_id title image" }
                     ]
                 }
