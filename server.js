@@ -489,7 +489,24 @@ app.use(
 );
 
 app.options("*", cors());
+// 🔥 FORCE WWW + HTTPS REDIRECT
+// app.use((req, res, next) => {
+//   const host = req.headers.host;
 
+//   if (!host) return next();
+
+//   const isWWW = host.startsWith("www.");
+//   const isHTTPS = req.headers["x-forwarded-proto"] === "https";
+
+//   if (!isWWW || !isHTTPS) {
+//     return res.redirect(
+//       301,
+//       "https://www." + host.replace(/^www\./, "") + req.url
+//     );
+//   }
+
+//   next();
+// });
 /**********************************************************
  * MIDDLEWARES
  **********************************************************/
