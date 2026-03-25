@@ -34,17 +34,21 @@ const enhanceProviderDetails = async (providerInput, req = null) => {
 
     // 2. Fetch ANY approved VendorProfile linked to this user
     // We fetch all approved ones and prioritize the one that has zones populated
-    const vendorProfiles = await VendorProfile.find({ 
+    const vendorProfiles = await VendorProfile.find({
         user: providerId,
-        status: "approved",
+        status: { $ne: "rejected" },
         isActive: true
     })
-    .select("storeName logo coverImage zones storeAddress latitude longitude")
-    .populate("zones", "name description icon")
-    .lean();
+        .sort({ status: 1 }) // "approved" comes before "pending" alphabetically (wait, no)
+        .select("storeName logo coverImage zones storeAddress latitude longitude status")
+        .populate("zones", "name description icon")
+        .lean();
 
-    // Prioritize a profile that has zones, otherwise take the first one
-    let vendorProfile = vendorProfiles.find(p => p.zones && p.zones.length > 0) || vendorProfiles[0];
+    // Prioritize "approved" status, then prioritize profile with zones
+    let vendorProfile = vendorProfiles.find(p => p.status === "approved" && p.zones && p.zones.length > 0)
+        || vendorProfiles.find(p => p.status === "approved")
+        || vendorProfiles.find(p => p.zones && p.zones.length > 0)
+        || vendorProfiles[0];
 
     // ✅ GEOGRAPHIC & ADDRESS FALLBACK: If NO profiles have zones, try nearest district by coordinates or address text
     if ((!vendorProfile || !vendorProfile.zones || vendorProfile.zones.length === 0)) {
@@ -66,8 +70,8 @@ const enhanceProviderDetails = async (providerInput, req = null) => {
                         },
                     },
                 })
-                .populate("zone_id", "name")
-                .lean();
+                    .populate("zone_id", "name")
+                    .lean();
 
                 if (nearestPincode) {
                     if (nearestPincode.zone_id) {
