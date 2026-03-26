@@ -4,6 +4,22 @@ const User = require("../../models/User");
 const Module = require("../../models/admin/module");
 const Profile = require("../../models/vendor/Profile");
 const VendorProfile = require("../../models/vendor/vendorProfile"); // Added VendorProfile model
+const Package = require("../../models/admin/Package");
+const MakeupPackage = require("../../models/admin/makeupPackageModel");
+const PhotographyPackage = require("../../models/vendor/PhotographyPackage");
+const BouncerPackage = require("../../models/vendor/bouncerPackageModel");
+const BoutiquePackage = require("../../models/vendor/boutiquePackageModel");
+const CakePackage = require("../../models/vendor/cakePackageModel");
+const EmceePackage = require("../../models/vendor/emceePackageModel");
+const EventProfessionalPackage = require("../../models/vendor/eventProfessionalPackageModel");
+const FloristPackage = require("../../models/vendor/floristPackageModel");
+const InvitationPackage = require("../../models/vendor/invitationPackageModel");
+const LightAndSoundPackage = require("../../models/vendor/lightAndSoundPackageModel");
+const MehandiPackage = require("../../models/vendor/mehandiPackageModel");
+const OrnamentPackage = require("../../models/vendor/ornamentPackageModel");
+const PanthalDecorationPackage = require("../../models/vendor/panthalDecorationPackageModel");
+const Catering = require("../../models/vendor/Catering");
+const Vehicle = require("../../models/vendor/Vehicle");
 const mongoose = require("mongoose");
 
 // Helper to calculate percentage growth
@@ -12,6 +28,46 @@ const calculateGrowth = (current, previous) => {
   return ((current - previous) / previous) * 100;
 };
 
+const getPackageCount = async (moduleTitle, moduleId) => {
+  const title = moduleTitle.toLowerCase();
+  let model;
+
+  if (title.includes('venue') || title.includes('auditorium')) model = Package;
+  else if (title.includes('makeup')) model = MakeupPackage;
+  else if (title.includes('photography')) model = PhotographyPackage;
+  else if (title.includes('bouncer')) model = BouncerPackage;
+  else if (title.includes('boutique')) model = BoutiquePackage;
+  else if (title.includes('cake')) model = CakePackage;
+  else if (title.includes('emcee')) model = EmceePackage;
+  else if (title.includes('professional')) model = EventProfessionalPackage;
+  else if (title.includes('florist') || title.includes('stage')) model = FloristPackage;
+  else if (title.includes('invitation')) model = InvitationPackage;
+  else if (title.includes('light')) model = LightAndSoundPackage;
+  else if (title.includes('mehandi')) model = MehandiPackage;
+  else if (title.includes('ornament')) model = OrnamentPackage;
+  else if (title.includes('panthal')) model = PanthalDecorationPackage;
+  else if (title.includes('catering')) model = Catering;
+  else if (title.includes('vehicle') || title.includes('transport')) model = Vehicle;
+
+  if (!model) return 0;
+
+  try {
+    const query = {
+      $or: [
+        { module: new mongoose.Types.ObjectId(moduleId) },
+        { module: moduleId },
+        { secondaryModule: new mongoose.Types.ObjectId(moduleId) },
+        { secondaryModule: moduleId },
+        { moduleId: new mongoose.Types.ObjectId(moduleId) },
+        { moduleId: moduleId }
+      ]
+    };
+    return await model.countDocuments(query);
+  } catch (err) {
+    console.error(`Error counting packages for ${moduleTitle}:`, err);
+    return 0;
+  }
+};
 exports.getModuleStats = async (req, res) => {
   try {
     const { moduleId } = req.query;
@@ -107,6 +163,17 @@ exports.getModuleStats = async (req, res) => {
       isActive: true 
     });
 
+    // Total Vendors (including non-active/unapproved)
+    const totalVendors = await VendorProfile.countDocuments({ 
+      $or: [
+        { module: new mongoose.Types.ObjectId(moduleId) },
+        { module: moduleId }
+      ] 
+    });
+
+    // Total Packages for this module
+    const totalPackages = await getPackageCount(moduleTitle, moduleId);
+
     const currentMonthEnquiries = await Enquiry.countDocuments({ 
       $or: [
         { moduleId: new mongoose.Types.ObjectId(moduleId) },
@@ -191,6 +258,8 @@ exports.getModuleStats = async (req, res) => {
         totalEnquiries,
         currentMonthEnquiries,
         activeVendors,
+        totalVendors,
+        totalPackages,
         topVendors, // Added top vendors for this module
         growthRate: growthRate.toFixed(2),
         currentMonthIncome: currentIncome
