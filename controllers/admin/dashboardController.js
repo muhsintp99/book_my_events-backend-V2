@@ -81,8 +81,8 @@ exports.getModuleStats = async (req, res) => {
     // Fetch Module Title
     let moduleInfo = await Module.findById(moduleId);
     if (!moduleInfo) {
-       const SecondaryModule = require("../../models/admin/secondarymodule");
-       moduleInfo = await SecondaryModule.findById(moduleId);
+      const SecondaryModule = require("../../models/admin/secondarymodule");
+      moduleInfo = await SecondaryModule.findById(moduleId);
     }
     const moduleTitle = moduleInfo ? moduleInfo.title : "Unknown";
     console.log("Resolved Module Title:", moduleTitle);
@@ -94,28 +94,28 @@ exports.getModuleStats = async (req, res) => {
 
     // 1. Total Earnings (Module Specific)
     const earningsData = await Booking.aggregate([
-      { 
-        $match: { 
+      {
+        $match: {
           $or: [
             { moduleId: new mongoose.Types.ObjectId(moduleId) },
             { moduleId: moduleId }
-          ], 
-          status: "Accepted" 
-        } 
+          ],
+          status: "Accepted"
+        }
       },
       { $group: { _id: null, total: { $sum: "$finalPrice" } } }
     ]);
     const totalEarnings = earningsData.length > 0 ? earningsData[0].total : 0;
 
     // 2. Total Orders (Module Specific)
-    const totalOrders = await Booking.countDocuments({ 
+    const totalOrders = await Booking.countDocuments({
       $or: [
         { moduleId: new mongoose.Types.ObjectId(moduleId) },
         { moduleId: moduleId }
       ]
     });
     // 3. Total Enquiries (Module Specific)
-    const totalEnquiries = await Enquiry.countDocuments({ 
+    const totalEnquiries = await Enquiry.countDocuments({
       $or: [
         { moduleId: new mongoose.Types.ObjectId(moduleId) },
         { moduleId: moduleId }
@@ -124,29 +124,29 @@ exports.getModuleStats = async (req, res) => {
 
     // 3. Income Growth (Module Specific)
     const currentMonthEarnings = await Booking.aggregate([
-      { 
-        $match: { 
+      {
+        $match: {
           $or: [
             { moduleId: new mongoose.Types.ObjectId(moduleId) },
             { moduleId: moduleId }
-          ], 
+          ],
           status: "Accepted",
           createdAt: { $gte: startOfMonth }
-        } 
+        }
       },
       { $group: { _id: null, total: { $sum: "$finalPrice" } } }
     ]);
 
     const lastMonthEarnings = await Booking.aggregate([
-      { 
-        $match: { 
+      {
+        $match: {
           $or: [
             { moduleId: new mongoose.Types.ObjectId(moduleId) },
             { moduleId: moduleId }
-          ], 
+          ],
           status: "Accepted",
           createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth }
-        } 
+        }
       },
       { $group: { _id: null, total: { $sum: "$finalPrice" } } }
     ]);
@@ -155,50 +155,38 @@ exports.getModuleStats = async (req, res) => {
     const lastIncome = lastMonthEarnings.length > 0 ? lastMonthEarnings[0].total : 0;
     const growthRate = calculateGrowth(currentIncome, lastIncome);
 
-    // 4. Subscribed Vendors for this module (Merging VendorProfile and Subscription models)
-    const vpSubscribedIds = await VendorProfile.find({ 
+    // 4. Premium Vendors for this module (Active/Trial/Pending subscriptions)
+    const activeVendors = await VendorProfile.countDocuments({
       $or: [
         { module: new mongoose.Types.ObjectId(moduleId) },
         { module: moduleId }
-      ], 
-      status: "approved", 
+      ],
+      status: "approved",
       isActive: true,
-      subscriptionStatus: { $in: ["active", "trial"] }
-    }).distinct("user");
-
-    const subSubscribedIds = await Subscription.find({
-      moduleId: moduleId,
-      status: { $in: ["active", "trial"] },
-      isCurrent: { $ne: false }
-    }).distinct("userId");
-
-    const mergedModuleIds = new Set([
-      ...vpSubscribedIds.map(id => id?.toString()), 
-      ...subSubscribedIds.map(id => id?.toString())
-    ]);
-    const activeVendors = Array.from(mergedModuleIds).filter(Boolean).length;
+      subscriptionStatus: { $in: ["active", "trial", "pending"] }
+    });
 
     // Total Vendors (including non-active/unapproved)
-    const totalVendors = await VendorProfile.countDocuments({ 
+    const totalVendors = await VendorProfile.countDocuments({
       $or: [
         { module: new mongoose.Types.ObjectId(moduleId) },
         { module: moduleId }
-      ] 
+      ]
     });
 
     // Total Packages for this module
     const totalPackages = await getPackageCount(moduleTitle, moduleId);
 
-    const currentMonthEnquiries = await Enquiry.countDocuments({ 
+    const currentMonthEnquiries = await Enquiry.countDocuments({
       $or: [
         { moduleId: new mongoose.Types.ObjectId(moduleId) },
         { moduleId: moduleId }
-      ], 
-      createdAt: { $gte: startOfMonth } 
+      ],
+      createdAt: { $gte: startOfMonth }
     });
 
     // 5. Identify if this is an enquiry-based module
-    const isEnquiryModule = ['light', 'bouncer', 'emcee', 'event host', 'panthal', 'professional'].some(m => 
+    const isEnquiryModule = ['light', 'bouncer', 'emcee', 'event host', 'panthal', 'professional'].some(m =>
       moduleTitle.toLowerCase().includes(m)
     );
 
@@ -206,13 +194,13 @@ exports.getModuleStats = async (req, res) => {
     let topVendors = [];
     if (isEnquiryModule) {
       topVendors = await Enquiry.aggregate([
-        { 
-          $match: { 
-             $or: [
-                { moduleId: new mongoose.Types.ObjectId(moduleId) },
-                { moduleId: moduleId }
-             ] 
-          } 
+        {
+          $match: {
+            $or: [
+              { moduleId: new mongoose.Types.ObjectId(moduleId) },
+              { moduleId: moduleId }
+            ]
+          }
         },
         { $group: { _id: "$vendorId", count: { $sum: 1 } } },
         { $sort: { count: -1 } },
@@ -235,13 +223,13 @@ exports.getModuleStats = async (req, res) => {
       ]);
     } else {
       topVendors = await Booking.aggregate([
-        { 
-          $match: { 
-             $or: [
-                { moduleId: new mongoose.Types.ObjectId(moduleId) },
-                { moduleId: moduleId }
-             ] 
-          } 
+        {
+          $match: {
+            $or: [
+              { moduleId: new mongoose.Types.ObjectId(moduleId) },
+              { moduleId: moduleId }
+            ]
+          }
         },
         { $group: { _id: "$providerId", count: { $sum: 1 } } },
         { $sort: { count: -1 } },
@@ -296,31 +284,20 @@ exports.getOverallStats = async (req, res) => {
     ]);
     const totalEarnings = earningsData.length > 0 ? earningsData[0].total : 0;
 
-    // 2. Subscribed Vendors (Platform wide)
-    const vpTotalSubscribedIds = await VendorProfile.find({ 
-      status: "approved", 
+    // 2. Premium Vendors (Platform wide)
+    const activeVendors = await VendorProfile.countDocuments({
+      status: "approved",
       isActive: true,
-      subscriptionStatus: { $in: ["active", "trial"] }
-    }).distinct("user");
-
-    const subTotalSubscribedIds = await Subscription.find({
-      status: { $in: ["active", "trial"] },
-      isCurrent: { $ne: false }
-    }).distinct("userId");
-
-    const mergedTotalIds = new Set([
-      ...vpTotalSubscribedIds.map(id => id?.toString()), 
-      ...subTotalSubscribedIds.map(id => id?.toString())
-    ]);
-    const activeVendors = Array.from(mergedTotalIds).filter(Boolean).length;
-   // Total Vendors (including non-active/unapproved)
+      subscriptionStatus: { $in: ["active", "trial", "pending"] }
+    });
+    // Total Vendors (including non-active/unapproved)
     const totalVendors = await VendorProfile.countDocuments();
 
     // 2a. Monthly Counts (Platform wide)
     const now = new Date();
     const currentYear = now.getFullYear();
     const startOfMonth = new Date(currentYear, now.getMonth(), 1);
-    
+
     const currentMonthOrders = await Booking.countDocuments({ createdAt: { $gte: startOfMonth } });
     const currentMonthEnquiries = await Enquiry.countDocuments({ createdAt: { $gte: startOfMonth } });
 
