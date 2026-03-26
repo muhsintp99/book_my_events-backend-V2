@@ -21,6 +21,7 @@ const PanthalDecorationPackage = require("../../models/vendor/panthalDecorationP
 const Catering = require("../../models/vendor/Catering");
 const Vehicle = require("../../models/vendor/Vehicle");
 const SecondaryModule = require("../../models/admin/secondarymodule"); // Added SecondaryModule
+const Subscription = require("../../models/admin/Subscription"); // Added Subscription
 const mongoose = require("mongoose");
 
 // Helper to calculate percentage growth
@@ -154,16 +155,28 @@ exports.getModuleStats = async (req, res) => {
     const lastIncome = lastMonthEarnings.length > 0 ? lastMonthEarnings[0].total : 0;
     const growthRate = calculateGrowth(currentIncome, lastIncome);
 
-    // 4. Premium Vendors for this module (Active/Trial/Pending subscriptions)
-    const activeVendors = await VendorProfile.countDocuments({ 
+    // 4. Subscribed Vendors for this module (Merging VendorProfile and Subscription models)
+    const vpSubscribedIds = await VendorProfile.find({ 
       $or: [
         { module: new mongoose.Types.ObjectId(moduleId) },
         { module: moduleId }
       ], 
       status: "approved", 
       isActive: true,
-      subscriptionStatus: { $in: ["active", "trial", "pending"] }
-    });
+      subscriptionStatus: { $in: ["active", "trial"] }
+    }).distinct("user");
+
+    const subSubscribedIds = await Subscription.find({
+      moduleId: moduleId,
+      status: { $in: ["active", "trial"] },
+      isCurrent: { $ne: false }
+    }).distinct("userId");
+
+    const mergedModuleIds = new Set([
+      ...vpSubscribedIds.map(id => id?.toString()), 
+      ...subSubscribedIds.map(id => id?.toString())
+    ]);
+    const activeVendors = Array.from(mergedModuleIds).filter(Boolean).length;
 
     // Total Vendors (including non-active/unapproved)
     const totalVendors = await VendorProfile.countDocuments({ 
@@ -283,13 +296,24 @@ exports.getOverallStats = async (req, res) => {
     ]);
     const totalEarnings = earningsData.length > 0 ? earningsData[0].total : 0;
 
-    // 2. Premium Vendors (Platform wide)
-    const activeVendors = await VendorProfile.countDocuments({ 
+    // 2. Subscribed Vendors (Platform wide)
+    const vpTotalSubscribedIds = await VendorProfile.find({ 
       status: "approved", 
       isActive: true,
-      subscriptionStatus: { $in: ["active", "trial", "pending"] }
-    });
-    // Total Vendors (including non-active/unapproved)
+      subscriptionStatus: { $in: ["active", "trial"] }
+    }).distinct("user");
+
+    const subTotalSubscribedIds = await Subscription.find({
+      status: { $in: ["active", "trial"] },
+      isCurrent: { $ne: false }
+    }).distinct("userId");
+
+    const mergedTotalIds = new Set([
+      ...vpTotalSubscribedIds.map(id => id?.toString()), 
+      ...subTotalSubscribedIds.map(id => id?.toString())
+    ]);
+    const activeVendors = Array.from(mergedTotalIds).filter(Boolean).length;
+   // Total Vendors (including non-active/unapproved)
     const totalVendors = await VendorProfile.countDocuments();
 
     // 2a. Monthly Counts (Platform wide)
