@@ -210,10 +210,14 @@ exports.getOverallStats = async (req, res) => {
     // 2. Active Vendors (Platform wide)
     const activeVendors = await VendorProfile.countDocuments({ status: "approved", isActive: true });
 
-    // 3. Platform Growth (Total Earnings last month vs this month)
+    // 2a. Monthly Counts (Platform wide)
     const now = new Date();
     const currentYear = now.getFullYear();
     const startOfMonth = new Date(currentYear, now.getMonth(), 1);
+    
+    const currentMonthOrders = await Booking.countDocuments({ createdAt: { $gte: startOfMonth } });
+    const currentMonthEnquiries = await Enquiry.countDocuments({ createdAt: { $gte: startOfMonth } });
+
     const startOfLastMonth = new Date(currentYear, now.getMonth() - 1, 1);
     const endOfLastMonth = new Date(currentYear, now.getMonth(), 0);
 
@@ -286,6 +290,8 @@ exports.getOverallStats = async (req, res) => {
       data: {
         totalBookings,
         activeVendors,
+        currentMonthOrders,
+        currentMonthEnquiries,
         overallGrowth: overallGrowth.toFixed(2),
         monthlyStats: fullMonthlyStats,
         topModules
