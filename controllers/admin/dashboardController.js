@@ -383,7 +383,7 @@ exports.getOverallStats = async (req, res) => {
         }
       },
       { $sort: { bookings: -1 } },
-      { $limit: 5 },
+      { $limit: 20 },
       {
         $lookup: {
           from: "modules", // matches the collection name of Module model
