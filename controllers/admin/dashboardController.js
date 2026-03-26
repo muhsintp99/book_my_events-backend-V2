@@ -178,6 +178,15 @@ exports.getModuleStats = async (req, res) => {
     ]);
     const activeVendors = Array.from(mergedModuleIds).filter(Boolean).length;
 
+    // 4a. New Orders for this month (Module Specific)
+    const currentMonthOrders = await Booking.countDocuments({ 
+      $or: [
+        { moduleId: new mongoose.Types.ObjectId(moduleId) },
+        { moduleId: moduleId }
+      ], 
+      createdAt: { $gte: startOfMonth } 
+    });
+
     // Total Vendors (including non-active/unapproved)
     const totalVendors = await VendorProfile.countDocuments({
       $or: [
@@ -277,7 +286,8 @@ exports.getModuleStats = async (req, res) => {
         totalPackages,
         topVendors, // Added top vendors for this module
         growthRate: growthRate.toFixed(2),
-        currentMonthIncome: currentIncome
+        currentMonthIncome: currentIncome,
+        currentMonthOrders: currentMonthOrders
       }
     });
   } catch (error) {
