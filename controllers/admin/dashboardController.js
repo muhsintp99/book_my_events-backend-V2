@@ -283,6 +283,8 @@ exports.getOverallStats = async (req, res) => {
 
     // 2. Active Vendors (Platform wide)
     const activeVendors = await VendorProfile.countDocuments({ status: "approved", isActive: true });
+    // Total Vendors (including non-active/unapproved)
+    const totalVendors = await VendorProfile.countDocuments();
 
     // 2a. Monthly Counts (Platform wide)
     const now = new Date();
@@ -364,6 +366,7 @@ exports.getOverallStats = async (req, res) => {
       data: {
         totalBookings,
         activeVendors,
+        totalVendors, // Added total vendors
         totalEarnings,
         currentMonthOrders,
         currentMonthEnquiries,
