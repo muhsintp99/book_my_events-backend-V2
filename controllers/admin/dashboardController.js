@@ -3,6 +3,7 @@ const Enquiry = require("../../models/vendor/Enquiry"); // Added Enquiry model
 const User = require("../../models/User");
 const Module = require("../../models/admin/module");
 const Profile = require("../../models/vendor/Profile");
+const VendorProfile = require("../../models/vendor/vendorProfile"); // Added VendorProfile model
 const mongoose = require("mongoose");
 
 // Helper to calculate percentage growth
@@ -72,13 +73,21 @@ exports.getModuleStats = async (req, res) => {
     const lastIncome = lastMonthEarnings.length > 0 ? lastMonthEarnings[0].total : 0;
     const growthRate = calculateGrowth(currentIncome, lastIncome);
 
+    // 4. Active Vendors for this module
+    const activeVendors = await VendorProfile.countDocuments({ 
+      module: new mongoose.Types.ObjectId(moduleId), 
+      status: "approved", 
+      isActive: true 
+    });
+
     res.json({
       success: true,
       data: {
         moduleTitle,
         totalEarnings,
         totalOrders,
-        totalEnquiries, // Added totalEnquiries
+        totalEnquiries,
+        activeVendors, // Added module-specific active vendors count
         growthRate: growthRate.toFixed(2),
         currentMonthIncome: currentIncome
       }
@@ -95,7 +104,7 @@ exports.getOverallStats = async (req, res) => {
     const totalBookings = await Booking.countDocuments();
 
     // 2. Active Vendors (Platform wide)
-    const activeVendors = await User.countDocuments({ role: "vendor", isBlocked: false });
+    const activeVendors = await VendorProfile.countDocuments({ status: "approved", isActive: true });
 
     // 3. Platform Growth (Total Earnings last month vs this month)
     const now = new Date();
