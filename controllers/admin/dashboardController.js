@@ -80,6 +80,11 @@ exports.getModuleStats = async (req, res) => {
       isActive: true 
     });
 
+    const currentMonthEnquiries = await Enquiry.countDocuments({ 
+      moduleId: new mongoose.Types.ObjectId(moduleId), 
+      createdAt: { $gte: startOfMonth } 
+    });
+
     res.json({
       success: true,
       data: {
@@ -87,7 +92,8 @@ exports.getModuleStats = async (req, res) => {
         totalEarnings,
         totalOrders,
         totalEnquiries,
-        activeVendors, // Added module-specific active vendors count
+        currentMonthEnquiries, // Added currentMonthEnquiries
+        activeVendors,
         growthRate: growthRate.toFixed(2),
         currentMonthIncome: currentIncome
       }
