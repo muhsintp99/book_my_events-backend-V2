@@ -85,6 +85,54 @@ exports.getModuleStats = async (req, res) => {
       createdAt: { $gte: startOfMonth } 
     });
 
+    // 5. Top Vendors for this module
+    let topVendors = [];
+    if (isEnquiryModule) {
+      topVendors = await Enquiry.aggregate([
+        { $match: { moduleId: new mongoose.Types.ObjectId(moduleId) } },
+        { $group: { _id: "$vendorId", count: { $sum: 1 } } }, // In Enquiry it is vendorId
+        { $sort: { count: -1 } },
+        { $limit: 5 },
+        {
+          $lookup: {
+            from: "vendorprofiles",
+            localField: "_id",
+            foreignField: "user",
+            as: "profile"
+          }
+        },
+        { $unwind: { path: "$profile", preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            name: { $ifNull: ["$profile.storeName", "Unknown Shop"] },
+            bookings: "$count" // Reuse bookings field for count
+          }
+        }
+      ]);
+    } else {
+      topVendors = await Booking.aggregate([
+        { $match: { moduleId: new mongoose.Types.ObjectId(moduleId) } },
+        { $group: { _id: "$providerId", count: { $sum: 1 } } }, // In Booking it is providerId
+        { $sort: { count: -1 } },
+        { $limit: 5 },
+        {
+          $lookup: {
+            from: "vendorprofiles",
+            localField: "_id",
+            foreignField: "user",
+            as: "profile"
+          }
+        },
+        { $unwind: { path: "$profile", preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            name: { $ifNull: ["$profile.storeName", "Unknown Shop"] },
+            bookings: "$count"
+          }
+        }
+      ]);
+    }
+
     res.json({
       success: true,
       data: {
@@ -92,8 +140,9 @@ exports.getModuleStats = async (req, res) => {
         totalEarnings,
         totalOrders,
         totalEnquiries,
-        currentMonthEnquiries, // Added currentMonthEnquiries
+        currentMonthEnquiries,
         activeVendors,
+        topVendors, // Added top vendors for this module
         growthRate: growthRate.toFixed(2),
         currentMonthIncome: currentIncome
       }
