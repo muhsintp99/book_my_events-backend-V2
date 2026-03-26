@@ -1,4 +1,5 @@
 const Booking = require("../../models/vendor/Booking");
+const Enquiry = require("../../models/vendor/Enquiry"); // Added Enquiry model
 const User = require("../../models/User");
 const Module = require("../../models/admin/module");
 const Profile = require("../../models/vendor/Profile");
@@ -18,6 +19,14 @@ exports.getModuleStats = async (req, res) => {
       return res.status(400).json({ success: false, message: "Valid Module ID is required" });
     }
 
+    // Fetch Module Title
+    let moduleInfo = await Module.findById(moduleId);
+    if (!moduleInfo) {
+       const SecondaryModule = require("../../models/admin/secondarymodule");
+       moduleInfo = await SecondaryModule.findById(moduleId);
+    }
+    const moduleTitle = moduleInfo ? moduleInfo.title : "Unknown";
+
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -32,6 +41,9 @@ exports.getModuleStats = async (req, res) => {
 
     // 2. Total Orders (Module Specific)
     const totalOrders = await Booking.countDocuments({ moduleId: new mongoose.Types.ObjectId(moduleId) });
+
+    // 3. Total Enquiries (Module Specific)
+    const totalEnquiries = await Enquiry.countDocuments({ moduleId: new mongoose.Types.ObjectId(moduleId) });
 
     // 3. Income Growth (Module Specific)
     const currentMonthEarnings = await Booking.aggregate([
@@ -63,8 +75,10 @@ exports.getModuleStats = async (req, res) => {
     res.json({
       success: true,
       data: {
+        moduleTitle,
         totalEarnings,
         totalOrders,
+        totalEnquiries, // Added totalEnquiries
         growthRate: growthRate.toFixed(2),
         currentMonthIncome: currentIncome
       }
