@@ -29,95 +29,6 @@ const calculateGrowth = (current, previous) => {
   return ((current - previous) / previous) * 100;
 };
 
-const getGlobalVendorsWithPackagesIds = async () => {
-  const models = [
-    Package, MakeupPackage, PhotographyPackage, BouncerPackage, BoutiquePackage, 
-    CakePackage, EmceePackage, EventProfessionalPackage, FloristPackage, 
-    InvitationPackage, LightAndSoundPackage, MehandiPackage, OrnamentPackage, 
-    PanthalDecorationPackage, Catering, Vehicle
-  ];
-
-  try {
-    const allIds = await Promise.all(models.map(async (model) => {
-      let ids = await model.distinct("provider", { isActive: true });
-      if (!ids || ids.length === 0) {
-        ids = await model.distinct("user", { isActive: true });
-      }
-      return ids;
-    }));
-    
-    // Flatten and unique
-    const flattenedPackageVendorIds = [...new Set(allIds.flat().map(id => id?.toString()))].filter(Boolean);
-
-    // Also get IDs of all approved/active vendors in Enquiry-based modules
-    const enquiryModuleIds = await Module.find({ title: { $regex: /light|bouncer|emcee|event host|panthal|professional/i } }).distinct("_id");
-    const secondaryEnquiryIds = await SecondaryModule.find({ title: { $regex: /light|bouncer|emcee|event host|panthal|professional/i } }).distinct("_id");
-    
-    const enquiryVendorUserIds = await VendorProfile.distinct("user", {
-        $or: [
-            { module: { $in: enquiryModuleIds } },
-            { module: { $in: secondaryEnquiryIds } }
-        ],
-        status: "approved",
-        isActive: true,
-        subscriptionStatus: { $in: ["active", "trial"] }
-    });
-    
-    // Combine and return
-    return [...new Set([...flattenedPackageVendorIds, ...enquiryVendorUserIds.map(id => id.toString())])];
-  } catch (err) {
-    console.error("Error getting global vendors with packages:", err);
-    return [];
-  }
-};
-
-const getVendorsWithPackagesIds = async (moduleTitle, moduleId) => {
-  const title = moduleTitle.toLowerCase();
-  let model;
-
-  if (title.includes('venue') || title.includes('auditorium')) model = Package;
-  else if (title.includes('makeup')) model = MakeupPackage;
-  else if (title.includes('photography')) model = PhotographyPackage;
-  else if (title.includes('bouncer')) model = BouncerPackage;
-  else if (title.includes('boutique')) model = BoutiquePackage;
-  else if (title.includes('cake')) model = CakePackage;
-  else if (title.includes('emcee')) model = EmceePackage;
-  else if (title.includes('professional')) model = EventProfessionalPackage;
-  else if (title.includes('florist') || title.includes('stage')) model = FloristPackage;
-  else if (title.includes('invitation')) model = InvitationPackage;
-  else if (title.includes('light')) model = LightAndSoundPackage;
-  else if (title.includes('mehandi')) model = MehandiPackage;
-  else if (title.includes('ornament')) model = OrnamentPackage;
-  else if (title.includes('panthal')) model = PanthalDecorationPackage;
-  else if (title.includes('catering')) model = Catering;
-  else if (title.includes('vehicle') || title.includes('transport')) model = Vehicle;
-
-  if (!model) return [];
-
-  try {
-    const query = {
-      $or: [
-        { module: new mongoose.Types.ObjectId(moduleId) },
-        { module: moduleId },
-        { secondaryModule: new mongoose.Types.ObjectId(moduleId) },
-        { secondaryModule: moduleId },
-        { moduleId: new mongoose.Types.ObjectId(moduleId) },
-        { moduleId: moduleId }
-      ]
-    };
-    
-    // Most models use 'provider' field for user ID
-    let vendorIds = await model.distinct("provider", query);
-    if (!vendorIds || vendorIds.length === 0) {
-      vendorIds = await model.distinct("user", query);
-    }
-    return vendorIds;
-  } catch (err) {
-    console.error(`Error getting vendors for ${moduleTitle}:`, err);
-    return [];
-  }
-};
-
 const getPackageCount = async (moduleTitle, moduleId) => {
   const title = moduleTitle.toLowerCase();
   let model;
@@ -244,7 +155,7 @@ exports.getModuleStats = async (req, res) => {
     const growthRate = calculateGrowth(currentIncome, lastIncome);
 
     // 4. Active Vendors for this module (Strictly counting those with active/trial subscriptions)
-    let activeVendorQuery = { 
+    const activeVendors = await VendorProfile.countDocuments({ 
       $or: [
         { module: new mongoose.Types.ObjectId(moduleId) },
         { module: moduleId }
@@ -252,19 +163,7 @@ exports.getModuleStats = async (req, res) => {
       status: "approved", 
       isActive: true,
       subscriptionStatus: { $in: ["active", "trial"] }
-    };
-
-    // New Requirement: Only count vendors with packages (except enquiry modules)
-    const isEnquiryModuleCheck = ['light', 'bouncer', 'emcee', 'event host', 'panthal', 'professional'].some(m => 
-      moduleTitle.toLowerCase().includes(m)
-    );
-
-    if (!isEnquiryModuleCheck) {
-      const packageVendorIds = await getVendorsWithPackagesIds(moduleTitle, moduleId);
-      activeVendorQuery.user = { $in: packageVendorIds };
-    }
-
-    const activeVendors = await VendorProfile.countDocuments(activeVendorQuery);
+    });
 
     // Total Vendors (including non-active/unapproved)
     const totalVendors = await VendorProfile.countDocuments({ 
@@ -384,13 +283,11 @@ exports.getOverallStats = async (req, res) => {
     ]);
     const totalEarnings = earningsData.length > 0 ? earningsData[0].total : 0;
 
-    // 2. Active Vendors (Platform wide - strictly counting active/trial subscriptions WITH packages)
-    const packageVendorIds = await getGlobalVendorsWithPackagesIds();
+    // 2. Active Vendors (Platform wide - strictly counting active/trial subscriptions)
     const activeVendors = await VendorProfile.countDocuments({ 
       status: "approved", 
       isActive: true, 
-      subscriptionStatus: { $in: ["active", "trial"] },
-      user: { $in: packageVendorIds }
+      subscriptionStatus: { $in: ["active", "trial"] }
     });
     // Total Vendors (including non-active/unapproved)
     const totalVendors = await VendorProfile.countDocuments();
