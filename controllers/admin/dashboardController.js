@@ -206,6 +206,11 @@ exports.getOverallStats = async (req, res) => {
   try {
     // 1. Total Bookings (Platform wide)
     const totalBookings = await Booking.countDocuments();
+    const earningsData = await Booking.aggregate([
+      { $match: { status: "Accepted" } },
+      { $group: { _id: null, total: { $sum: "$finalPrice" } } }
+    ]);
+    const totalEarnings = earningsData.length > 0 ? earningsData[0].total : 0;
 
     // 2. Active Vendors (Platform wide)
     const activeVendors = await VendorProfile.countDocuments({ status: "approved", isActive: true });
@@ -290,6 +295,7 @@ exports.getOverallStats = async (req, res) => {
       data: {
         totalBookings,
         activeVendors,
+        totalEarnings,
         currentMonthOrders,
         currentMonthEnquiries,
         overallGrowth: overallGrowth.toFixed(2),
