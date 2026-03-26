@@ -154,14 +154,15 @@ exports.getModuleStats = async (req, res) => {
     const lastIncome = lastMonthEarnings.length > 0 ? lastMonthEarnings[0].total : 0;
     const growthRate = calculateGrowth(currentIncome, lastIncome);
 
-    // 4. Active Vendors for this module
+    // 4. Premium Vendors for this module (Active/Trial/Pending subscriptions)
     const activeVendors = await VendorProfile.countDocuments({ 
       $or: [
         { module: new mongoose.Types.ObjectId(moduleId) },
         { module: moduleId }
       ], 
       status: "approved", 
-      isActive: true
+      isActive: true,
+      subscriptionStatus: { $in: ["active", "trial", "pending"] }
     });
 
     // Total Vendors (including non-active/unapproved)
@@ -282,10 +283,11 @@ exports.getOverallStats = async (req, res) => {
     ]);
     const totalEarnings = earningsData.length > 0 ? earningsData[0].total : 0;
 
-    // 2. Active Vendors (Platform wide)
+    // 2. Premium Vendors (Platform wide)
     const activeVendors = await VendorProfile.countDocuments({ 
       status: "approved", 
-      isActive: true
+      isActive: true,
+      subscriptionStatus: { $in: ["active", "trial", "pending"] }
     });
     // Total Vendors (including non-active/unapproved)
     const totalVendors = await VendorProfile.countDocuments();
