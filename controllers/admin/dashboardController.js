@@ -179,12 +179,12 @@ exports.getModuleStats = async (req, res) => {
     const activeVendors = Array.from(mergedModuleIds).filter(Boolean).length;
 
     // 4a. New Orders for this month (Module Specific)
-    const currentMonthOrders = await Booking.countDocuments({ 
+    const currentMonthOrders = await Booking.countDocuments({
       $or: [
         { moduleId: new mongoose.Types.ObjectId(moduleId) },
         { moduleId: moduleId }
-      ], 
-      createdAt: { $gte: startOfMonth } 
+      ],
+      createdAt: { $gte: startOfMonth }
     });
 
     // Total Vendors (including non-active/unapproved)
@@ -467,35 +467,11 @@ exports.getNotifications = async (req, res) => {
       .limit(limit)
       .populate('moduleId', 'title');
 
-    // 4. Fetch Latest Packages from ALL models
-    const packageModels = [
-        { model: Package, name: 'Venue' },
-        { model: MakeupPackage, name: 'Makeup' },
-        { model: PhotographyPackage, name: 'Photography' },
-        { model: FloristPackage, name: 'Florist' },
-        { model: MehandiPackage, name: 'Mehandi' },
-        { model: Catering, name: 'Catering' },
-        { model: CakePackage, name: 'Cake' }
-    ];
-
-    const packagePromises = packageModels.map(pm => 
-        pm.model.find().sort({ createdAt: -1 }).limit(3).populate('module', 'title')
-    );
-    const packageResults = await Promise.all(packagePromises);
-    
-    const allLatestPackages = [];
-    packageResults.forEach((results, index) => {
-        results.forEach(pkg => {
-            allLatestPackages.push({
-                id: pkg._id,
-                type: 'package',
-                title: 'New Package Created',
-                description: `New ${packageModels[index].name} package "${pkg.title}" created.`,
-                createdAt: pkg.createdAt,
-                unread: false
-            });
-        });
-    });
+    // 4. Fetch Latest Packages
+    const latestPackages = await Package.find()
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate('module', 'title');
 
     // Map into a unified notification format
     const notifications = [
@@ -523,7 +499,14 @@ exports.getNotifications = async (req, res) => {
         createdAt: e.createdAt,
         unread: e.status === 'pending'
       })),
-      ...allLatestPackages
+      ...latestPackages.map(p => ({
+        id: p._id,
+        type: 'package',
+        title: 'New Package Created',
+        description: `New package "${p.title}" created in ${p.module?.title || 'Venues'}.`,
+        createdAt: p.createdAt,
+        unread: false
+      }))
     ];
 
     // Sort all by most recent first
