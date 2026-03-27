@@ -442,3 +442,82 @@ exports.getOverallStats = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+exports.getNotifications = async (req, res) => {
+  try {
+    const limit = 5;
+
+    // 1. Fetch Latest Vendor Registrations
+    const latestVendors = await VendorProfile.find()
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate('module', 'title')
+      .populate('zone', 'name');
+
+    // 2. Fetch Latest Bookings
+    const latestBookings = await Booking.find()
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate('moduleId', 'title')
+      .populate('providerId', 'firstName lastName');
+
+    // 3. Fetch Latest Enquiries
+    const latestEnquiries = await Enquiry.find()
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate('moduleId', 'title');
+
+    // 4. Fetch Latest Packages
+    const latestPackages = await Package.find()
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate('module', 'title');
+
+    // Map into a unified notification format
+    const notifications = [
+      ...latestVendors.map(v => ({
+        id: v._id,
+        type: 'vendor',
+        title: 'New Vendor Join',
+        description: `Vendor "${v.storeName || 'Unknown'}" registered for ${v.module?.title || 'a module'}.`,
+        createdAt: v.createdAt,
+        unread: v.status === 'pending'
+      })),
+      ...latestBookings.map(b => ({
+        id: b._id,
+        type: 'order',
+        title: 'New Order Received',
+        description: `Order #${b.paymentOrderId || b._id.toString().slice(-6)} for ${b.moduleType} received.`,
+        createdAt: b.createdAt,
+        unread: b.status === 'Pending'
+      })),
+      ...latestEnquiries.map(e => ({
+        id: e._id,
+        type: 'enquiry',
+        title: 'New Enquiry Received',
+        description: `Enquiry from "${e.fullName}" for ${e.eventType || 'services'}.`,
+        createdAt: e.createdAt,
+        unread: e.status === 'pending'
+      })),
+      ...latestPackages.map(p => ({
+        id: p._id,
+        type: 'package',
+        title: 'New Package Created',
+        description: `New package "${p.title}" created in ${p.module?.title || 'Venues'}.`,
+        createdAt: p.createdAt,
+        unread: false
+      }))
+    ];
+
+    // Sort all by most recent first
+    notifications.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json({
+      success: true,
+      data: notifications.slice(0, 20)
+    });
+  } catch (error) {
+    console.error("Get Notifications Error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
