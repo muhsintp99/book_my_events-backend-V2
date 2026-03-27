@@ -501,35 +501,39 @@ exports.getNotifications = async (req, res) => {
       })));
     } catch (err) { console.error("Error fetching enquiry notifications:", err); }
 
-    // 4. Multiple Package Models Detection
+// 4. Multiple Package Models Detection
     const packageModels = [
       { model: Package, name: 'Venue' },
-      { model: MakeupPackage, name: 'Makeup' },
-      { model: PhotographyPackage, name: 'Photography' },
-      { model: FloristPackage, name: 'Florist' },
-      { model: MehandiPackage, name: 'Mehandi' },
-      { model: Catering, name: 'Catering' },
-      { model: CakePackage, name: 'Cake' },
-      { model: InvitationPackage, name: 'Invitation' }
+      { model: require('../../models/admin/makeupPackageModel'), name: 'Makeup' },
+      { model: require('../../models/vendor/PhotographyPackage'), name: 'Photography' },
+      { model: require('../../models/vendor/floristPackageModel'), name: 'Florist' },
+      { model: require('../../models/vendor/mehandiPackageModel'), name: 'Mehandi' },
+      { model: require('../../models/vendor/Catering'), name: 'Catering' },
+      { model: require('../../models/vendor/cakePackageModel'), name: 'Cake' },
+      { model: require('../../models/vendor/invitationPackageModel'), name: 'Invitation' },
+      { model: require('../../models/vendor/boutiquePackageModel'), name: 'Boutique' },
+      { model: require('../../models/vendor/lightAndSoundPackageModel'), name: 'Light & Sound' }
     ];
 
     try {
       const packagePromises = packageModels.map(pm => 
-        pm.model.find().sort({ createdAt: -1 }).limit(3).populate('module', 'title').populate('moduleId', 'title')
+        pm.model.find().sort({ createdAt: -1 }).limit(3).lean()
       );
-      const packageResults = await Promise.all(packagePromises);
+      const packageResults = await Promise.allSettled(packagePromises);
       
-      packageResults.forEach((results, index) => {
-        results.forEach(pkg => {
-          allNotifications.push({
-            id: pkg._id,
-            type: 'package',
-            title: 'New Package Created',
-            description: `New ${packageModels[index].name} package "${pkg.title}" created.`,
-            createdAt: pkg.createdAt,
-            unread: false
+      packageResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          result.value.forEach(pkg => {
+            allNotifications.push({
+              id: pkg._id,
+              type: 'package',
+              title: 'New Package Created',
+              description: `New ${packageModels[index].name} package "${pkg.title || 'Untitled'}" created.`,
+              createdAt: pkg.createdAt,
+              unread: false
+            });
           });
-        });
+        }
       });
     } catch (err) { console.error("Error fetching package notifications:", err); }
 
