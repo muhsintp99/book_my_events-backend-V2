@@ -374,8 +374,17 @@ exports.getOverallStats = async (req, res) => {
       };
     });
 
-    // 5. Top Booked Modules
+    // 5. Top Booked Modules (Combining Bookings and Enquiries for overall activity)
     const topModules = await Booking.aggregate([
+      {
+        $project: { moduleId: 1 }
+      },
+      {
+        $unionWith: {
+          coll: "enquiries",
+          pipeline: [{ $project: { moduleId: 1 } }]
+        }
+      },
       {
         $group: {
           _id: "$moduleId",
@@ -386,16 +395,29 @@ exports.getOverallStats = async (req, res) => {
       { $limit: 20 },
       {
         $lookup: {
-          from: "modules", // matches the collection name of Module model
+          from: "modules",
           localField: "_id",
           foreignField: "_id",
-          as: "moduleInfo"
+          as: "primaryModuleInfo"
         }
       },
-      { $unwind: "$moduleInfo" },
+      {
+        $lookup: {
+          from: "secondarymodules",
+          localField: "_id",
+          foreignField: "_id",
+          as: "secondaryModuleInfo"
+        }
+      },
       {
         $project: {
-          name: "$moduleInfo.title",
+          name: {
+            $ifNull: [
+              { $arrayElemAt: ["$primaryModuleInfo.title", 0] },
+              { $arrayElemAt: ["$secondaryModuleInfo.title", 0] },
+              "Unknown Module"
+            ]
+          },
           bookings: 1
         }
       }
