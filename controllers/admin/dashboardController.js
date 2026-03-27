@@ -445,79 +445,107 @@ exports.getOverallStats = async (req, res) => {
 
 exports.getNotifications = async (req, res) => {
   try {
-    const limit = 5;
+    const limit = 10;
+    let allNotifications = [];
 
     // 1. Fetch Latest Vendor Registrations
-    const latestVendors = await VendorProfile.find()
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .populate('module', 'title')
-      .populate('zone', 'name');
-
-    // 2. Fetch Latest Bookings
-    const latestBookings = await Booking.find()
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .populate('moduleId', 'title')
-      .populate('providerId', 'firstName lastName');
-
-    // 3. Fetch Latest Enquiries
-    const latestEnquiries = await Enquiry.find()
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .populate('moduleId', 'title');
-
-    // 4. Fetch Latest Packages
-    const latestPackages = await Package.find()
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .populate('module', 'title');
-
-    // Map into a unified notification format
-    const notifications = [
-      ...latestVendors.map(v => ({
+    try {
+      const latestVendors = await VendorProfile.find()
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .populate('module', 'title')
+        .populate('zones', 'name');
+      
+      allNotifications.push(...latestVendors.map(v => ({
         id: v._id,
         type: 'vendor',
         title: 'New Vendor Join',
         description: `Vendor "${v.storeName || 'Unknown'}" registered for ${v.module?.title || 'a module'}.`,
         createdAt: v.createdAt,
         unread: v.status === 'pending'
-      })),
-      ...latestBookings.map(b => ({
+      })));
+    } catch (err) { console.error("Error fetching vendor notifications:", err); }
+
+    // 2. Fetch Latest Bookings
+    try {
+      const latestBookings = await Booking.find()
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .populate('moduleId', 'title')
+        .populate('providerId', 'firstName lastName');
+      
+      allNotifications.push(...latestBookings.map(b => ({
         id: b._id,
         type: 'order',
         title: 'New Order Received',
-        description: `Order #${b.paymentOrderId || b._id.toString().slice(-6)} for ${b.moduleType} received.`,
+        description: `Order #${b.paymentOrderId || b._id.toString().slice(-6)} for ${b.moduleType || 'services'} received.`,
         createdAt: b.createdAt,
         unread: b.status === 'Pending'
-      })),
-      ...latestEnquiries.map(e => ({
+      })));
+    } catch (err) { console.error("Error fetching booking notifications:", err); }
+
+    // 3. Fetch Latest Enquiries
+    try {
+      const latestEnquiries = await Enquiry.find()
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .populate('moduleId', 'title');
+      
+      allNotifications.push(...latestEnquiries.map(e => ({
         id: e._id,
         type: 'enquiry',
         title: 'New Enquiry Received',
         description: `Enquiry from "${e.fullName}" for ${e.eventType || 'services'}.`,
         createdAt: e.createdAt,
         unread: e.status === 'pending'
-      })),
-      ...latestPackages.map(p => ({
-        id: p._id,
-        type: 'package',
-        title: 'New Package Created',
-        description: `New package "${p.title}" created in ${p.module?.title || 'Venues'}.`,
-        createdAt: p.createdAt,
-        unread: false
-      }))
+      })));
+    } catch (err) { console.error("Error fetching enquiry notifications:", err); }
+
+    // 4. Multiple Package Models Detection
+    const packageModels = [
+      { model: Package, name: 'Venue' },
+      { model: MakeupPackage, name: 'Makeup' },
+      { model: PhotographyPackage, name: 'Photography' },
+      { model: FloristPackage, name: 'Florist' },
+      { model: MehandiPackage, name: 'Mehandi' },
+      { model: Catering, name: 'Catering' },
+      { model: CakePackage, name: 'Cake' },
+      { model: InvitationPackage, name: 'Invitation' }
     ];
 
+    try {
+      const packagePromises = packageModels.map(pm => 
+        pm.model.find().sort({ createdAt: -1 }).limit(3).populate('module', 'title').populate('moduleId', 'title')
+      );
+      const packageResults = await Promise.all(packagePromises);
+      
+      packageResults.forEach((results, index) => {
+        results.forEach(pkg => {
+          allNotifications.push({
+            id: pkg._id,
+            type: 'package',
+            title: 'New Package Created',
+            description: `New ${packageModels[index].name} package "${pkg.title}" created.`,
+            createdAt: pkg.createdAt,
+            unread: false
+          });
+        });
+      });
+    } catch (err) { console.error("Error fetching package notifications:", err); }
+
     // Sort all by most recent first
-    notifications.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    allNotifications.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt) : new Date(0);
+      const dateB = b.createdAt ? new Date(b.createdAt) : new Date(0);
+      return dateB - dateA;
+    });
 
     res.json({
       success: true,
-      data: notifications.slice(0, 20)
+      data: allNotifications.slice(0, 20)
     });
   } catch (error) {
-    console.error("Get Notifications Error:", error);
+    console.error("Overall Notifications Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
