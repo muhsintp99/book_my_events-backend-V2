@@ -31,8 +31,7 @@ const blogSchema = new mongoose.Schema({
     },
     category: {
         type: String,
-        required: [true, 'Category is required'],
-        enum: ['Wedding', 'Planning', 'Corporate', 'Decoration', 'Photography', 'Catering']
+        required: [true, 'Category is required']
     },
     featuredImage: {
         type: String,
