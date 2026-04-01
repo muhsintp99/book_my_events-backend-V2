@@ -1898,23 +1898,23 @@ exports.login = async (req, res) => {
     }
 
 
-        // 🛡️ ROLE-BASED ACCESS CONTROL (Strict separation of Customer and Vendor Portals)
+    // 🛡️ ROLE-BASED ACCESS CONTROL (Strict separation of Customer and Vendor Portals)
     const referer = (req.headers.referer || "").toLowerCase();
     const origin = (req.headers.origin || "").toLowerCase();
-    
-    // Detect if the request is coming from the Vendor Panel based on URL or common dev ports
-    const isVendorPanel = referer.includes("vendor") || 
-                         origin.includes("vendor") || 
-                         referer.includes(":5173") || 
-                         referer.includes(":5174") ||
-                         referer.includes(":5002") ||
 
-                         req.body.loginType === "vendor";
+    // Detect if the request is coming from the Vendor Panel based on URL or common dev ports
+    const isVendorPanel = referer.includes("vendor") ||
+      origin.includes("vendor") ||
+      referer.includes(":5173") ||
+      referer.includes(":5174") ||
+      referer.includes(":5002") ||
+
+      req.body.loginType === "vendor";
 
     // 1. Admins & Superadmins: Allowed to log in to all portals
     if (user.role === "admin" || user.role === "superadmin" || user.role === "superadmin") {
       // Access granted
-    } 
+    }
     // 2. Vendor Panel: ONLY allow vendors
     else if (isVendorPanel) {
       if (user.role !== "vendor") {
@@ -1923,7 +1923,7 @@ exports.login = async (req, res) => {
           message: "Access denied. Only vendor accounts can log in to the Vendor Panel.",
         });
       }
-    } 
+    }
     // 3. Main Website / Customer Portal: ONLY allow customers (role "user")
     else {
       if (user.role !== "user") {
@@ -2088,7 +2088,7 @@ exports.register = async (req, res) => {
       latitude,
       longitude,
       accountType,
-       vendorType,
+      vendorType,
       maxBookings,
       services,
       specialised,
@@ -2107,7 +2107,7 @@ exports.register = async (req, res) => {
       req.body.zone = undefined;
       req.body.zones = undefined;
       req.body.subscriptionPlan = undefined;
-       req.body.services = undefined;
+      req.body.services = undefined;
       req.body.specialised = undefined;
       req.body.startingPrice = undefined;
       req.body.minBookingPrice = undefined;
@@ -2236,7 +2236,7 @@ exports.register = async (req, res) => {
     let vendorProfile = null;
     if (role === "vendor") {
       const ModuleModel = mongoose.model("Module");
-        const SecondaryModuleModel = mongoose.model("SecondaryModule");
+      const SecondaryModuleModel = mongoose.model("SecondaryModule");
       let moduleData = await ModuleModel.findById(module);
       let mType = "Module";
 
@@ -2260,7 +2260,7 @@ exports.register = async (req, res) => {
         }
         : undefined;
 
-     
+
       const vendorTypeValue = vendorType || "individual";
 
       // Parse services if string
@@ -2298,7 +2298,7 @@ exports.register = async (req, res) => {
             bankDetails,
             bio: bioSection,
             vendorType: vendorTypeValue,
-             maxBookings: maxBookings || null,
+            maxBookings: maxBookings || null,
             services: parsedServices || [],
             specialised: specialised || null,
             startingPrice: startingPrice || null,
@@ -2319,17 +2319,17 @@ exports.register = async (req, res) => {
             module: mongoose.Types.ObjectId.isValid(module?.toString().trim())
               ? new mongoose.Types.ObjectId(module.toString().trim())
               : null,
-               moduleType: mType,
+            moduleType: mType,
 
-            zones: (function() {
+            zones: (function () {
               // Use multi-zones (req.body.zones) first since it already includes the primary zone
               const zoneInput = req.body.zones || zone;
               if (Array.isArray(zoneInput)) {
                 return zoneInput.filter(z => mongoose.Types.ObjectId.isValid(z?.toString().trim()))
-                               .map(z => new mongoose.Types.ObjectId(z.toString().trim()));
+                  .map(z => new mongoose.Types.ObjectId(z.toString().trim()));
               } else if (zoneInput && typeof zoneInput === 'string' && zoneInput.includes(',')) {
                 return zoneInput.split(',').map(z => z.trim()).filter(z => mongoose.Types.ObjectId.isValid(z))
-                               .map(z => new mongoose.Types.ObjectId(z));
+                  .map(z => new mongoose.Types.ObjectId(z));
               } else if (zoneInput && mongoose.Types.ObjectId.isValid(zoneInput.toString().trim())) {
                 return [new mongoose.Types.ObjectId(zoneInput.toString().trim())];
               }
@@ -2385,7 +2385,8 @@ exports.register = async (req, res) => {
         .populate("module", "title")
         .populate("services", "title")
         .populate("specialised", "title")
-        .populate("zones", "name description coordinates city country isActive isTopZone icon");    }
+        .populate("zones", "name description coordinates city country isActive isTopZone icon");
+    }
 
     const responseData = {
       success: true,
@@ -2427,7 +2428,7 @@ exports.register = async (req, res) => {
         state: vendorProfile?.storeAddress?.state || "",
         zipCode: vendorProfile?.storeAddress?.zipCode || "",
         fullAddress: vendorProfile?.storeAddress?.fullAddress || "",
-         services: vendorProfile?.services || [],
+        services: vendorProfile?.services || [],
         specialised: vendorProfile?.specialised || null,
         startingPrice: vendorProfile?.startingPrice || null,
         minBookingPrice: vendorProfile?.minBookingPrice || null,
@@ -2801,11 +2802,12 @@ exports.forgotPassword = async (req, res) => {
     user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
     await user.save();
 
-    // const resetURL = `${req.protocol}://${req.get(
-    //   "host"
-    // )}/api/auth/reset-password/${resetToken}`;
-     const API_BASE_URL = process.env.API_BASE_URL || "https://api.bookmyevent.ae";
-    const resetURL = `${API_BASE_URL}/api/auth/reset-password/${resetToken}`;
+    // const API_BASE_URL = process.env.API_BASE_URL || "https://api.bookmyevent.ae";
+    // const resetURL = `${API_BASE_URL}/api/auth/reset-password/${resetToken}`;
+
+    // Point to frontend reset page
+    const FRONTEND_URL = "https://bookmyevent.ae";
+    const resetURL = `${FRONTEND_URL}/reset-password.html?token=${resetToken}`;
 
     try {
       await sendEmail(email, "Password Reset", resetPasswordEmail(resetURL));
