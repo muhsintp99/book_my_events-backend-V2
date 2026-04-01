@@ -2,6 +2,7 @@ const Bouncer = require("../../models/vendor/bouncerPackageModel");
 const VendorProfile = require("../../models/vendor/vendorProfile");
 const User = require("../../models/User");
 const Pincode = require("../../models/vendor/Pincode");
+const Subscription = require("../../models/admin/Subscription");
 const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
 const fs = require("fs");
@@ -517,12 +518,33 @@ exports.getBouncerVendors = async (req, res) => {
             });
 
         const filteredUsers = users.filter(u => u.vendorProfile);
+
+        // ✅ Fetch Subscriptions for these vendors
+        const subscriptions = await Subscription.find({
+            userId: { $in: vendorIds },
+            isCurrent: true,
+        })
+            .populate("planId")
+            .populate("moduleId", "title icon")
+            .lean();
+
         const final = filteredUsers.map(user => {
             const countObj = vendorsAgg.find(
                 v => v._id.toString() === user._id.toString()
             );
 
             const vp = user.vendorProfile || {};
+
+            const sub = subscriptions.find(
+                s => s.userId.toString() === user._id.toString()
+            );
+
+            const now = new Date();
+            const isExpired = sub ? sub.endDate < now : true;
+            const daysLeft = sub
+                ? Math.max(0, Math.ceil((sub.endDate - now) / (1000 * 60 * 60 * 24)))
+                : 0;
+
             return {
                 _id: user._id,
                 firstName: user.firstName,
@@ -542,7 +564,38 @@ exports.getBouncerVendors = async (req, res) => {
 
                 latitude: vp.latitude,
                 longitude: vp.longitude,
-                _needsZoneLookup: !vp.zones || vp.zones.length === 0
+                _needsZoneLookup: !vp.zones || vp.zones.length === 0,
+
+                subscription: sub
+                    ? {
+                        isSubscribed: sub.status === "active",
+                        status: sub.status,
+                        plan: sub.planId,
+                        module: sub.moduleId,
+                        billing: {
+                            startDate: sub.startDate,
+                            endDate: sub.endDate,
+                            paymentId: sub.paymentId,
+                            autoRenew: sub.autoRenew
+                        },
+                        access: {
+                            canAccess: sub.status === "active" && !isExpired,
+                            isExpired,
+                            daysLeft
+                        }
+                    }
+                    : {
+                        isSubscribed: false,
+                        status: "none",
+                        plan: null,
+                        module: null,
+                        billing: null,
+                        access: {
+                            canAccess: false,
+                            isExpired: true,
+                            daysLeft: 0
+                        }
+                    }
             };
         });
 

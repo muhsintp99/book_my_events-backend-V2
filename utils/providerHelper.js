@@ -1,6 +1,7 @@
-const mongoose = require("mongoose");
 const VendorProfile = require("../models/vendor/vendorProfile");
 const Pincode = require("../models/vendor/Pincode");
+const Subscription = require("../models/admin/Subscription");
+const mongoose = require("mongoose");
 
 /**
  * Standardizes provider data with full store and location details.
@@ -128,6 +129,52 @@ const enhanceProviderDetails = async (providerInput, req = null) => {
             : null;
         providerObj.hasVendorProfile = false;
     }
+
+    // 4. Fetch CURRENT Subscription details
+    const sub = await Subscription.findOne({
+        userId: providerId,
+        isCurrent: true,
+    })
+        .populate("planId")
+        .populate("moduleId", "title icon")
+        .lean();
+
+    const now = new Date();
+    const isExpired = sub ? sub.endDate < now : true;
+    const daysLeft = sub
+        ? Math.max(0, Math.ceil((sub.endDate - now) / (1000 * 60 * 60 * 24)))
+        : 0;
+
+    providerObj.subscription = sub
+        ? {
+            isSubscribed: sub.status === "active",
+            status: sub.status,
+            plan: sub.planId,
+            module: sub.moduleId,
+            billing: {
+                startDate: sub.startDate,
+                endDate: sub.endDate,
+                paymentId: sub.paymentId,
+                autoRenew: sub.autoRenew
+            },
+            access: {
+                canAccess: sub.status === "active" && !isExpired,
+                isExpired,
+                daysLeft
+            }
+        }
+        : {
+            isSubscribed: false,
+            status: "none",
+            plan: null,
+            module: null,
+            billing: null,
+            access: {
+                canAccess: false,
+                isExpired: true,
+                daysLeft: 0
+            }
+        };
 
     return providerObj;
 };

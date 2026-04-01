@@ -1,7 +1,8 @@
 const Invitation = require("../../models/vendor/invitationPackageModel");
 const VendorProfile = require("../../models/vendor/vendorProfile");
-const Pincode = require("../../models/vendor/Pincode");
 const User = require("../../models/User");
+const Pincode = require("../../models/vendor/Pincode");
+const Subscription = require("../../models/admin/Subscription");
 const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
@@ -488,8 +489,17 @@ exports.getInvitationVendors = async (req, res) => {
             provider: { $in: vendorIds },
             isActive: true
         })
-            .select("provider packageId packageName description packagePrice thumbnail images isActive isTopPick services")
-            .populate("services", "title image icon")
+            .select("provider packageId packageName description packagePrice thumbnail images isActive isTopPick category")
+            .populate("category", "title image icon")
+            .lean();
+
+        // ✅ Fetch Subscriptions for these vendors
+        const subscriptions = await Subscription.find({
+            userId: { $in: vendorIds },
+            isCurrent: true,
+        })
+            .populate("planId")
+            .populate("moduleId", "title icon")
             .lean();
 
         const final = users.map(user => {
@@ -503,6 +513,16 @@ exports.getInvitationVendors = async (req, res) => {
             const vendorPackages = allPackages.filter(
                 p => p.provider?.toString() === user._id.toString()
             );
+
+            const sub = subscriptions.find(
+                s => s.userId.toString() === user._id.toString()
+            );
+
+            const now = new Date();
+            const isExpired = sub ? sub.endDate < now : true;
+            const daysLeft = sub
+                ? Math.max(0, Math.ceil((sub.endDate - now) / (1000 * 60 * 60 * 24)))
+                : 0;
 
             return {
                 _id: user._id,
@@ -527,7 +547,38 @@ exports.getInvitationVendors = async (req, res) => {
 
                 latitude: vp.latitude,
                 longitude: vp.longitude,
-                _needsZoneLookup: !vp.zones || vp.zones.length === 0
+                _needsZoneLookup: !vp.zones || vp.zones.length === 0,
+
+                subscription: sub
+                    ? {
+                        isSubscribed: sub.status === "active",
+                        status: sub.status,
+                        plan: sub.planId,
+                        module: sub.moduleId,
+                        billing: {
+                            startDate: sub.startDate,
+                            endDate: sub.endDate,
+                            paymentId: sub.paymentId,
+                            autoRenew: sub.autoRenew
+                        },
+                        access: {
+                            canAccess: sub.status === "active" && !isExpired,
+                            isExpired,
+                            daysLeft
+                        }
+                    }
+                    : {
+                        isSubscribed: false,
+                        status: "none",
+                        plan: null,
+                        module: null,
+                        billing: null,
+                        access: {
+                            canAccess: false,
+                            isExpired: true,
+                            daysLeft: 0
+                        }
+                    }
             };
         });
 
