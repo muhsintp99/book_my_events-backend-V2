@@ -379,33 +379,44 @@ exports.getBouncerByVendor = async (req, res) => {
             });
         }
 
+        // 1. ALWAYS FETCH VENDOR INFO
+        const vendor = await User.findById(vendorId)
+            .select("firstName lastName email phone profilePhoto")
+            .populate({
+                path: "vendorProfile",
+                populate: [
+                    { path: "zones", select: "_id name city country" },
+                    { path: "services", select: "_id title image" },
+                    { path: "specialised", select: "_id title image" }
+                ]
+            }).lean();
+
+        if (!vendor) {
+            return res.status(404).json({ success: false, message: "Vendor not found" });
+        }
+
+        // Standardize profile photo
+        if (!vendor.profilePhoto && vendor.vendorProfile?.logo) {
+            vendor.profilePhoto = vendor.vendorProfile.logo;
+        }
+
+        // 2. FETCH ACTUAL PACKAGES
         const packages = await Bouncer.find({
             provider: vendorId,
             isActive: true
         })
             .populate({
-                path: "provider",
-                select: "firstName lastName email phone profilePhoto",
-                populate: {
-                    path: "vendorProfile",
-                    populate: [
-               { path: "zones", select: "_id name city country" },                        { path: "services", select: "_id title image" },
-                        { path: "specialised", select: "_id title image" }
-                    ]
-                }
-            })
-            .populate({
                 path: "secondaryModule",
                 select: "_id title icon"
             })
             .populate("services", "title image icon")
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
 
+        // 3. INJECT VENDOR INFO INTO PACKAGES (so old frontend doesn't break)
         packages.forEach(pkg => {
-            if (pkg.provider && !pkg.provider.profilePhoto && pkg.provider.vendorProfile?.logo) {
-                pkg.provider.profilePhoto = pkg.provider.vendorProfile.logo;
-            }
-            if (pkg.provider && pkg.provider.vendorProfile) {
+            pkg.provider = vendor;
+            if (pkg.provider.vendorProfile) {
                 pkg.provider.vendorProfile.zone = pkg.provider.vendorProfile.zones?.[0] || null;
             }
         });
@@ -413,6 +424,7 @@ exports.getBouncerByVendor = async (req, res) => {
         res.json({
             success: true,
             count: packages.length,
+            vendor: vendor, // New: Top-level vendor info
             data: packages
         });
 
