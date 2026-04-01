@@ -535,6 +535,7 @@ app.use("/api/brands", require("./routes/admin/brandRoutes"));
 app.use("/api/coupons", require("./routes/admin/couponsRouters"));
 app.use("/api/categories", require("./routes/admin/categoryRoutes"));
 app.use("/api/banners", require("./routes/admin/bannerRoutes"));
+app.use("/api/blogs", require("./routes/admin/blogRouter"));
 app.use("/api/vehicle-banners", require("./routes/admin/vehicleBannerRoutes"));
 app.use("/api/zones", require("./routes/admin/zoneRoutes"));
 app.use("/api/subscription", require("./routes/admin/subscriptionRoutes"));
