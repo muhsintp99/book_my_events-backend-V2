@@ -590,8 +590,8 @@ exports.getLightAndSoundVendors = async (req, res) => {
             }
         }
 
-        // ✅ Include all module-assigned vendors
-        const filtered = final;
+        // ✅ FILTER: Only show vendors that HAVE at least one active package in this module
+        const filtered = final.filter(v => v.packageCount > 0);
 
         res.json({
             success: true,

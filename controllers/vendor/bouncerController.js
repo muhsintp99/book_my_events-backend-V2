@@ -460,10 +460,16 @@ exports.getBouncerVendors = async (req, res) => {
         }).distinct('provider');
 
         // Combined set of vendor IDs
-        const vendorIds = [...new Set([
-            ...profileVendorIds.map(id => id.toString()),
-            ...packageVendors.map(id => id.toString())
-        ])];
+        // ✅ REQUIREMENT: Only show vendors that HAVE at least one active package in this module
+        const activeVendorIds = await Bouncer.find({
+            secondaryModule: new mongoose.Types.ObjectId(moduleId),
+            isActive: true
+        }).distinct('provider');
+
+        // Filter these IDs against those that have a profile for this module
+        const vendorIds = profileVendorIds.filter(id => 
+            activeVendorIds.some(pkgId => pkgId.toString() === id.toString())
+        );
 
         const vendorsAgg = await Bouncer.aggregate([
             {

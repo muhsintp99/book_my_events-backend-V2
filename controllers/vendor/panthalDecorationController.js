@@ -439,8 +439,12 @@ exports.getPanthalDecorationVendors = async (req, res) => {
             }
         ]);
 
-        const vendorIdsFromPackages = packagesAgg.map(v => v._id);
-        const allVendorIds = [...new Set([...vendorIdsFromProfiles, ...vendorIdsFromPackages])];
+        const vendorIdsFromPackages = packagesAgg.map(v => v._id.toString());
+        
+        // INTERSECTION: Only include vendors who HAVE a profile AND active packages
+        const allVendorIds = vendorIdsFromProfiles.filter(id => 
+            vendorIdsFromPackages.includes(id.toString())
+        );
 
         /* ================================
            3️⃣ Fetch User Details and Combine
