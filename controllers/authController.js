@@ -2226,6 +2226,9 @@ exports.register = async (req, res) => {
           email: email?.toString().trim(),
           password: userPassword,
           phone: phone?.toString().trim(),
+          profilePhoto: req.files?.logo
+            ? `/uploads/vendors/${req.files.logo[0].filename}`
+            : "",
           role: finalRole,
           refreshToken,
         },
