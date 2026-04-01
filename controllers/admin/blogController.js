@@ -1,6 +1,15 @@
+const fs = require('fs');
+const path = require('path');
 const Blog = require('../../models/admin/blogModel');
 
-// @desc    Get all blogs with pagination (Newest First)
+// Helper: delete file if exists (Following your moduleController style)
+const deleteFileIfExists = (filePath) => {
+    if (filePath && fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+    }
+};
+
+// @desc    Get all blogs with pagination
 exports.getBlogs = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -8,7 +17,7 @@ exports.getBlogs = async (req, res) => {
         const skip = (page - 1) * limit;
 
         const blogs = await Blog.find({ isPublished: true })
-            .sort({ createdAt: -1 }) // Newest blogs at the top
+            .sort({ createdAt: -1 }) 
             .skip(skip)
             .limit(limit);
 
@@ -16,15 +25,11 @@ exports.getBlogs = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            pagination: {
-                total,
-                page,
-                pages: Math.ceil(total / limit)
-            },
+            pagination: { total, page, pages: Math.ceil(total / limit) },
             data: blogs
         });
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        res.status(500).json({ error: err.message });
     }
 };
 
@@ -33,68 +38,74 @@ exports.getBlogBySlug = async (req, res) => {
     try {
         const blog = await Blog.findOneAndUpdate(
             { slug: req.params.slug },
-            { $inc: { views: 1 } }, 
+            { $inc: { views: 1 } },
             { new: true }
         );
 
-        if (!blog) {
-            return res.status(404).json({ success: false, message: 'Blog not found' });
-        }
-
+        if (!blog) return res.status(404).json({ error: 'Blog not found' });
         res.status(200).json({ success: true, data: blog });
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        res.status(500).json({ error: err.message });
     }
 };
 
-// @desc    Create new blog with Image
+// @desc    Create new blog
 exports.createBlog = async (req, res) => {
     try {
-        const blogData = { ...req.body };
-
-        // 🖼️ Handle uploaded image
-        if (req.file) {
-            blogData.featuredImage = req.file.filename;
-        }
+        const blogData = {
+            ...req.body,
+            // Store relative path like your modules
+            featuredImage: req.file ? `Uploads/blogs/${req.file.filename}` : 'default-blog.jpg'
+        };
 
         const blog = await Blog.create(blogData);
         res.status(201).json({ success: true, data: blog });
     } catch (err) {
-        res.status(400).json({ success: false, message: err.message });
+        res.status(400).json({ error: err.message });
     }
 };
 
-// @desc    Update blog with Image
+// @desc    Update blog
 exports.updateBlog = async (req, res) => {
     try {
-        const blogData = { ...req.body };
+        const blog = await Blog.findById(req.params.id);
+        if (!blog) return res.status(404).json({ error: 'Blog not found' });
 
-        // 🖼️ Handle new image update
+        const updateData = { ...req.body };
+
         if (req.file) {
-            blogData.featuredImage = req.file.filename;
+            // Delete old image using your logic
+            if (blog.featuredImage && blog.featuredImage !== 'default-blog.jpg') {
+                deleteFileIfExists(path.join(__dirname, `../../${blog.featuredImage}`));
+            }
+            updateData.featuredImage = `Uploads/blogs/${req.file.filename}`;
         }
 
-        const blog = await Blog.findByIdAndUpdate(req.params.id, blogData, {
+        const updatedBlog = await Blog.findByIdAndUpdate(req.params.id, updateData, {
             new: true,
             runValidators: true
         });
 
-        if (!blog) {
-            return res.status(404).json({ success: false, message: 'Blog not found' });
-        }
-        
-        res.status(200).json({ success: true, data: blog });
+        res.status(200).json({ success: true, data: updatedBlog });
     } catch (err) {
-        res.status(400).json({ success: false, message: err.message });
+        res.status(400).json({ error: err.message });
     }
 };
 
 // @desc    Delete blog
 exports.deleteBlog = async (req, res) => {
     try {
-        await Blog.findByIdAndDelete(req.params.id);
-        res.status(200).json({ success: true, message: 'Blog deleted' });
+        const blog = await Blog.findById(req.params.id);
+        if (!blog) return res.status(404).json({ error: 'Blog not found' });
+
+        // Delete image using your logic
+        if (blog.featuredImage && blog.featuredImage !== 'default-blog.jpg') {
+            deleteFileIfExists(path.join(__dirname, `../../${blog.featuredImage}`));
+        }
+
+        await blog.deleteOne();
+        res.json({ success: true, message: 'Blog deleted successfully' });
     } catch (err) {
-        res.status(400).json({ success: false, message: err.message });
+        res.status(500).json({ error: err.message });
     }
 };
