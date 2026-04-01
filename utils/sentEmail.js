@@ -172,11 +172,27 @@ exports.otpEmail = (otp) => `
 `;
 
 exports.resetPasswordEmail = (resetURL) => `
-  <div style="font-family:Arial,sans-serif;line-height:1.6">
-    <h2>Password Reset</h2>
-    <p>Click the link below to reset your password:</p>
-    <p><a href="${resetURL}" style="background:#007bff;color:#fff;padding:10px 20px;border-radius:5px;text-decoration:none;">Reset Password</a></p>
-    <p>This link is valid for 10 minutes.</p>
+  <div style="font-family: 'Poppins', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e1e1e1; border-radius: 10px; overflow: hidden;">
+    <div style="background-color: #f32626; padding: 30px; text-align: center;">
+      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Password Reset Request</h1>
+    </div>
+    <div style="padding: 40px 30px; background-color: #ffffff;">
+      <p style="font-size: 16px; margin-bottom: 25px;">Hello,</p>
+      <p style="font-size: 16px; margin-bottom: 25px;">We received a request to reset the password for your <strong>Book My Event</strong> account. If you didn't make this request, you can safely ignore this email.</p>
+      
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="${resetURL}" style="background-color: #f32626; color: #ffffff; padding: 15px 35px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(243, 38, 38, 0.2);">Reset Your Password</a>
+      </div>
+      
+      <p style="font-size: 14px; color: #666; margin-bottom: 25px;">This link will expire in <strong>10 minutes</strong> for your security.</p>
+      
+      <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
+      
+      <p style="font-size: 14px; color: #888; margin-bottom: 0;">Thanks,<br/><strong>The Book My Event Team</strong></p>
+    </div>
+    <div style="background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #999;">
+      <p style="margin: 0;">&copy; 2026 Book My Event. All rights reserved.</p>
+    </div>
   </div>
 `;
 

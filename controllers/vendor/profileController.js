@@ -304,6 +304,25 @@ exports.getProfileByProviderId = async (req, res) => {
 
     if (profile) {
       console.log(`[getProfileByProviderId] Profile found for user: ${providerId}`);
+
+      // ✅ ROBUST SYNC: If profile exists but missing photo/cover, sync from VendorProfile
+      const vendorProfile = await VendorProfile.findOne({ user: providerId });
+      let needsSave = false;
+
+      if (vendorProfile && (!profile.profilePhoto || profile.profilePhoto === "") && vendorProfile.logo) {
+        profile.profilePhoto = vendorProfile.logo;
+        needsSave = true;
+      }
+      if (vendorProfile && (!profile.coverImage || profile.coverImage === "") && vendorProfile.coverImage) {
+        profile.coverImage = vendorProfile.coverImage;
+        needsSave = true;
+      }
+
+      if (needsSave) {
+        await profile.save();
+        console.log(`[getProfileByProviderId] Synced missing photo/cover to Profile for: ${providerId}`);
+      }
+
       return res.status(200).json({ success: true, data: profile });
     }
 
@@ -360,7 +379,9 @@ exports.getProfileByProviderId = async (req, res) => {
       mobileNumber: mobileNumber,
       businessAddress: businessAddress,
       socialLinks: {},
-      bankDetails: vendorProfile ? vendorProfile.bankDetails : {}
+      bankDetails: vendorProfile ? vendorProfile.bankDetails : {},
+      profilePhoto: vendorProfile?.logo || user.profilePhoto || "",
+      coverImage: vendorProfile?.coverImage || ""
     });
 
     try {
@@ -789,7 +810,8 @@ exports.updateProfile = async (req, res) => {
           businessAddress: defaultBusinessAddress,
           socialLinks: updatedData.socialLinks || {},
           bankDetails: updatedData.bankDetails || (vendorProfile ? vendorProfile.bankDetails : {}),
-          profilePhoto: updatedData.profilePhoto || ""
+          profilePhoto: updatedData.profilePhoto || vendorProfile?.logo || user.profilePhoto || "",
+          coverImage: updatedData.coverImage || vendorProfile?.coverImage || ""
         });
 
         try {
