@@ -667,13 +667,10 @@ exports.getMehandiVendors = async (req, res) => {
            1️⃣ Build Profile Filter
         ================================= */
         let profileMatch = {
-            // Check BOTH possible field names in VendorProfile just in case
             $or: [
                 { module: new mongoose.Types.ObjectId(moduleId) },
                 { secondaryModule: new mongoose.Types.ObjectId(moduleId) }
             ],
-            // Relaxed status filter to match Photography module behavior
-            // status: "approved", 
             isActive: true
         };
 
@@ -785,7 +782,6 @@ exports.getMehandiVendors = async (req, res) => {
                 longitude: vp?.longitude || null,
                 _needsZoneLookup: (!vp?.zones || vp.zones.length === 0),
 
-                // 🔥 SUBSCRIPTION (for premium multi-zone display)
                 subscription: sub
                     ? {
                         isSubscribed: sub.status === "active",
@@ -819,8 +815,8 @@ exports.getMehandiVendors = async (req, res) => {
             };
         });
 
-        // ✅ Include all vendors assigned to the module
-        const result = final;
+        // ✅ FILTER: Only show vendors that HAVE at least one active package in this module
+        const result = final.filter(v => v.packageCount > 0);
 
         // ✅ GEOGRAPHIC FALLBACK: If zone is STILL null, try to find nearest district by coordinates
         const stillMissingZones = result.filter(v => !v.zone && v.latitude && v.longitude);

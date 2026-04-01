@@ -2,6 +2,7 @@ const Florist = require("../../models/vendor/floristPackageModel");
 const VendorProfile = require("../../models/vendor/vendorProfile");
 const Pincode = require("../../models/vendor/Pincode");
 const User = require("../../models/User");
+const Subscription = require("../../models/admin/Subscription");
 const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
@@ -481,6 +482,15 @@ exports.getFloristVendors = async (req, res) => {
             .populate("services", "title image icon")
             .lean();
 
+        // ✅ Fetch Subscriptions for these vendors
+        const subscriptions = await Subscription.find({
+            userId: { $in: vendorIds },
+            isCurrent: true,
+        })
+            .populate("planId")
+            .populate("moduleId", "title icon")
+            .lean();
+
         const final = users.map(user => {
             const countObj = vendorsAgg.find(
                 v => v._id.toString() === user._id.toString()
@@ -490,8 +500,18 @@ exports.getFloristVendors = async (req, res) => {
 
             // ✅ Filter packages for THIS vendor
             const vendorPackages = allPackages.filter(
-                p => p.provider?.toString() === user._id.toString()
+                p => p.provider.toString() === user._id.toString()
             );
+
+            const sub = subscriptions.find(
+                s => s.userId.toString() === user._id.toString()
+            );
+
+            const now = new Date();
+            const isExpired = sub ? sub.endDate < now : true;
+            const daysLeft = sub
+                ? Math.max(0, Math.ceil((sub.endDate - now) / (1000 * 60 * 60 * 24)))
+                : 0;
 
             return {
                 _id: user._id,
@@ -516,7 +536,38 @@ exports.getFloristVendors = async (req, res) => {
 
                 latitude: vp.latitude,
                 longitude: vp.longitude,
-                _needsZoneLookup: !vp.zones || vp.zones.length === 0
+                _needsZoneLookup: !vp.zones || vp.zones.length === 0,
+
+                subscription: sub
+                    ? {
+                        isSubscribed: sub.status === "active",
+                        status: sub.status,
+                        plan: sub.planId,
+                        module: sub.moduleId,
+                        billing: {
+                            startDate: sub.startDate,
+                            endDate: sub.endDate,
+                            paymentId: sub.paymentId,
+                            autoRenew: sub.autoRenew
+                        },
+                        access: {
+                            canAccess: sub.status === "active" && !isExpired,
+                            isExpired,
+                            daysLeft
+                        }
+                    }
+                    : {
+                        isSubscribed: false,
+                        status: "none",
+                        plan: null,
+                        module: null,
+                        billing: null,
+                        access: {
+                            canAccess: false,
+                            isExpired: true,
+                            daysLeft: 0
+                        }
+                    }
             };
         });
 
@@ -602,8 +653,8 @@ exports.getFloristVendors = async (req, res) => {
             }
         }
 
-        // ✅ Include all module-assigned vendors
-        const filtered = final;
+        // ✅ FILTER: Only show vendors that HAVE at least one active package in this module
+        const filtered = final.filter(v => v.packageCount > 0);
 
         res.json({
             success: true,
