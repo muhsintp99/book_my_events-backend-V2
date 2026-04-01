@@ -478,8 +478,8 @@ exports.getFloristVendors = async (req, res) => {
             provider: { $in: vendorIds },
             isActive: true
         })
-            .select("provider packageId packageName description packagePrice thumbnail images isActive isTopPick category")
-            .populate("category", "title image icon")
+            .select("provider packageId packageName description packagePrice thumbnail images isActive isTopPick services")
+            .populate("services", "title image icon")
             .lean();
 
         // ✅ Fetch Subscriptions for these vendors
