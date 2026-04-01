@@ -819,8 +819,8 @@ exports.getMehandiVendors = async (req, res) => {
             };
         });
 
-        // ✅ Filter to only show vendors who have at least one active package
-        const result = final.filter(v => v.packageCount > 0);
+        // ✅ Include all vendors assigned to the module
+        const result = final;
 
         // ✅ GEOGRAPHIC FALLBACK: If zone is STILL null, try to find nearest district by coordinates
         const stillMissingZones = result.filter(v => !v.zone && v.latitude && v.longitude);

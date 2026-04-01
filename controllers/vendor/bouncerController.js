@@ -436,9 +436,27 @@ exports.getBouncerVendors = async (req, res) => {
             });
         }
 
+        // 1️⃣ Get all potential vendor IDs from profiles assigned to this module
+        const profilesForModule = await VendorProfile.find({
+            module: new mongoose.Types.ObjectId(moduleId)
+        }).select('user');
+        const profileVendorIds = profilesForModule.map(p => p.user);
+
+        // 2️⃣ Get all potential vendor IDs from actual packages
+        const packageVendors = await Bouncer.find({
+            secondaryModule: new mongoose.Types.ObjectId(moduleId)
+        }).distinct('provider');
+
+        // Combined set of vendor IDs
+        const vendorIds = [...new Set([
+            ...profileVendorIds.map(id => id.toString()),
+            ...packageVendors.map(id => id.toString())
+        ])];
+
         const vendorsAgg = await Bouncer.aggregate([
             {
                 $match: {
+                    provider: { $in: vendorIds.map(id => new mongoose.Types.ObjectId(id)) },
                     secondaryModule: new mongoose.Types.ObjectId(moduleId),
                     isActive: true
                 }
@@ -450,8 +468,6 @@ exports.getBouncerVendors = async (req, res) => {
                 }
             }
         ]);
-
-        const vendorIds = vendorsAgg.map(v => v._id);
 
         let profileMatch = {
             // status: "approved", // 💡 Relaxed for testing: allow pending vendors to show in lists

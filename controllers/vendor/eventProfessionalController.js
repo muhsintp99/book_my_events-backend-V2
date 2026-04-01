@@ -1035,7 +1035,44 @@ exports.getEventProfessionalVendors = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid module ID" });
         }
 
-        const vendorsAgg = await EventProfessional.aggregate([
+        /* ================================
+           1️⃣ Find Vendor Profiles (Main Source)
+        ================================= */
+        let profileMatch = {
+            module: new mongoose.Types.ObjectId(moduleId),
+            isActive: true
+        };
+
+        if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
+            profileMatch.zones = new mongoose.Types.ObjectId(zoneId);
+        }
+
+        if (city) {
+            profileMatch["storeAddress.city"] = { $regex: city, $options: "i" };
+        }
+
+        if (address) {
+            profileMatch["storeAddress.fullAddress"] = { $regex: address, $options: "i" };
+        }
+
+        const vendorProfiles = await VendorProfile.find(profileMatch)
+            .select("user storeName storeAddress zones services specialised latitude longitude status")
+            .lean();
+
+        if (!vendorProfiles.length) {
+            return res.json({
+                success: true,
+                count: 0,
+                data: []
+            });
+        }
+
+        const vendorIdsFromProfiles = vendorProfiles.map(vp => vp.user);
+
+        /* ================================
+           2️⃣ Get Package Counts and Check Packages
+        ================================= */
+        const packagesAgg = await EventProfessional.aggregate([
             {
                 $match: {
                     secondaryModule: new mongoose.Types.ObjectId(moduleId),
@@ -1050,26 +1087,17 @@ exports.getEventProfessionalVendors = async (req, res) => {
             }
         ]);
 
-        const vendorIds = vendorsAgg.map(v => v._id);
+        const vendorIdsFromPackages = packagesAgg.map(v => v._id);
+        const allVendorIds = [...new Set([...vendorIdsFromProfiles, ...vendorIdsFromPackages])];
 
-        let profileMatch = { isActive: true };
+        /* ================================
+           3️⃣ Fetch User Details and Combine
+        ================================= */
 
-        if (zoneId && mongoose.Types.ObjectId.isValid(zoneId)) {
-            profileMatch.zones = new mongoose.Types.ObjectId(zoneId);
-        }
-        if (city) {
-            profileMatch["storeAddress.city"] = { $regex: city, $options: "i" };
-        }
-        if (address) {
-            profileMatch["storeAddress.fullAddress"] = { $regex: address, $options: "i" };
-        }
-
-        const users = await User.find({ _id: { $in: vendorIds } })
+        const users = await User.find({ _id: { $in: allVendorIds } })
             .select("firstName lastName email phone profilePhoto")
             .populate({
                 path: "vendorProfile",
-                match: profileMatch,
-                // ✅ FIX: use 'zones' not 'zone'
                 populate: [
                     { path: "zones", select: "name" },
                     { path: "services", select: "title icon slug" },
@@ -1080,7 +1108,7 @@ exports.getEventProfessionalVendors = async (req, res) => {
         const filteredUsers = users.filter(u => u.vendorProfile);
 
         const final = filteredUsers.map(user => {
-            const countObj = vendorsAgg.find(v => v._id.toString() === user._id.toString());
+            const countObj = packagesAgg.find(v => v._id.toString() === user._id.toString());
             const vp = user.vendorProfile || {};
             return {
                 _id: user._id,

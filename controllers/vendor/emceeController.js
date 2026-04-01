@@ -378,30 +378,10 @@ exports.getEmceeVendors = async (req, res) => {
         }
 
         /* ================================
-           1️⃣ Get Providers With Packages
-        ================================= */
-        const vendorsAgg = await Emcee.aggregate([
-            {
-                $match: {
-                    secondaryModule: new mongoose.Types.ObjectId(moduleId),
-                    isActive: true
-                }
-            },
-            {
-                $group: {
-                    _id: "$provider",
-                    packageCount: { $sum: 1 }
-                }
-            }
-        ]);
-
-        const vendorIds = vendorsAgg.map(v => v._id);
-
-        /* ================================
-           2️⃣ Build Profile Filter
+           1️⃣ Find Vendor Profiles (Main Source)
         ================================= */
         let profileMatch = {
-            // status: "approved", // 💡 Relaxation for testing
+            module: new mongoose.Types.ObjectId(moduleId),
             isActive: true
         };
 
@@ -417,14 +397,50 @@ exports.getEmceeVendors = async (req, res) => {
             profileMatch["storeAddress.fullAddress"] = { $regex: address, $options: "i" };
         }
 
+        const vendorProfiles = await VendorProfile.find(profileMatch)
+            .select("user storeName storeAddress zones services specialised latitude longitude status")
+            .lean();
+
+        if (!vendorProfiles.length) {
+            return res.json({
+                success: true,
+                count: 0,
+                data: []
+            });
+        }
+
+        const vendorIdsFromProfiles = vendorProfiles.map(vp => vp.user);
+
+        /* ================================
+           2️⃣ Get Package Counts and Check Packages
+        ================================= */
+        const packagesAgg = await Emcee.aggregate([
+            {
+                $match: {
+                    secondaryModule: new mongoose.Types.ObjectId(moduleId),
+                    isActive: true
+                }
+            },
+            {
+                $group: {
+                    _id: "$provider",
+                    packageCount: { $sum: 1 }
+                }
+            }
+        ]);
+
+        const vendorIdsFromPackages = packagesAgg.map(v => v._id);
+        const allVendorIds = [...new Set([...vendorIdsFromProfiles, ...vendorIdsFromPackages])];
+
         /* ================================
            3️⃣ Populate Vendor Profile
         ================================= */
-        const users = await User.find({ _id: { $in: vendorIds } })
+        const users = await User.find({ _id: { $in: allVendorIds } })
             .select("firstName lastName email phone profilePhoto")
             .populate({
                 path: "vendorProfile",
-                match: profileMatch,
+                // Notice we removed match: profileMatch here because we already filtered via profileMatch above
+                // or we want to show vendors who have packages even if they don't match the profile filter (legacy)
                 populate: [
                     { path: "zones", select: "name" },
                     { path: "services", select: "title icon slug" },
@@ -435,7 +451,7 @@ exports.getEmceeVendors = async (req, res) => {
         const filteredUsers = users.filter(u => u.vendorProfile);
 
         const final = filteredUsers.map(user => {
-            const countObj = vendorsAgg.find(
+            const countObj = packagesAgg.find(
                 v => v._id.toString() === user._id.toString()
             );
 
