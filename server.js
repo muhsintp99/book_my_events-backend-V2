@@ -584,6 +584,8 @@ app.use("/api/event-professional", require("./routes/vendor/eventProfessionalRou
 app.use("/api/premium-highlights", require("./routes/vendor/premiumVendorRoutes"));
 app.use("/api/admin/dashboard", require("./routes/admin/dashboardRoutes"));
 app.use("/api/event-requests", require("./routes/admin/eventRequestRouter"));
+app.use("/api/reports", require("./routes/admin/reportRoutes"));
+
 
 
 /**********************************************************
