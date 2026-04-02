@@ -195,6 +195,7 @@ export const createCoupon = async (req, res) => {
       maxDiscount,
       startDate,
       expireDate,
+      isActive = true,
       applicableCategories,
       applicableStores,
       moduleId,
