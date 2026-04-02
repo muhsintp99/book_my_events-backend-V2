@@ -3,12 +3,113 @@ const Payment = require('../../models/admin/Payment');
 const { successResponse, errorResponse } = require('../../utils/responseFormatter');
 const asyncHandler = require('../../utils/asyncHandler');
 const mongoose = require('mongoose');
+const User = require('../../models/User');
+const VendorProfile = require('../../models/vendor/vendorProfile');
+const Package = require('../../models/admin/Package');
+
 
 /**
- * ADMIN PAYMENT REPORT
- * - Total Revenue (Bookings + Subscriptions)
- * - Monthly breakdown
- * - Recent transactions
+ * ADMIN ALL-ROUND REPORT
+ * - User/Vendor Counts
+ * - Booking lifecycle stats
+ * - Revenue
+ * - Package overview
+ */
+exports.getAdminAllAroundReport = asyncHandler(async (req, res) => {
+  const { startDate, endDate } = req.query;
+  const filter = {};
+  if (startDate && endDate) {
+    filter.createdAt = { $gte: new Date(startDate), $lte: new Date(endDate) };
+  }
+
+  // 1. User/Vendor Totals
+  const totalUsers = await User.countDocuments({ role: 'customer' });
+  const totalVendors = await VendorProfile.countDocuments({ status: 'approved' });
+  const pendingVendors = await VendorProfile.countDocuments({ status: 'pending' });
+
+  // 2. Booking Lifecycle Stats
+  const bookingLifecycle = await Booking.aggregate([
+    { $match: filter },
+    { $group: {
+        _id: '$status',
+        count: { $sum: 1 },
+        revenue: { $sum: '$finalPrice' }
+      }
+    }
+  ]);
+
+  // 3. Package Count (Aggregated across platform)
+  // Note: Since packages are in multiple models, we use the core Package model as a representative or sum others if needed
+  const corePackageCount = await Package.countDocuments();
+
+  // 4. Payment Stats
+  const paymentStats = await Payment.aggregate([
+    { $match: { status: 'success' } },
+    { $group: { _id: null, total: { $sum: '$amount' } } }
+  ]);
+
+  return successResponse(res, {
+    platform: {
+      users: totalUsers,
+      activeVendors: totalVendors,
+      pendingApproval: pendingVendors,
+      platformPackages: corePackageCount
+    },
+    bookings: bookingLifecycle,
+    totalSubsRevenue: paymentStats[0]?.total || 0
+  }, 'Admin comprehensive report fetched');
+});
+
+/**
+ * VENDOR ALL-ROUND REPORT
+ * - Booking details (Pending, Accepted, Rejected, Cancelled)
+ * - Earnings
+ * - Package highlights
+ */
+exports.getVendorAllAroundReport = asyncHandler(async (req, res) => {
+  const vendorId = req.params.vendorId || req.user?._id;
+  if (!vendorId) return errorResponse(res, 'Vendor ID required', 400);
+  
+  const vId = new mongoose.Types.ObjectId(vendorId);
+
+  // 1. Booking Stats
+  const bookingStats = await Booking.aggregate([
+    { $match: { providerId: vId } },
+    { $group: {
+        _id: '$status',
+        count: { $sum: 1 },
+        amount: { $sum: '$finalPrice' }
+      }
+    }
+  ]);
+
+  // 2. Payment Status Summary
+  const paymentStatus = await Booking.aggregate([
+    { $match: { providerId: vId } },
+    { $group: {
+        _id: '$paymentStatus',
+        count: { $sum: 1 },
+        amount: { $sum: '$finalPrice' }
+      }
+    }
+  ]);
+
+  // 3. Recent Activity (Latest 5 Bookings)
+  const recentActivity = await Booking.find({ providerId: vId })
+    .sort({ createdAt: -1 })
+    .limit(5)
+    .populate('userId', 'firstName lastName')
+    .lean();
+
+  return successResponse(res, {
+    bookingAnalysis: bookingStats,
+    paymentAnalysis: paymentStatus,
+    recentActivity
+  }, 'Vendor comprehensive report fetched');
+});
+
+/**
+ * ADMIN PAYMENT REPORT (Existing but improved)
  */
 exports.getAdminPaymentReport = asyncHandler(async (req, res) => {
   const { startDate, endDate } = req.query;
@@ -40,19 +141,19 @@ exports.getAdminPaymentReport = asyncHandler(async (req, res) => {
     }
   ]);
 
-  // 3. Monthly Breakdown (Last 6 Months)
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  // 3. Monthly Breakdown (Last 12 Months)
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
 
   const monthlyBreakdown = await Booking.aggregate([
-    { $match: { createdAt: { $gte: sixMonthsAgo }, paymentStatus: 'completed' } },
+    { $match: { createdAt: { $gte: twelveMonthsAgo }, paymentStatus: 'completed' } },
     { $group: { 
-        _id: { $month: '$createdAt' },
+        _id: { $month: '$createdAt', $year: '$createdAt' },
         revenue: { $sum: '$finalPrice' },
         orders: { $sum: 1 }
       }
     },
-    { $sort: { '_id': 1 } }
+    { $sort: { '_id.year': 1, '_id.month': 1 } }
   ]);
 
   // 4. Recent Transactions
@@ -80,17 +181,11 @@ exports.getAdminPaymentReport = asyncHandler(async (req, res) => {
 });
 
 /**
- * VENDOR PAYMENT REPORT
- * - Total Earnings
- * - Pending Payouts
- * - Performance by Module
+ * VENDOR PAYMENT REPORT (Existing but improved)
  */
 exports.getVendorPaymentReport = asyncHandler(async (req, res) => {
-  const vendorId = req.user?._id || req.query.vendorId; // Support both auth and query for admin view
-
-  if (!vendorId) {
-    return errorResponse(res, 'Vendor ID is required', 400);
-  }
+  const vendorId = req.params.vendorId || req.user?._id;
+  if (!vendorId) return errorResponse(res, 'Vendor ID is required', 400);
 
   const vId = new mongoose.Types.ObjectId(vendorId);
 
@@ -146,3 +241,4 @@ exports.getVendorPaymentReport = asyncHandler(async (req, res) => {
     recentTransactions
   }, 'Vendor payment report fetched successfully');
 });
+
