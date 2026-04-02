@@ -400,6 +400,9 @@ const bookingSchema = new mongoose.Schema(
     location: {
       type: String,
     },
+    purpose: {
+      type: String,
+    },
     time: {
       type: String, // Exact time string (e.g. 10:00 AM)
     },

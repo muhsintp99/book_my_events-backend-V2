@@ -611,6 +611,7 @@ exports.createBooking = async (req, res) => {
       bouncerId,
       emceeId,
       invitationDetails, // ✅ NEW: Captured invitation content
+      purpose, // ✅ NEW: Event purpose
     } = req.body;
 
 
@@ -1937,6 +1938,8 @@ exports.createBooking = async (req, res) => {
       invitationDetails: (moduleType === "Invitation & Printing" || moduleType === "Invitation" || moduleType === "Printing")
         ? invitationDetails
         : undefined,
+
+      purpose: purpose || undefined,
     };
 
     console.log("💾 Creating booking...");
