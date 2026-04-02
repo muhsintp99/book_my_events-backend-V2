@@ -27,11 +27,17 @@ const getPopulateOptions = () => {
   return populateArray;
 };
 
+const { setCache, getCache, clearCache } = require("../../utils/cache");
+
 // ----------------------- GET ALL BANNERS -----------------------
 exports.getAllBanners = async (req, res) => {
   try {
     const { page = 1, limit = 10, zone, bannerType, isActive, isFeatured, vendor } =
       req.query;
+
+    const cacheKey = `banners_${JSON.stringify(req.query)}`;
+    const cachedData = getCache(cacheKey);
+    if (cachedData) return res.json(cachedData);
 
     const filter = {
       vendor: null  // Only fetch banners where vendor is null
@@ -41,14 +47,13 @@ exports.getAllBanners = async (req, res) => {
     if (bannerType) filter.bannerType = bannerType.toLowerCase();
     if (isActive !== undefined) filter.isActive = isActive === "true";
     if (isFeatured !== undefined) filter.isFeatured = isFeatured === "true";
-    // Remove the vendor filter from query params since we always want vendor: null
-    // if (vendor) filter.vendor = vendor;
 
     const banners = await Banner.find(filter)
       .populate(getPopulateOptions())
       .sort({ displayOrder: 1, createdAt: -1 })
       .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .skip((page - 1) * limit)
+      .lean(); // Faster performance
 
     const total = await Banner.countDocuments(filter);
 
@@ -59,17 +64,23 @@ exports.getAllBanners = async (req, res) => {
       itemsPerPage: parseInt(limit),
     };
 
-    return paginatedResponse(
+    const response = paginatedResponse(
       res,
       { banners },
       pagination,
       "Banners fetched successfully"
     );
+
+    // Cache for 5 minutes
+    setCache(cacheKey, response, 5);
+
+    return response;
   } catch (error) {
     console.error("Get banners error:", error);
     return errorResponse(res, "Error fetching banners", 500);
   }
 };
+
 
 // ----------------------- GET BANNERS BY VENDOR ID -----------------------
 exports.getBannersByVendor = async (req, res) => {

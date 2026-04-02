@@ -747,13 +747,9 @@ io.on("connection", (socket) => {
 /**********************************************************
  * GLOBAL ERROR HANDLER
  **********************************************************/
-app.use((err, req, res, next) => {
-  console.error("❌ Error:", err.message);
-  res.status(500).json({
-    success: false,
-    message: err.message || "Internal Server Error"
-  });
-});
+const errorHandler = require("./middlewares/errorHandler");
+app.use(errorHandler);
+
 
 /**********************************************************
  * START SERVER

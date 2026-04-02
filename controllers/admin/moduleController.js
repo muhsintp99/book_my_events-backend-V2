@@ -25,6 +25,8 @@ const populateModule = async (moduleId) => {
     });
 };
 
+const { setCache, getCache, clearCache } = require('../../utils/cache');
+
 // Create Module
 exports.createModule = async (req, res) => {
   try {
@@ -55,6 +57,10 @@ exports.createModule = async (req, res) => {
 
     const module = await Module.create(moduleData);
     const populated = await populateModule(module._id);
+    
+    // Invalidate Cache
+    clearCache();
+
     res.status(201).json({ message: 'Module created', module: populated });
   } catch (err) {
     console.error('Create Module Error:', err);
@@ -92,6 +98,10 @@ exports.updateModule = async (req, res) => {
 
     await module.save();
     const populated = await populateModule(module._id);
+    
+    // Invalidate Cache
+    clearCache();
+
     res.json({ message: 'Module updated', module: populated });
   } catch (err) {
     console.error('Update Module Error:', err);
@@ -110,6 +120,10 @@ exports.deleteModule = async (req, res) => {
 
     deleteFileIfExists(path.join(__dirname, `../../${module.icon}`));
     await module.deleteOne();
+
+    // Invalidate Cache
+    clearCache();
+
     res.json({ message: 'Module deleted successfully' });
   } catch (err) {
     console.error('Delete Module Error:', err);
@@ -120,18 +134,28 @@ exports.deleteModule = async (req, res) => {
 // Get all modules (fully populated)
 exports.getModules = async (req, res) => {
   try {
+    // Check Cache
+    const cachedData = getCache('all_modules');
+    if (cachedData) return res.json(cachedData);
+
     const modules = await Module.find()
       .populate({
         path: 'categories',
         select: '-__v',
         populate: { path: 'brands', select: '-__v' }
-      });
+      })
+      .lean(); // Faster performance
+    
+    // Save to Cache
+    setCache('all_modules', modules, 10); // Cache for 10 minutes
+
     res.json(modules);
   } catch (err) {
     console.error('Get Modules Error:', err);
     res.status(500).json({ error: err.message });
   }
 };
+
 
 // Get single module (fully populated)
 exports.getModule = async (req, res) => {
