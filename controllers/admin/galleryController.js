@@ -15,9 +15,15 @@ exports.getGallery = async (req, res) => {
         if (req.query.module) {
             filter.module = req.query.module;
         }
+        if (req.query.isFeatured) {
+            filter.isFeatured = req.query.isFeatured === 'true';
+        }
+        if (req.query.search) {
+            filter.title = { $regex: req.query.search, $options: 'i' };
+        }
 
         const gallery = await Gallery.find(filter)
-            .populate('module') // Assuming it can be populated if ref is correct
+            .populate('module') 
             .sort({ createdAt: -1 });
         res.status(200).json({ success: true, data: gallery });
     } catch (err) {
@@ -31,7 +37,7 @@ exports.createGallery = async (req, res) => {
         const { title, module, isFeatured, moduleModel } = req.body;
         const galleryData = {
             title,
-            module,
+            module: module && module !== 'null' && module !== 'undefined' ? module : undefined,
             moduleModel: moduleModel || 'Module',
             isFeatured: isFeatured === 'true' || isFeatured === true,
             image: req.file ? `Uploads/gallery/${req.file.filename}` : ''
@@ -57,7 +63,7 @@ exports.updateGallery = async (req, res) => {
         const { title, module, isFeatured, moduleModel } = req.body;
         const updateData = {
             title,
-            module,
+            module: module && module !== 'null' && module !== 'undefined' ? module : undefined,
             moduleModel: moduleModel || 'Module',
             isFeatured: isFeatured === 'true' || isFeatured === true,
         };

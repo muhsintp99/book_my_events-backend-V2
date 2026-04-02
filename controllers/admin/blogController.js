@@ -9,25 +9,68 @@ const deleteFileIfExists = (filePath) => {
     }
 };
 
-// @desc    Get all blogs with pagination
+// @desc    Get all blogs with pagination (Public View)
 exports.getBlogs = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 6;
         const skip = (page - 1) * limit;
 
-        const blogs = await Blog.find({ isPublished: true })
+        const filter = { isPublished: true };
+        if (req.query.category) {
+            filter.category = req.query.category;
+        }
+        if (req.query.tag) {
+            filter.tags = { $in: [req.query.tag] };
+        }
+
+        const blogs = await Blog.find(filter)
             .sort({ createdAt: -1 }) 
             .skip(skip)
             .limit(limit);
 
-        const total = await Blog.countDocuments({ isPublished: true });
+        const total = await Blog.countDocuments(filter);
 
         res.status(200).json({
             success: true,
             pagination: { total, page, pages: Math.ceil(total / limit) },
             data: blogs
         });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// @desc    Get all blogs for Admin (shows unpublished)
+exports.getBlogsForAdmin = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
+
+        const blogs = await Blog.find()
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
+
+        const total = await Blog.countDocuments();
+
+        res.status(200).json({
+            success: true,
+            pagination: { total, page, pages: Math.ceil(total / limit) },
+            data: blogs
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// @desc    Get single blog by ID (For Admin Edit)
+exports.getBlogById = async (req, res) => {
+    try {
+        const blog = await Blog.findById(req.params.id);
+        if (!blog) return res.status(404).json({ error: 'Blog not found' });
+        res.status(200).json({ success: true, data: blog });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -49,12 +92,16 @@ exports.getBlogBySlug = async (req, res) => {
     }
 };
 
+// CUSTOM SLUGIFY (Also used in model, but here for manual update triggers)
+const slugify = (text) => {
+    return text.toString().toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w\-]+/g, '').replace(/\-\-+/g, '-');
+};
+
 // @desc    Create new blog
 exports.createBlog = async (req, res) => {
     try {
         const blogData = {
             ...req.body,
-            // Store relative path like your modules
             featuredImage: req.file ? `Uploads/blogs/${req.file.filename}` : 'default-blog.jpg'
         };
 
@@ -73,8 +120,12 @@ exports.updateBlog = async (req, res) => {
 
         const updateData = { ...req.body };
 
+        // Manual slug update because findByIdAndUpdate bypasses pre-save hook
+        if (req.body.title) {
+            updateData.slug = slugify(req.body.title);
+        }
+
         if (req.file) {
-            // Delete old image using your logic
             if (blog.featuredImage && blog.featuredImage !== 'default-blog.jpg') {
                 deleteFileIfExists(path.join(__dirname, `../../${blog.featuredImage}`));
             }
@@ -98,7 +149,6 @@ exports.deleteBlog = async (req, res) => {
         const blog = await Blog.findById(req.params.id);
         if (!blog) return res.status(404).json({ error: 'Blog not found' });
 
-        // Delete image using your logic
         if (blog.featuredImage && blog.featuredImage !== 'default-blog.jpg') {
             deleteFileIfExists(path.join(__dirname, `../../${blog.featuredImage}`));
         }

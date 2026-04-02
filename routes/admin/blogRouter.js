@@ -11,9 +11,11 @@ const upload = createUpload("blogs", {
 
 // PUBLIC ROUTES
 router.get('/', controller.getBlogs);
-router.get('/:slug', controller.getBlogBySlug);
+router.get('/slug/:slug', controller.getBlogBySlug);
 
 // ADMIN ROUTES
+router.get('/admin', controller.getBlogsForAdmin);
+router.get('/:id', controller.getBlogById);
 router.post('/create', upload.single("image"), controller.createBlog);
 router.put('/:id', upload.single("image"), controller.updateBlog);
 router.delete('/:id', controller.deleteBlog);
