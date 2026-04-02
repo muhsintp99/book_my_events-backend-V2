@@ -594,6 +594,7 @@ exports.createBooking = async (req, res) => {
       packageId,
       numberOfGuests,
       couponId,
+      couponCode,  // ✅ NEW: Accept coupon code from frontend
       paymentType,
       cakeId,
       cakeCart,  // ✅ NEW: Multi-cake cart support
@@ -1710,14 +1711,77 @@ exports.createBooking = async (req, res) => {
       0
     );
 
+    // =========================================================
+    // 🎟️ COUPON APPLICATION (Supports both couponId & couponCode)
+    // =========================================================
     let couponDiscountValue = 0;
+    let resolvedCoupon = null;
+
+    // Resolve coupon: prefer couponId, fallback to couponCode lookup
     if (couponId) {
-      const coupon = await Coupon.findById(couponId);
-      if (coupon?.isActive) {
-        couponDiscountValue =
-          coupon.type === "percentage"
-            ? (afterDiscount * coupon.discount) / 100
-            : coupon.discount;
+      resolvedCoupon = await Coupon.findById(couponId);
+    } else if (couponCode) {
+      resolvedCoupon = await Coupon.findOne({
+        code: couponCode.toUpperCase(),
+        isActive: true
+      });
+    }
+
+    if (resolvedCoupon) {
+      const now = new Date();
+      const start = new Date(resolvedCoupon.startDate);
+      const expire = new Date(resolvedCoupon.expireDate);
+      const isDateValid = now >= start && now <= expire;
+
+      if (resolvedCoupon.isActive && isDateValid) {
+        // 🔥 VENDOR LEVEL APPLICABILITY CHECK
+        let isApplicable = true;
+        if (resolvedCoupon.ownerType === "vendor") {
+          const couponVendorId = resolvedCoupon.vendorId?.toString();
+          const targetVendorId = (serviceProvider?.provider || serviceProvider?._id)?.toString();
+
+          if (couponVendorId !== targetVendorId) {
+            console.log(`❌ Coupon ${resolvedCoupon.code} is not for this vendor`);
+            isApplicable = false;
+          } else if (resolvedCoupon.linkedPackages?.length > 0) {
+            // Check if this specific package is linked
+            const targetPackageId = packageId || serviceProvider?._id; // fallback if module IS the package
+            const isPackageLinked = resolvedCoupon.linkedPackages.some(
+              lp => (lp.packageId || lp._id || lp).toString() === targetPackageId?.toString()
+            );
+
+            if (!isPackageLinked) {
+              console.log(`❌ Coupon ${resolvedCoupon.code} is not for this package`);
+              isApplicable = false;
+            }
+          }
+        }
+
+        if (isApplicable) {
+          // Check usage limits
+          const usageOk = !resolvedCoupon.maxUses || (resolvedCoupon.usedCount || 0) < resolvedCoupon.maxUses;
+
+          if (usageOk) {
+            // Calculate discount
+            if (resolvedCoupon.discountType === "percentage" || resolvedCoupon.type === "percentage") {
+              couponDiscountValue = (afterDiscount * resolvedCoupon.discount) / 100;
+              // Apply max discount cap if set
+              if (resolvedCoupon.maxDiscount && couponDiscountValue > resolvedCoupon.maxDiscount) {
+                couponDiscountValue = resolvedCoupon.maxDiscount;
+              }
+            } else {
+              couponDiscountValue = Math.min(resolvedCoupon.discount, afterDiscount);
+            }
+
+            // Increment usage count
+            await Coupon.findByIdAndUpdate(resolvedCoupon._id, { $inc: { usedCount: 1 } });
+            console.log(`🎟️ Coupon applied: ${resolvedCoupon.code} | Discount: ₹${couponDiscountValue}`);
+          } else {
+            console.log(`⚠️ Coupon ${resolvedCoupon.code} has exceeded usage limit`);
+          }
+        }
+      } else {
+        console.log(`⚠️ Coupon ${resolvedCoupon.code} is expired or inactive`);
       }
     }
 
