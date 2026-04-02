@@ -16,7 +16,13 @@ const CouponSchema = new mongoose.Schema({
   applicableCategories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }],
   applicableStores: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Store' }],
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  moduleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Module' }  // 👈 Add this line
+  moduleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Module' },
+  ownerType: { type: String, enum: ['admin', 'vendor'], default: 'admin' },
+  vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  linkedPackages: [{
+    packageId: { type: mongoose.Schema.Types.ObjectId },
+    packageName: { type: String }
+  }]
 }, { timestamps: true });
 
 CouponSchema.pre('save', function(next){

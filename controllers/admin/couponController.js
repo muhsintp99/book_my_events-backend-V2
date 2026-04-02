@@ -5,11 +5,13 @@ import { successResponse, errorResponse, paginatedResponse } from '../../utils/r
 // ===== Get all coupons =====
 export const getAllCoupons = async (req, res) => {
   try {
-    const { page = 1, limit = 10, type, isActive, search } = req.query;
+    const { page = 1, limit = 10, type, isActive, search, ownerType, vendorId } = req.query;
 
     const filter = {};
     if (type) filter.type = type;
     if (isActive !== undefined) filter.isActive = isActive === 'true';
+    if (ownerType) filter.ownerType = ownerType;
+    if (vendorId) filter.vendorId = vendorId;
     if (search) {
       filter.$or = [
         { title: { $regex: search, $options: 'i' } },
@@ -21,6 +23,7 @@ export const getAllCoupons = async (req, res) => {
       .populate('createdBy', 'firstName lastName')
       .populate('applicableCategories', 'title')
       // .populate('applicableStores', 'storeName') // Commented out until Store model is imported
+      .populate('vendorId', 'firstName lastName shopName')
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit));
@@ -195,7 +198,10 @@ export const createCoupon = async (req, res) => {
       isActive = true,
       applicableCategories,
       applicableStores,
-      moduleId
+      moduleId,
+      ownerType = 'admin',
+      vendorId,
+      linkedPackages
     } = req.body;
 
     // Validate required fields
@@ -225,6 +231,11 @@ export const createCoupon = async (req, res) => {
       return errorResponse(res, 'Invalid moduleId format', 400);
     }
 
+    // Validate vendorId if provided or if ownerType is vendor
+    if (ownerType === 'vendor' && !vendorId) {
+      return errorResponse(res, 'Vendor ID is required for vendor-level coupons', 400);
+    }
+
     const coupon = new Coupon({
       title,
       code: code.toUpperCase(),
@@ -240,7 +251,10 @@ export const createCoupon = async (req, res) => {
       applicableCategories: Array.isArray(applicableCategories) ? applicableCategories : [],
       applicableStores: Array.isArray(applicableStores) ? applicableStores : [],
       createdBy: req.user?._id,
-      moduleId: moduleId || undefined
+      moduleId: moduleId || undefined,
+      ownerType,
+      vendorId: vendorId || undefined,
+      linkedPackages: Array.isArray(linkedPackages) ? linkedPackages : []
     });
 
     await coupon.save();
@@ -363,7 +377,7 @@ export const toggleCouponStatus = async (req, res) => {
 // ===== Validate coupon =====
 export const validateCoupon = async (req, res) => {
   try {
-    const { code } = req.body;
+    const { code, vendorId, packageId, amount } = req.body;
     const now = new Date();
 
     const coupon = await Coupon.findOne({
@@ -374,8 +388,32 @@ export const validateCoupon = async (req, res) => {
     });
 
     if (!coupon) return errorResponse(res, 'Invalid or expired coupon code', 404);
+    
+    // Check usage limit
     if (coupon.totalUses && coupon.usedCount >= coupon.totalUses) {
       return errorResponse(res, 'Coupon usage limit exceeded', 400);
+    }
+
+    // Check minimum purchase amount
+    if (amount && amount < coupon.minPurchase) {
+      return errorResponse(res, `Minimum purchase amount for this coupon is ${coupon.minPurchase}`, 400);
+    }
+
+    // Check Vendor/Package restrictions for vendor-level coupons
+    if (coupon.ownerType === 'vendor') {
+      if (!vendorId || coupon.vendorId.toString() !== vendorId.toString()) {
+        return errorResponse(res, 'This coupon is not applicable for this vendor', 400);
+      }
+
+      // Check if linked to specific packages
+      if (coupon.linkedPackages?.length > 0) {
+        const isPackageApplicable = coupon.linkedPackages.some(
+          lp => lp.packageId.toString() === packageId?.toString()
+        );
+        if (!isPackageApplicable) {
+          return errorResponse(res, 'This coupon is not applicable for the selected package', 400);
+        }
+      }
     }
 
     return successResponse(res, { coupon }, 'Coupon is valid');
