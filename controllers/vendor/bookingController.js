@@ -1738,20 +1738,25 @@ exports.createBooking = async (req, res) => {
         let isApplicable = true;
         if (resolvedCoupon.ownerType === "vendor") {
           const couponVendorId = resolvedCoupon.vendorId?.toString();
-          const targetVendorId = (serviceProvider?.provider || serviceProvider?._id)?.toString();
+          // Use already resolved providerId if available to avoid missing fields on serviceProvider
+          const targetVendorId = (req.body.providerId || serviceProvider?.provider || serviceProvider?.createdBy || serviceProvider?._id)?.toString();
 
           if (couponVendorId !== targetVendorId) {
-            console.log(`❌ Coupon ${resolvedCoupon.code} is not for this vendor`);
+            console.log(`❌ Coupon ${resolvedCoupon.code} vendor mismatch: CouponVendor=${couponVendorId}, TargetVendor=${targetVendorId}`);
             isApplicable = false;
           } else if (resolvedCoupon.linkedPackages?.length > 0) {
             // Check if this specific package is linked
-            const targetPackageId = packageId || serviceProvider?._id; // fallback if module IS the package
+            // Standardize packageId check - try multiple lookups
+            const targetPackageId = packageId || req.body.packageId || req.body.boutiqueId || req.body.ornamentId || serviceProvider?._id;
             const isPackageLinked = resolvedCoupon.linkedPackages.some(
-              lp => (lp.packageId || lp._id || lp).toString() === targetPackageId?.toString()
+              lp => {
+                const lpId = (lp.packageId || lp._id || lp).toString();
+                return lpId === targetPackageId?.toString();
+              }
             );
 
             if (!isPackageLinked) {
-              console.log(`❌ Coupon ${resolvedCoupon.code} is not for this package`);
+              console.log(`❌ Coupon ${resolvedCoupon.code} is not for this package: ${targetPackageId}`);
               isApplicable = false;
             }
           }
