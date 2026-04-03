@@ -506,12 +506,13 @@ exports.deleteCatering = async (req, res) => {
 exports.getCaterings = async (req, res) => {
   try {
     const caterings = await Catering.find()
-      .populate("module", "title images")
-      .populate("categories", "title image")
-      .populate("provider", "firstName lastName email phone")
       .sort({ isTopPick: -1, createdAt: -1 });
 
-    res.json({ success: true, count: caterings.length, data: caterings });
+    const enhanced = await Promise.all(
+      caterings.map(c => populateCatering(c._id, req))
+    );
+
+    res.json({ success: true, count: enhanced.length, data: enhanced });
 
   } catch (err) {
     console.log("❌ Get Catering Error:", err);
@@ -709,12 +710,13 @@ exports.getCateringsByProvider = async (req, res) => {
     if (moduleId) query.module = moduleId;
 
     const caterings = await Catering.find(query)
-      .populate("module", "title")
-      .populate("categories", "title image")
-      .populate("provider", "firstName lastName email phone")
       .sort({ createdAt: -1 });
 
-    res.json({ success: true, count: caterings.length, data: caterings });
+    const enhanced = await Promise.all(
+      caterings.map(c => populateCatering(c._id, req))
+    );
+
+    res.json({ success: true, count: enhanced.length, data: enhanced });
 
   } catch (err) {
     console.log("❌ Get Provider Packages Error:", err);
