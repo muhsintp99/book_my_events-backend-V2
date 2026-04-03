@@ -1791,7 +1791,7 @@ exports.createBooking = async (req, res) => {
                 couponDiscountValue = Math.min(resolvedCoupon.discount, afterDiscount);
               }
 
-              // Increment usage count
+                // Increment usage count
               await Coupon.findByIdAndUpdate(resolvedCoupon._id, { $inc: { usedCount: 1 } });
               console.log(`🎟️ Coupon applied: ${resolvedCoupon.code} | Discount: ₹${couponDiscountValue}`);
             }
@@ -1804,8 +1804,21 @@ exports.createBooking = async (req, res) => {
       }
     }
 
-    let taxAmount = (afterDiscount * (pricing.taxRate || 0)) / 100;
-    let finalPrice = Math.max(afterDiscount - couponDiscountValue + taxAmount, 0);
+    // Calculate total including tax if applicable
+    const taxRate = Number(serviceProvider.buyPricing?.tax || serviceProvider.rentalPricing?.tax || 0);
+    const totalPriceBeforeCoupon = afterDiscount + (afterDiscount * taxRate) / 100;
+
+    // Recalculate coupon discount if it's a percentage of the total
+    if (resolvedCoupon && (resolvedCoupon.discountType === "percentage" || resolvedCoupon.type === "percentage")) {
+       couponDiscountValue = (totalPriceBeforeCoupon * resolvedCoupon.discount) / 100;
+       
+       // Respect max discount if set
+       if (resolvedCoupon.maxDiscount && couponDiscountValue > resolvedCoupon.maxDiscount) {
+         couponDiscountValue = resolvedCoupon.maxDiscount;
+       }
+    }
+
+    let finalPrice = Math.max(totalPriceBeforeCoupon - couponDiscountValue, 0);
 
     // [REAL WORLD RENTAL UPGRADE] 
     // Add refundable security deposit to total finalPrice for rentals
