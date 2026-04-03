@@ -269,7 +269,13 @@ export const updateCoupon = async (req, res) => {
       if (!coupon) return errorResponse(res, 'Coupon not found', 404);
 
       const updateData = { ...req.body };
-      delete updateData.code;
+      if (updateData.code) {
+        updateData.code = updateData.code.toUpperCase();
+        const existing = await Coupon.findOne({ code: updateData.code, _id: { $ne: req.params.id } });
+        if (existing) {
+          return errorResponse(res, 'Coupon code already exists', 400);
+        }
+      }
 
       if (req.file) {
         updateData.bannerImage = req.file.path.replace(/\\/g, '/');
