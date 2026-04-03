@@ -390,8 +390,25 @@ export const validateCoupon = async (req, res) => {
     if (!coupon) return errorResponse(res, 'Invalid or expired coupon code', 404);
     
     // Check usage limit
-    if (coupon.totalUses && coupon.usedCount >= coupon.totalUses) {
+    const totalUses = coupon.totalUses || coupon.maxUses || 0;
+    if (totalUses && coupon.usedCount >= totalUses) {
       return errorResponse(res, 'Coupon usage limit exceeded', 400);
+    }
+
+    // 🔥 Check if this user has already used this coupon (Enforce ONE TIME PER USER)
+    if (req.body.userId || req.user?._id) {
+        const userId = req.body.userId || req.user?._id;
+        const Booking = mongoose.model('Booking');
+        const userUsedCoupon = await Booking.findOne({
+            userId: userId,
+            couponId: coupon._id,
+            status: { $nin: ["Rejected", "Cancelled"] },
+            paymentStatus: { $nin: ["failed", "cancelled"] }
+        });
+
+        if (userUsedCoupon) {
+            return errorResponse(res, 'You have already used this coupon code.', 400);
+        }
     }
 
     // Check minimum purchase amount

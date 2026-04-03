@@ -1758,26 +1758,40 @@ exports.createBooking = async (req, res) => {
         }
 
         if (isApplicable) {
-          // Check usage limits
-          const usageOk = !resolvedCoupon.maxUses || (resolvedCoupon.usedCount || 0) < resolvedCoupon.maxUses;
+          // Check overall usage limits
+          const totalUses = resolvedCoupon.totalUses || resolvedCoupon.maxUses || 0; // support both
+          const usageOk = !totalUses || (resolvedCoupon.usedCount || 0) < totalUses;
 
           if (usageOk) {
-            // Calculate discount
-            if (resolvedCoupon.discountType === "percentage" || resolvedCoupon.type === "percentage") {
-              couponDiscountValue = (afterDiscount * resolvedCoupon.discount) / 100;
-              // Apply max discount cap if set
-              if (resolvedCoupon.maxDiscount && couponDiscountValue > resolvedCoupon.maxDiscount) {
-                couponDiscountValue = resolvedCoupon.maxDiscount;
-              }
-            } else {
-              couponDiscountValue = Math.min(resolvedCoupon.discount, afterDiscount);
-            }
+            // 🔥 Check if this user has already used this coupon (Enforce ONE TIME PER USER)
+            const userUsedCoupon = await Booking.findOne({
+              userId: user._id,
+              couponId: resolvedCoupon._id,
+              status: { $nin: ["Rejected", "Cancelled"] },
+              paymentStatus: { $nin: ["failed", "cancelled"] }
+            });
 
-            // Increment usage count
-            await Coupon.findByIdAndUpdate(resolvedCoupon._id, { $inc: { usedCount: 1 } });
-            console.log(`🎟️ Coupon applied: ${resolvedCoupon.code} | Discount: ₹${couponDiscountValue}`);
+            if (userUsedCoupon) {
+              console.log(`⚠️ User ${user._id} has already used coupon ${resolvedCoupon.code}`);
+              // We won't block the booking, but we won't apply the discount
+            } else {
+              // Calculate discount
+              if (resolvedCoupon.discountType === "percentage" || resolvedCoupon.type === "percentage") {
+                couponDiscountValue = (afterDiscount * resolvedCoupon.discount) / 100;
+                // Apply max discount cap if set
+                if (resolvedCoupon.maxDiscount && couponDiscountValue > resolvedCoupon.maxDiscount) {
+                  couponDiscountValue = resolvedCoupon.maxDiscount;
+                }
+              } else {
+                couponDiscountValue = Math.min(resolvedCoupon.discount, afterDiscount);
+              }
+
+              // Increment usage count
+              await Coupon.findByIdAndUpdate(resolvedCoupon._id, { $inc: { usedCount: 1 } });
+              console.log(`🎟️ Coupon applied: ${resolvedCoupon.code} | Discount: ₹${couponDiscountValue}`);
+            }
           } else {
-            console.log(`⚠️ Coupon ${resolvedCoupon.code} has exceeded usage limit`);
+            console.log(`⚠️ Coupon ${resolvedCoupon.code} has reached overall usage limit (${totalUses})`);
           }
         }
       } else {
@@ -1986,6 +2000,8 @@ exports.createBooking = async (req, res) => {
       discountValue: pricing.discount || 0,
       discountType: pricing.discount ? "flat" : "none",
       couponDiscountValue,
+      couponId: resolvedCoupon ? resolvedCoupon._id : undefined,
+      couponCode: resolvedCoupon ? resolvedCoupon.code : undefined,
 
       finalPrice,
       advanceAmount,

@@ -669,6 +669,15 @@ const bookingSchema = new mongoose.Schema(
     },
 
     couponDiscountValue: { type: Number, default: 0 },
+    couponId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Coupon",
+      default: null,
+    },
+    couponCode: {
+      type: String,
+      default: null,
+    },
     finalPrice: { type: Number, default: 0 },
 
     advanceAmount: { type: Number, default: 0 },
