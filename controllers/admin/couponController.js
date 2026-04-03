@@ -1,6 +1,8 @@
 import Coupon from '../../models/admin/coupons.js';
 import mongoose from 'mongoose';
 import { successResponse, errorResponse, paginatedResponse } from '../../utils/responseFormatter.js';
+import createUpload from '../../middlewares/upload.js';
+const upload = createUpload('coupons', { fileSizeMB: 2 });
 
 // ===== Get all coupons =====
 export const getAllCoupons = async (req, res) => {
@@ -183,165 +185,107 @@ export const getCouponsByModuleId = async (req, res) => {
 
 // ===== Create coupon =====
 export const createCoupon = async (req, res) => {
-  try {
-    const {
-      title,
-      code,
-      type = 'percentage',
-      discount,
-      discountType = 'percentage',
-      totalUses = 1,
-      minPurchase = 0,
-      maxDiscount,
-      startDate,
-      expireDate,
-      isActive = true,
-      applicableCategories,
-      applicableStores,
-      moduleId,
-      ownerType = 'admin',
-      vendorId,
-      linkedPackages
-    } = req.body;
+  upload.single('bannerImage')(req, res, async (err) => {
+    if (err) return errorResponse(res, err.message || 'Error uploading file', 400);
 
-    // Validate required fields
-    if (!title || !code || !discount) {
-      return errorResponse(res, 'Title, code and discount are required', 400);
+    try {
+      const {
+        title,
+        code,
+        type = 'percentage',
+        discount,
+        discountType = 'percentage',
+        description,
+        totalUses = 1,
+        minPurchase = 0,
+        maxDiscount,
+        startDate,
+        expireDate,
+        isActive = true,
+        applicableCategories,
+        applicableStores,
+        moduleId,
+        ownerType = 'admin',
+        vendorId,
+        linkedPackages
+      } = req.body;
+
+      // Validate required fields
+      if (!title || !code || !discount) {
+        return errorResponse(res, 'Title, code and discount are required', 400);
+      }
+
+      // Check duplicate code
+      const existing = await Coupon.findOne({ code: code.toUpperCase() });
+      if (existing) return errorResponse(res, 'Coupon code already exists', 400);
+
+      const start = startDate ? new Date(startDate) : new Date();
+      const expire = new Date(expireDate);
+
+      const couponData = {
+        title,
+        code: code.toUpperCase(),
+        type,
+        discount: parseFloat(discount),
+        discountType,
+        description,
+        totalUses: parseInt(totalUses),
+        minPurchase: parseFloat(minPurchase),
+        maxDiscount: maxDiscount ? parseFloat(maxDiscount) : undefined,
+        startDate: start,
+        expireDate: expire,
+        isActive,
+        applicableCategories: Array.isArray(applicableCategories) ? applicableCategories : [],
+        applicableStores: Array.isArray(applicableStores) ? applicableStores : [],
+        createdBy: req.user?._id,
+        moduleId: moduleId || undefined,
+        ownerType,
+        vendorId: vendorId || undefined,
+        linkedPackages: Array.isArray(linkedPackages) ? linkedPackages : []
+      };
+
+      if (req.file) {
+        couponData.bannerImage = req.file.path.replace(/\\/g, '/');
+      }
+
+      const coupon = new Coupon(couponData);
+      await coupon.save();
+
+      return successResponse(res, { coupon }, 'Coupon created successfully', 201);
+    } catch (error) {
+      console.error('Create coupon error:', error);
+      return errorResponse(res, `Error creating coupon: ${error.message}`, 500);
     }
-
-    // Validate expireDate is provided
-    if (!expireDate) {
-      return errorResponse(res, 'Expire date is required', 400);
-    }
-
-    // Validate date logic
-    const start = startDate ? new Date(startDate) : new Date();
-    const expire = new Date(expireDate);
-    
-    if (expire <= start) {
-      return errorResponse(res, 'Expire date must be after start date', 400);
-    }
-
-    // Check duplicate code
-    const existing = await Coupon.findOne({ code: code.toUpperCase() });
-    if (existing) return errorResponse(res, 'Coupon code already exists', 400);
-
-    // Validate moduleId if provided
-    if (moduleId && !mongoose.Types.ObjectId.isValid(moduleId)) {
-      return errorResponse(res, 'Invalid moduleId format', 400);
-    }
-
-    // Validate vendorId if provided or if ownerType is vendor
-    if (ownerType === 'vendor' && !vendorId) {
-      return errorResponse(res, 'Vendor ID is required for vendor-level coupons', 400);
-    }
-
-    const coupon = new Coupon({
-      title,
-      code: code.toUpperCase(),
-      type,
-      discount: parseFloat(discount),
-      discountType,
-      totalUses: parseInt(totalUses),
-      minPurchase: parseFloat(minPurchase),
-      maxDiscount: maxDiscount ? parseFloat(maxDiscount) : undefined,
-      startDate: start,
-      expireDate: expire,
-      isActive,
-      applicableCategories: Array.isArray(applicableCategories) ? applicableCategories : [],
-      applicableStores: Array.isArray(applicableStores) ? applicableStores : [],
-      createdBy: req.user?._id,
-      moduleId: moduleId || undefined,
-      ownerType,
-      vendorId: vendorId || undefined,
-      linkedPackages: Array.isArray(linkedPackages) ? linkedPackages : []
-    });
-
-    await coupon.save();
-
-    const populatedCoupon = await Coupon.findById(coupon._id)
-      .populate('createdBy', 'firstName lastName')
-      .populate('applicableCategories', 'title');
-      // .populate('applicableStores', 'storeName'); // Commented out until Store model is imported
-
-    // Clean response - remove empty arrays and unwanted fields
-    const responseData = populatedCoupon.toObject();
-    
-    // Remove empty arrays
-    if (responseData.applicableCategories?.length === 0) delete responseData.applicableCategories;
-    if (responseData.applicableStores?.length === 0) delete responseData.applicableStores;
-    
-    // Remove createdBy details, keep only ID
-    if (responseData.createdBy) {
-      responseData.createdBy = responseData.createdBy._id || responseData.createdBy;
-    }
-
-    return successResponse(res, { coupon: responseData }, 'Coupon created successfully', 201);
-  } catch (error) {
-    console.error('Create coupon error:', error);
-    console.error('Error name:', error.name);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-    
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(e => e.message);
-      return errorResponse(res, `Validation error: ${messages.join(', ')}`, 400);
-    }
-    if (error.code === 11000) {
-      return errorResponse(res, 'Coupon code already exists', 400);
-    }
-    return errorResponse(res, `Error creating coupon: ${error.message}`, 500);
-  }
+  });
 };
 
 // ===== Update coupon =====
 export const updateCoupon = async (req, res) => {
-  try {
-    const coupon = await Coupon.findById(req.params.id);
-    if (!coupon) return errorResponse(res, 'Coupon not found', 404);
+  upload.single('bannerImage')(req, res, async (err) => {
+    if (err) return errorResponse(res, err.message || 'Error uploading file', 400);
 
-    const updateData = { ...req.body };
-    delete updateData.code; // prevent code update
+    try {
+      const coupon = await Coupon.findById(req.params.id);
+      if (!coupon) return errorResponse(res, 'Coupon not found', 404);
 
-    // Validate dates if being updated
-    if (updateData.expireDate || updateData.startDate) {
-      const start = updateData.startDate ? new Date(updateData.startDate) : coupon.startDate;
-      const expire = updateData.expireDate ? new Date(updateData.expireDate) : coupon.expireDate;
-      
-      if (expire <= start) {
-        return errorResponse(res, 'Expire date must be after start date', 400);
+      const updateData = { ...req.body };
+      delete updateData.code;
+
+      if (req.file) {
+        updateData.bannerImage = req.file.path.replace(/\\/g, '/');
       }
-    }
 
-    const updatedCoupon = await Coupon.findByIdAndUpdate(req.params.id, updateData, {
-      new: true,
-      runValidators: true
-    })
-      .populate('createdBy', 'firstName lastName')
-      .populate('applicableCategories', 'title');
-      // .populate('applicableStores', 'storeName'); // Commented out until Store model is imported
+      const updatedCoupon = await Coupon.findByIdAndUpdate(req.params.id, updateData, {
+        new: true,
+        runValidators: true
+      });
 
-    // Clean response data
-    const responseData = updatedCoupon.toObject();
-    
-    // Remove empty arrays
-    if (responseData.applicableCategories?.length === 0) delete responseData.applicableCategories;
-    if (responseData.applicableStores?.length === 0) delete responseData.applicableStores;
-    
-    // Remove createdBy details, keep only ID
-    if (responseData.createdBy) {
-      responseData.createdBy = responseData.createdBy._id || responseData.createdBy;
+      return successResponse(res, { coupon: updatedCoupon }, 'Coupon updated successfully');
+    } catch (error) {
+      console.error('Update coupon error:', error);
+      return errorResponse(res, 'Error updating coupon', 500);
     }
-
-    return successResponse(res, { coupon: responseData }, 'Coupon updated successfully');
-  } catch (error) {
-    console.error('Update coupon error:', error);
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(e => e.message);
-      return errorResponse(res, `Validation error: ${messages.join(', ')}`, 400);
-    }
-    return errorResponse(res, 'Error updating coupon', 500);
-  }
+  });
 };
 
 // ===== Delete coupon =====

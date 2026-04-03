@@ -6,6 +6,8 @@ const CouponSchema = new mongoose.Schema({
   type: { type: String, enum: ['percentage', 'fixed_amount', 'free_shipping'], required: true },
   discount: { type: Number, required: true },
   discountType: { type: String, enum: ['percentage', 'amount'], required: true },
+  description: { type: String, trim: true },
+  bannerImage: { type: String },
   minPurchase: { type: Number, default: 0 },
   maxDiscount: { type: Number },
   totalUses: { type: Number, default: 1 },
