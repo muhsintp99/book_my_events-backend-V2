@@ -834,7 +834,7 @@ exports.getAllMakeupPackages = async (req, res) => {
   try {
     const { search, module } = req.query;
 
-    let query = {};
+    let query = { isActive: true };
 
     if (search && search.trim()) query.$text = { $search: search };
     if (module && mongoose.Types.ObjectId.isValid(module)) query.module = module;

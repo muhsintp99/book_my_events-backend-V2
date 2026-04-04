@@ -505,7 +505,13 @@ exports.deleteCatering = async (req, res) => {
 // ----------------------------- GET ALL -----------------------------
 exports.getCaterings = async (req, res) => {
   try {
-    const caterings = await Catering.find()
+    const { module } = req.query;
+
+    let query = { isActive: true };
+
+    if (module && mongoose.Types.ObjectId.isValid(module)) query.module = module;
+
+    const caterings = await Catering.find(query)
       .sort({ isTopPick: -1, createdAt: -1 });
 
     const enhanced = await Promise.all(
