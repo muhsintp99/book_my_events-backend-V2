@@ -398,10 +398,17 @@ exports.getProfileByProviderId = async (req, res) => {
       }
     }
 
+    // 6. Include zone information in the response for convenience
+    const profileObj = profile.toObject();
+    if (vendorProfile) {
+      profileObj.zones = vendorProfile.zones;
+      profileObj.zone = vendorProfile.zones?.[0] || null;
+    }
+
     return res.status(200).json({
       success: true,
       message: "Profile loaded successfully",
-      data: profile
+      data: profileObj
     });
 
   } catch (error) {
@@ -1008,10 +1015,20 @@ exports.updateProfile = async (req, res) => {
         }
       }
 
+      // Include zone in the response for vendor
+      const finalResponse = profile.toObject();
+      const finalVendorProfile = await VendorProfile.findOne({ user: targetUserId })
+        .populate("zones", "name city");
+      
+      if (finalVendorProfile) {
+        finalResponse.zones = finalVendorProfile.zones;
+        finalResponse.zone = finalVendorProfile.zones?.[0] || null;
+      }
+
       return res.status(200).json({
         success: true,
         message: "Profile and linked records updated successfully",
-        data: profile,
+        data: finalResponse,
       });
     }
 

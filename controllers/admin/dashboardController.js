@@ -238,6 +238,7 @@ exports.getModuleStats = async (req, res) => {
         {
           $project: {
             name: { $ifNull: ["$profile.storeName", "Unknown Shop"] },
+            zone: { $ifNull: ["$profile.storeAddress.city", "No Zone"] }, // Corrected way to access the city
             bookings: "$count"
           }
         }
@@ -267,6 +268,7 @@ exports.getModuleStats = async (req, res) => {
         {
           $project: {
             name: { $ifNull: ["$profile.storeName", "Unknown Shop"] },
+            zone: { $ifNull: ["$profile.storeAddress.city", "No Zone"] },
             bookings: "$count"
           }
         }
