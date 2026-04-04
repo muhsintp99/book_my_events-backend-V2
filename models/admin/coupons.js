@@ -24,7 +24,8 @@ const CouponSchema = new mongoose.Schema({
   linkedPackages: [{
     packageId: { type: mongoose.Schema.Types.ObjectId },
     packageName: { type: String }
-  }]
+  }],
+  applyTo: { type: String, enum: ['total', 'advance'], default: 'total' }
 }, { timestamps: true });
 
 CouponSchema.pre('save', function(next){

@@ -207,7 +207,8 @@ export const createCoupon = async (req, res) => {
         moduleId,
         ownerType = 'admin',
         vendorId,
-        linkedPackages
+        linkedPackages,
+        applyTo = 'total'
       } = req.body;
 
       // Validate required fields
@@ -241,7 +242,8 @@ export const createCoupon = async (req, res) => {
         moduleId: moduleId || undefined,
         ownerType,
         vendorId: vendorId || undefined,
-        linkedPackages: Array.isArray(linkedPackages) ? linkedPackages : []
+        linkedPackages: Array.isArray(linkedPackages) ? linkedPackages : [],
+        applyTo
       };
 
       if (req.file) {
@@ -327,8 +329,9 @@ export const toggleCouponStatus = async (req, res) => {
 // ===== Validate coupon =====
 export const validateCoupon = async (req, res) => {
   try {
-    const { code, vendorId, packageId, amount } = req.body;
+    const { code, vendorId, packageId, amount, totalAmount } = req.body;
     const now = new Date();
+    const purchaseAmount = amount || totalAmount || 0;
 
     const coupon = await Coupon.findOne({
       code: code.toUpperCase(),
@@ -340,17 +343,17 @@ export const validateCoupon = async (req, res) => {
     if (!coupon) return errorResponse(res, 'Invalid or expired coupon code', 404);
     
     // Check usage limit
-    const totalUses = coupon.totalUses || coupon.maxUses || 0;
-    if (totalUses && coupon.usedCount >= totalUses) {
+    const totalUsageLimit = coupon.totalUses || coupon.maxUses || 0;
+    if (totalUsageLimit && coupon.usedCount >= totalUsageLimit) {
       return errorResponse(res, 'Coupon usage limit exceeded', 400);
     }
 
     // 🔥 Check if this user has already used this coupon (Enforce ONE TIME PER USER)
-    if (req.body.userId || req.user?._id) {
-        const userId = req.body.userId || req.user?._id;
+    const currentUserId = req.body.userId || req.user?._id;
+    if (currentUserId) {
         const Booking = mongoose.model('Booking');
         const userUsedCoupon = await Booking.findOne({
-            userId: userId,
+            userId: currentUserId,
             couponId: coupon._id,
             status: { $nin: ["Rejected", "Cancelled"] },
             paymentStatus: { $nin: ["failed", "cancelled"] }
@@ -362,8 +365,8 @@ export const validateCoupon = async (req, res) => {
     }
 
     // Check minimum purchase amount
-    if (amount && amount < coupon.minPurchase) {
-      return errorResponse(res, `Minimum purchase amount for this coupon is ${coupon.minPurchase}`, 400);
+    if (purchaseAmount && purchaseAmount < coupon.minPurchase) {
+      return errorResponse(res, `Minimum purchase amount for this coupon is ₹${coupon.minPurchase}`, 400);
     }
 
     // Check Vendor/Package restrictions for vendor-level coupons
