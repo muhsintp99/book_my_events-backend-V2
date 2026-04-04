@@ -254,13 +254,18 @@ exports.searchMakeupPackages = async (req, res) => {
 
     const total = await Makeup.countDocuments(query);
 
+    // 🔥 ENHANCE PROVIDER DETAILS (Zones, storeName, logo, etc.)
+    const enhancedPackages = await Promise.all(
+      makeupPackages.map(m => populateMakeup(m._id, req))
+    );
+
     res.json({
       success: true,
-      count: makeupPackages.length,
+      count: enhancedPackages.length,
       totalResults: total,
       totalPages: Math.ceil(total / limit),
       page: Number(page),
-      data: makeupPackages,
+      data: enhancedPackages,
     });
 
   } catch (err) {
@@ -567,9 +572,9 @@ exports.getVendorsForMakeupModule = async (req, res) => {
         isActive: true,
         zones: { $exists: true, $ne: [] }
       })
-      .select("user zones storeAddress")
-      .populate("zones", "name")
-      .lean();
+        .select("user zones storeAddress")
+        .populate("zones", "name")
+        .lean();
 
       for (const vendor of vendorsNeedingZones) {
         const otherVp = otherProfiles.find(p => p.user.toString() === vendor._id.toString());
@@ -591,7 +596,7 @@ exports.getVendorsForMakeupModule = async (req, res) => {
     if (zoneMissing.length > 0) {
       const Zone = mongoose.model("Zone");
       const allZones = await Zone.find({ isActive: true }).select("name").lean();
-      
+
       for (const vendor of zoneMissing) {
         try {
           // A. GEOGRAPHIC FALLBACK (requires coordinates)
@@ -616,7 +621,7 @@ exports.getVendorsForMakeupModule = async (req, res) => {
               } else {
                 const possibleName = nearestPincode.city || nearestPincode.state;
                 if (possibleName) {
-                  const matchedZone = allZones.find(z => 
+                  const matchedZone = allZones.find(z =>
                     z.name.toLowerCase() === possibleName.toLowerCase()
                   );
                   vendor.zone = matchedZone || { _id: null, name: possibleName };
@@ -634,14 +639,14 @@ exports.getVendorsForMakeupModule = async (req, res) => {
           // B. ADDRESS STRING MATCHING (If still null, search in address text)
           if (!vendor.zone) {
             const addressText = `${vendor.storeAddress?.fullAddress || ""} ${vendor.storeAddress?.city || ""} ${vendor.storeAddress?.street || ""}`.toLowerCase();
-            
+
             // Handle common synonyms
             let searchStr = addressText;
             if (searchStr.includes("calicut")) searchStr += " kozhikode";
             if (searchStr.includes("kochi") || searchStr.includes("cochin")) searchStr += " ernakulam";
             if (searchStr.includes("trivandrum")) searchStr += " thiruvananthapuram";
 
-            const matchedZone = allZones.find(z => 
+            const matchedZone = allZones.find(z =>
               searchStr.includes(z.name.toLowerCase())
             );
 

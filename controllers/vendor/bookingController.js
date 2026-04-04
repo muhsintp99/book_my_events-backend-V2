@@ -594,6 +594,7 @@ exports.createBooking = async (req, res) => {
       packageId,
       numberOfGuests,
       couponId,
+      couponCode,  // ✅ NEW: Accept coupon code from frontend
       paymentType,
       cakeId,
       cakeCart,  // ✅ NEW: Multi-cake cart support
@@ -611,6 +612,7 @@ exports.createBooking = async (req, res) => {
       bouncerId,
       emceeId,
       invitationDetails, // ✅ NEW: Captured invitation content
+      purpose, // ✅ NEW: Event purpose
     } = req.body;
 
 
@@ -1709,65 +1711,184 @@ exports.createBooking = async (req, res) => {
       0
     );
 
+    // =========================================================
+    // 🎟️ COUPON APPLICATION (Supports both couponId & couponCode)
+    // =========================================================
     let couponDiscountValue = 0;
+    let resolvedCoupon = null;
+
+    // Resolve coupon: prefer couponId, fallback to couponCode lookup
     if (couponId) {
-      const coupon = await Coupon.findById(couponId);
-      if (coupon?.isActive) {
-        couponDiscountValue =
-          coupon.type === "percentage"
-            ? (afterDiscount * coupon.discount) / 100
-            : coupon.discount;
+      resolvedCoupon = await Coupon.findById(couponId);
+    } else if (couponCode) {
+      resolvedCoupon = await Coupon.findOne({
+        code: couponCode.toUpperCase(),
+        isActive: true
+      });
+    }
+
+    if (resolvedCoupon) {
+      const now = new Date();
+      const start = new Date(resolvedCoupon.startDate);
+      const expire = new Date(resolvedCoupon.expireDate);
+      const isDateValid = now >= start && now <= expire;
+
+      if (resolvedCoupon.isActive && isDateValid) {
+        // 🔥 VENDOR LEVEL APPLICABILITY CHECK
+        let isApplicable = true;
+        if (resolvedCoupon.ownerType === "vendor") {
+          const couponVendorId = resolvedCoupon.vendorId?.toString();
+          // Use already resolved providerId if available to avoid missing fields on serviceProvider
+          const targetVendorId = (req.body.providerId || serviceProvider?.provider || serviceProvider?.createdBy || serviceProvider?._id)?.toString();
+
+          if (couponVendorId !== targetVendorId) {
+            console.log(`❌ Coupon ${resolvedCoupon.code} vendor mismatch: CouponVendor=${couponVendorId}, TargetVendor=${targetVendorId}`);
+            isApplicable = false;
+          } else if (resolvedCoupon.linkedPackages?.length > 0) {
+            // Check if this specific package is linked
+            // Standardize packageId check - try multiple lookups
+            const targetPackageId = packageId || req.body.packageId || req.body.boutiqueId || req.body.ornamentId || serviceProvider?._id;
+            const isPackageLinked = resolvedCoupon.linkedPackages.some(
+              lp => {
+                const lpId = (lp.packageId || lp._id || lp).toString();
+                return lpId === targetPackageId?.toString();
+              }
+            );
+
+            if (!isPackageLinked) {
+              console.log(`❌ Coupon ${resolvedCoupon.code} is not for this package: ${targetPackageId}`);
+              isApplicable = false;
+            }
+          }
+        }
+
+        if (isApplicable) {
+          // Check overall usage limits
+          const totalUses = resolvedCoupon.totalUses || resolvedCoupon.maxUses || 0; // support both
+          const usageOk = !totalUses || (resolvedCoupon.usedCount || 0) < totalUses;
+
+          if (usageOk) {
+            // 🔥 Check if this user has already used this coupon (Enforce ONE TIME PER USER)
+            const userUsedCoupon = await Booking.findOne({
+              userId: user._id,
+              couponId: resolvedCoupon._id,
+              status: { $nin: ["Rejected", "Cancelled"] },
+              paymentStatus: { $nin: ["failed", "cancelled"] }
+            });
+
+            if (userUsedCoupon) {
+              console.log(`⚠️ User ${user._id} has already used coupon ${resolvedCoupon.code}`);
+              // We won't block the booking, but we won't apply the discount
+            } else {
+              // Calculate discount
+              if (resolvedCoupon.discountType === "percentage" || resolvedCoupon.type === "percentage") {
+                couponDiscountValue = (afterDiscount * resolvedCoupon.discount) / 100;
+                // Apply max discount cap if set
+                if (resolvedCoupon.maxDiscount && couponDiscountValue > resolvedCoupon.maxDiscount) {
+                  couponDiscountValue = resolvedCoupon.maxDiscount;
+                }
+              } else {
+                couponDiscountValue = Math.min(resolvedCoupon.discount, afterDiscount);
+              }
+
+                // Increment usage count
+              await Coupon.findByIdAndUpdate(resolvedCoupon._id, { $inc: { usedCount: 1 } });
+              console.log(`🎟️ Coupon applied: ${resolvedCoupon.code} | Discount: ₹${couponDiscountValue}`);
+            }
+          } else {
+            console.log(`⚠️ Coupon ${resolvedCoupon.code} has reached overall usage limit (${totalUses})`);
+          }
+        }
+      } else {
+        console.log(`⚠️ Coupon ${resolvedCoupon.code} is expired or inactive`);
       }
     }
 
-    let taxAmount = (afterDiscount * (pricing.taxRate || 0)) / 100;
-    let finalPrice = Math.max(afterDiscount - couponDiscountValue + taxAmount, 0);
+    // [PHASE 1] Calculate total before coupon
+    const taxRate = Number(serviceProvider.buyPricing?.tax || serviceProvider.rentalPricing?.tax || 0);
+    const totalPriceBeforeCoupon = afterDiscount + (afterDiscount * taxRate) / 100;
 
-    // [REAL WORLD RENTAL UPGRADE] 
-    // Add refundable security deposit to total finalPrice for rentals
-    const securityDeposit = pricing.securityDeposit || 0;
-    if (securityDeposit > 0) {
-      finalPrice += securityDeposit;
-    }
-
-    // 🔥 ADD SHIPPING PRICE (Critical for Cakes/Delivery)
-    // This ensures the payment gateway charges the amount displayed to the user
-    if (pricing.shippingPrice > 0) {
-      finalPrice += pricing.shippingPrice;
-    }
-    // ADVANCE PAYMENT
+    // [PHASE 2] Calculate BASE Advance Amount (before coupon)
     let advanceAmount = 0;
-
     if (moduleType === "Catering") {
-      // 🔥 CATERING: 10% of Final Price
-      const totalForAdvance = finalPrice; // Use finalPrice as base for 10%
-      advanceAmount = Math.round(totalForAdvance * 0.10);
+      advanceAmount = Math.round(totalPriceBeforeCoupon * 0.10);
     } else {
-      advanceAmount =
-        Number(
-          moduleType === "Venues"
-            ? serviceProvider.advanceDeposit
-            : moduleType === "Cake"
-              ? serviceProvider.priceInfo?.advanceBookingAmount
-              : (moduleKey === "ornament" || moduleKey === "ornaments")
+      advanceAmount = Number(
+        moduleType === "Venues"
+          ? serviceProvider.advanceDeposit
+          : moduleType === "Cake"
+            ? serviceProvider.priceInfo?.advanceBookingAmount
+            : (["ornament", "ornaments"].includes((moduleType || "").toLowerCase()))
+              ? ((bookingMode || serviceProvider.availabilityMode || "purchase").toLowerCase() === "rental"
+                ? serviceProvider.rentalPricing?.advanceForBooking
+                : 0)
+              : (moduleType === "Boutique" || moduleType === "Boutiques")
                 ? ((bookingMode || serviceProvider.availabilityMode || "purchase").toLowerCase() === "rental"
                   ? serviceProvider.rentalPricing?.advanceForBooking
                   : 0)
-                : (moduleType === "Boutique" || moduleType === "Boutiques")
-                  ? ((bookingMode || serviceProvider.availabilityMode || "purchase").toLowerCase() === "rental"
-                    ? serviceProvider.rentalPricing?.advanceForBooking
-                    : 0)
-                  : serviceProvider.advanceBookingAmount
-        ) || 0;
+                : serviceProvider.advanceBookingAmount
+      ) || 0;
     }
 
-    // [REAL WORLD RENTAL UPGRADE]
-    // Initial Payment (Advance) must include the full Security Deposit
+    // [PHASE 3] Finalize Coupon Discount based on 'applyTo'
+    if (resolvedCoupon) {
+      let applyTarget = (resolvedCoupon.applyTo || "total");
+
+      // For specific modules, ALWAYS apply to total as per user requirement
+      const restrictedModules = ["cake", "ornament", "ornaments", "boutique", "boutiques"];
+      if (restrictedModules.includes((moduleType || "").toLowerCase())) {
+        applyTarget = "total";
+      }
+
+      const baseForDiscount = (applyTarget === "advance") ? advanceAmount : totalPriceBeforeCoupon;
+
+      if (resolvedCoupon.discountType === "percentage" || resolvedCoupon.type === "percentage") {
+        couponDiscountValue = (baseForDiscount * resolvedCoupon.discount) / 100;
+        if (resolvedCoupon.maxDiscount && couponDiscountValue > resolvedCoupon.maxDiscount) {
+          couponDiscountValue = resolvedCoupon.maxDiscount;
+        }
+      } else {
+        couponDiscountValue = Math.min(resolvedCoupon.discount, baseForDiscount);
+      }
+      console.log(`🎟️ [${applyTarget.toUpperCase()}] Coupon: Deducting ₹${couponDiscountValue} from ${applyTarget}`);
+    }
+
+    // [PHASE 4] Deduct Coupon from both Final Price and Advance (if matched)
+    let finalPrice = Math.max(totalPriceBeforeCoupon - couponDiscountValue, 0);
+
+    // If applyTo is 'advance', specifically subtract from the advance field
+    if (resolvedCoupon && resolvedCoupon.applyTo === "advance") {
+        advanceAmount = Math.max(advanceAmount - couponDiscountValue, 0);
+    } else if (resolvedCoupon && resolvedCoupon.applyTo === "total") {
+        // For percentage-based systems (Catering or any module with NO fixed advance), re-calculate 10%
+        const hasFixedAdvance = !!(
+            moduleType === "Venues" ? serviceProvider.advanceDeposit : 
+            moduleType === "Cake" ? serviceProvider.priceInfo?.advanceBookingAmount :
+            serviceProvider.advanceBookingAmount
+        );
+        
+        if (moduleType === "Catering" || !hasFixedAdvance) {
+            advanceAmount = Math.round(finalPrice * 0.10);
+        }
+    }
+
+    // Safety: Advance can never exceed the final price
+    advanceAmount = Math.round(Math.min(advanceAmount, finalPrice));
+
+    // Add security deposit and shipping to both totals
+    const securityDeposit = Number(pricing.securityDeposit) || 0;
     if (securityDeposit > 0) {
+      finalPrice += securityDeposit;
       advanceAmount += securityDeposit;
     }
 
+    if (pricing.shippingPrice > 0) {
+      finalPrice += pricing.shippingPrice;
+      advanceAmount += pricing.shippingPrice;
+    }
+
     advanceAmount = Math.max(advanceAmount, 0);
+
     const remainingAmount = Math.max(finalPrice - advanceAmount, 0);
 
     // 🔥 CAKE DELIVERY ADDRESS FIX (Map structured deliveryAddress to flat address field)
@@ -1921,6 +2042,8 @@ exports.createBooking = async (req, res) => {
       discountValue: pricing.discount || 0,
       discountType: pricing.discount ? "flat" : "none",
       couponDiscountValue,
+      couponId: resolvedCoupon ? resolvedCoupon._id : undefined,
+      couponCode: resolvedCoupon ? resolvedCoupon.code : undefined,
 
       finalPrice,
       advanceAmount,
@@ -1937,11 +2060,19 @@ exports.createBooking = async (req, res) => {
       invitationDetails: (moduleType === "Invitation & Printing" || moduleType === "Invitation" || moduleType === "Printing")
         ? invitationDetails
         : undefined,
+
+      purpose: purpose || undefined,
     };
 
     console.log("💾 Creating booking...");
     const booking = await Booking.create(bookingData);
     console.log("✅ Booking created:", booking._id);
+
+    // ✅ Increment coupon used count if coupon was used
+    if (resolvedCoupon) {
+      await Coupon.findByIdAndUpdate(resolvedCoupon._id, { $inc: { usedCount: 1 } });
+      console.log(`🎟️ Incremented usage count for coupon: ${resolvedCoupon.code}`);
+    }
 
     // ✅ DECREMENT STOCK FOR PURCHASE BOOKINGS
     if (moduleType === "Ornament" || moduleType === "Ornaments") {
