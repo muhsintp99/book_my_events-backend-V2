@@ -5,6 +5,13 @@ const walletAdminController = require('../../controllers/admin/walletAdminContro
 const { protect } = require('../../middlewares/authMiddleware');
 
 /**
+ * @route   GET /api/admin/wallet/all-withdrawals
+ * @desc    Get all vendor withdrawal requests (All statuses)
+ * @access  Private (Admin)
+ */
+router.get('/all-withdrawals', protect, walletAdminController.getAllWithdrawals);
+
+/**
  * @route   GET /api/admin/wallet/pending-withdrawals
  * @desc    Get all pending vendor withdrawal requests
  * @access  Private (Admin)
