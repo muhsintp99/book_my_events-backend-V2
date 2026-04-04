@@ -613,8 +613,22 @@ exports.getVendorsForCateringModule = async (req, res) => {
       });
     }
 
+    // ✅ NEW LOGIC: Drive vendor discovery by their ACTIVE PACKAGES in this module
+    const providersWithPackages = await Catering.distinct("provider", {
+      module: moduleId,
+      isActive: true
+    });
+
+    if (!providersWithPackages.length) {
+      return res.json({
+        success: true,
+        data: providerId ? null : [],
+        message: "No vendors found with active packages for this module"
+      });
+    }
+
     // 🔹 Base query
-    let query = { module: moduleId };
+    let query = { user: { $in: providersWithPackages } };
 
     // 🔹 If providerId passed → fetch only that vendor
     if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
@@ -647,7 +661,8 @@ exports.getVendorsForCateringModule = async (req, res) => {
       {
         $match: {
           module: new mongoose.Types.ObjectId(moduleId),
-          provider: { $in: vendorIds }
+          provider: { $in: vendorIds },
+          isActive: true // ✅ ONLY COUNT ACTIVE PACKAGES
         }
       },
       {

@@ -461,8 +461,21 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
       });
     }
 
+    // ✅ NEW LOGIC: Drive vendor discovery by their ACTIVE PACKAGES in this module
+    const providersWithPackages = await Photography.distinct("provider", {
+      module: moduleId,
+      isActive: true
+    });
+
+    if (!providersWithPackages.length) {
+      return res.json({
+        success: true,
+        data: providerId ? null : []
+      });
+    }
+
     // 🔹 Build VendorProfile query
-    let vpQuery = { module: moduleId };
+    let vpQuery = { user: { $in: providersWithPackages } };
 
     if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
       vpQuery.user = providerId;
@@ -492,7 +505,8 @@ exports.getVendorsForPhotographyModule = async (req, res) => {
       {
         $match: {
           module: new mongoose.Types.ObjectId(moduleId),
-          provider: { $in: vendorIds }
+          provider: { $in: vendorIds },
+          isActive: true // ✅ ONLY COUNT ACTIVE PACKAGES
         }
       },
       {

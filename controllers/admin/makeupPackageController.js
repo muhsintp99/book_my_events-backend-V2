@@ -443,7 +443,20 @@ exports.getVendorsForMakeupModule = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid module ID" });
     }
 
-    let query = { module: moduleId };
+    // ✅ NEW LOGIC: Drive vendor discovery by their ACTIVE PACKAGES in this module
+    const providersWithPackages = await Makeup.distinct("provider", {
+      module: moduleId,
+      isActive: true
+    });
+
+    if (!providersWithPackages.length) {
+      return res.json({
+        success: true,
+        data: providerId ? null : []
+      });
+    }
+
+    let query = { user: { $in: providersWithPackages } };
     if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
       query.user = providerId;
     }
@@ -471,7 +484,8 @@ exports.getVendorsForMakeupModule = async (req, res) => {
       {
         $match: {
           module: new mongoose.Types.ObjectId(moduleId),
-          provider: { $in: vendorIds }
+          provider: { $in: vendorIds },
+          isActive: true // ✅ ONLY COUNT ACTIVE PACKAGES
         }
       },
       {
