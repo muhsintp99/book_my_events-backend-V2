@@ -215,32 +215,6 @@ exports.getSingleVendor = async (req, res) => {
   }
 };
 
-// exports.createProfile = async (req, res) => {
-//   try {
-//     const { userId, name, address, mobileNumber, socialLinks } = req.body;
-//     const profilePhoto = req.file ? `/uploads/profiles/${req.file.filename}` : "";
-
-//     const profile = await Profile.create({
-//       userId,
-//       name,
-//       address,
-//       mobileNumber,
-//       socialLinks: socialLinks ? JSON.parse(socialLinks) : {},
-//       profilePhoto,
-//     });
-
-//     res.status(201).json({
-//       success: true,
-//       message: "Profile created successfully",
-//       data: profile,
-//     });
-//   } catch (error) {
-//     res.status(500).json({ success: false, message: error.message });
-//   }
-// };
-
-
-
 exports.createProfile = async (req, res) => {
   try {
     // UPDATED: Accept vendorName and businessAddress
@@ -263,9 +237,6 @@ exports.createProfile = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
-
-
 
 // Get all profiles
 exports.getProfiles = async (req, res) => {
@@ -424,185 +395,9 @@ exports.getProfileByProviderId = async (req, res) => {
 
 
 // Update profile
-// exports.updateProfile = async (req, res) => {
-//   try {
-//     const { role, name, firstName, lastName, address, mobileNumber, socialLinks } = req.body;
-//     const userId = req.params.id;
+// exports.updateProfile = async (req, res) => { ... } (legacy commented out)
 
-//     let updatedData = {};
-
-//     // Parse social links safely
-//     if (socialLinks) {
-//       try {
-//         updatedData.socialLinks = JSON.parse(socialLinks);
-//       } catch (err) {
-//         return res.status(400).json({ success: false, message: "Invalid socialLinks format" });
-//       }
-//     }
-
-//     // Handle profile photo upload (from form-data)
-//     if (req.file) {
-//       updatedData.profilePhoto = `/uploads/profiles/${req.file.filename}`;
-//     }
-
-//     // ✅ Case 1: Vendor update
-//     if (role === "vendor") {
-//       updatedData.name = name;
-//       updatedData.address = address;
-//       updatedData.mobileNumber = mobileNumber;
-
-//       const profile = await Profile.findOneAndUpdate(
-//         { userId },
-//         updatedData,
-//         { new: true, upsert: true }
-//       ).populate("userId", "email role");
-
-//       if (!profile)
-//         return res.status(404).json({ success: false, message: "Vendor profile not found" });
-
-//       return res.status(200).json({
-//         success: true,
-//         message: "Vendor profile updated successfully",
-//         data: profile,
-//       });
-//     }
-
-//     // ✅ Case 2: User update
-//     if (role === "user") {
-//       const updateFields = {
-//         firstName: firstName || name,
-//         lastName: lastName || "",
-//         address: address || "",
-//         phone: mobileNumber || "",
-//         socialMedia: updatedData.socialLinks || {},
-//       };
-
-//       // Attach profile photo if uploaded
-//       if (updatedData.profilePhoto) {
-//         updateFields.profilePhoto = updatedData.profilePhoto;
-//       }
-
-//       const user = await User.findByIdAndUpdate(userId, updateFields, { new: true });
-
-//       if (!user)
-//         return res.status(404).json({ success: false, message: "User not found" });
-
-//       return res.status(200).json({
-//         success: true,
-//         message: "User profile updated successfully",
-//         data: user,
-//       });
-//     }
-
-//     return res.status(400).json({
-//       success: false,
-//       message: "Invalid role. Please provide role as 'vendor' or 'user'.",
-//     });
-//   } catch (error) {
-//     console.error("Update Profile Error:", error);
-//     res.status(500).json({ success: false, message: error.message });
-//   }
-// };
-
-
-
-
-
-
-// ... existing imports
-
-// Update profile
-// exports.updateProfile = async (req, res) => {
-//   try {
-//     // 1. Accept ONLY the fields sent by Frontend
-//     const { role, vendorName, firstName, lastName, businessAddress, mobileNumber, socialLinks } = req.body;
-
-//     // 2. The ID in the URL is the PROFILE ID (based on your frontend call)
-//     const id = req.params.id;
-
-//     let updatedData = {};
-
-//     // 3. Parse social links safely
-//     if (socialLinks) {
-//       try {
-//         updatedData.socialLinks = typeof socialLinks === 'string' ? JSON.parse(socialLinks) : socialLinks;
-//       } catch (err) {
-//         return res.status(400).json({ success: false, message: "Invalid socialLinks format" });
-//       }
-//     }
-
-//     if (req.file) {
-//       updatedData.profilePhoto = `/uploads/profiles/${req.file.filename}`;
-//     }
-
-//     // ✅ Case 1: Vendor Update
-//     // We Map 'vendorName' -> 'name' and 'businessAddress' -> 'address' to preserve DB Schema
-//     if (role === "vendor" || vendorName) {
-//       if (vendorName) updatedData.vendorName = vendorName;
-//       if (businessAddress) updatedData.businessAddress = businessAddress;
-//       if (mobileNumber) updatedData.mobileNumber = mobileNumber;
-
-//       // Try finding by ID first
-//       let profile = await Profile.findByIdAndUpdate(id, updatedData, { new: true });
-
-//       // Fallback: If not found by ID, try finding by userId (just in case)
-//       if (!profile) {
-//         profile = await Profile.findOneAndUpdate({ userId: id }, updatedData, { new: true });
-//       }
-
-//       if (!profile)
-//         return res.status(404).json({ success: false, message: "Vendor profile not found" });
-
-//       return res.status(200).json({
-//         success: true,
-//         message: "Vendor updated successfully",
-//         data: profile,
-//       });
-//     }
-
-//     // ✅ Case 2: User Update
-//     if (role === "user") {
-//       // Logic: The 'id' param is likely the PROFILE ID, not User ID.
-//       // We need to resolve the User ID from the Profile first.
-
-//       let targetUserId = id; // Default to assuming it's User ID (legacy fallback)
-
-//       // Try to find the profile to get the real User ID
-//       const profileDoc = await Profile.findById(id);
-//       if (profileDoc && profileDoc.userId) {
-//         targetUserId = profileDoc.userId;
-//       }
-
-//       const updateFields = {
-//         firstName: firstName || vendorName, // fallback
-//         lastName: lastName || "",
-//         phone: mobileNumber || "",
-//       };
-
-//       if (updatedData.socialLinks) updateFields.socialMedia = updatedData.socialLinks;
-//       if (updatedData.profilePhoto) updateFields.profilePhoto = updatedData.profilePhoto;
-
-//       const user = await User.findByIdAndUpdate(targetUserId, updateFields, { new: true });
-
-//       if (!user) return res.status(404).json({ success: false, message: "User not found" });
-
-//       return res.status(200).json({
-//         success: true,
-//         message: "User updated successfully",
-//         data: user,
-//       });
-//     }
-
-//     return res.status(400).json({ success: false, message: "Invalid request" });
-
-//   } catch (error) {
-//     console.error("Update Profile Error:", error);
-//     res.status(500).json({ success: false, message: error.message });
-//   }
-// };
-// ✅ FIXED: Update profile - handles BOTH Profile ID and User ID
-
-// ✅ UPDATE VENDOR BIO (FIX)
+// ✅ UPDATE VENDOR BIO
 exports.updateVendorBio = async (req, res) => {
   try {
     const { vendorId } = req.params;
@@ -733,9 +528,9 @@ exports.updateProfile = async (req, res) => {
       // Handle Bio fields
       if (bioTitle !== undefined || bioSubtitle !== undefined || bioDescription !== undefined) {
         updatedData.bio = {
-          title: bioTitle !== undefined ? bioTitle : (profile?.bio?.title || ""),
-          subtitle: bioSubtitle !== undefined ? bioSubtitle : (profile?.bio?.subtitle || ""),
-          description: bioDescription !== undefined ? bioDescription : (profile?.bio?.description || "")
+          title: bioTitle !== undefined ? bioTitle : "",
+          subtitle: bioSubtitle !== undefined ? bioSubtitle : "",
+          description: bioDescription !== undefined ? bioDescription : ""
         };
       }
 
@@ -836,10 +631,7 @@ exports.updateProfile = async (req, res) => {
         }
       }
 
-      // =====================================================
       // NEW: ROBUST SYNC TO USER AND VENDORPROFILE
-      // =====================================================
-      // Ensure we have a string User ID and convert to ObjectId for queries
       let userIdStr = id;
       if (profile.userId) {
         userIdStr = profile.userId._id ? profile.userId._id.toString() : profile.userId.toString();
@@ -849,21 +641,16 @@ exports.updateProfile = async (req, res) => {
         ? new mongoose.Types.ObjectId(userIdStr)
         : null;
 
-      if (!targetUserId) {
-        console.error(`[updateProfile] Invalid User ID for sync: ${userIdStr}`);
-      } else {
+      if (targetUserId) {
         console.log(`[updateProfile] Initiating sync for User ID: ${targetUserId}`);
 
-        // Prepare name fields - ensure lastName is not empty for User model
+        // Prepare name fields
         const rawName = (vendorName || profile.vendorName || "Vendor").trim();
         const nameParts = rawName.split(/\s+/);
         const firstNameSync = nameParts[0] || "Vendor";
-        let lastNameSync = nameParts.slice(1).join(" ");
+        let lastNameSync = nameParts.slice(1).join(" ") || " ";
 
-        // Ensure lastName is at least a space to satisfy 'required' validation if name is single word
-        if (!lastNameSync) lastNameSync = " ";
-
-        // Update User Model and Handle Password/Email Updates
+        // Update User Model
         try {
           const userObj = await User.findById(targetUserId);
           if (userObj) {
@@ -874,32 +661,21 @@ exports.updateProfile = async (req, res) => {
             if (email && email.trim() !== '') {
               const newEmail = email.trim().toLowerCase();
               if (newEmail !== userObj.email.toLowerCase()) {
-                // Determine if this new email is already taken
                 const existingUser = await User.findOne({ email: newEmail });
                 if (existingUser && existingUser._id.toString() !== userObj._id.toString()) {
-                  console.log(`[updateProfile] Cannot update email - ${newEmail} already taken`);
-                  return res.status(400).json({ success: false, message: `The email address ${newEmail} is already registered to another account` });
+                  return res.status(400).json({ success: false, message: `The email address ${newEmail} is already registered` });
                 }
-
-                console.log(`[updateProfile] Email changing from ${userObj.email} to ${newEmail}`);
                 userObj.email = newEmail;
-                newPassword = Math.random().toString(36).slice(-8); // Generate an 8-char secure password
+                newPassword = Math.random().toString(36).slice(-8);
                 userObj.password = newPassword;
                 emailChanged = true;
                 userFieldUpdated = true;
               }
             }
 
-            if (firstNameSync && firstNameSync !== userObj.firstName) {
-              userObj.firstName = firstNameSync;
-              userFieldUpdated = true;
-            }
-
-            if (lastNameSync !== undefined && lastNameSync !== userObj.lastName) {
-              userObj.lastName = lastNameSync;
-              userFieldUpdated = true;
-            }
-
+            if (firstNameSync !== userObj.firstName) { userObj.firstName = firstNameSync; userFieldUpdated = true; }
+            if (lastNameSync !== userObj.lastName) { userObj.lastName = lastNameSync; userFieldUpdated = true; }
+            
             const mobileInput = mobileNumber || profile.mobileNumber;
             if (mobileInput && mobileInput !== userObj.phone) {
               userObj.phone = mobileInput;
@@ -907,64 +683,24 @@ exports.updateProfile = async (req, res) => {
               userFieldUpdated = true;
             }
 
-            if (updatedData.socialLinks) {
-              userObj.socialMedia = updatedData.socialLinks;
-              userFieldUpdated = true;
-            }
+            if (updatedData.socialLinks) { userObj.socialMedia = updatedData.socialLinks; userFieldUpdated = true; }
+            if (updatedData.profilePhoto) { userObj.profilePhoto = updatedData.profilePhoto; userFieldUpdated = true; }
 
-            if (updatedData.profilePhoto) {
-              userObj.profilePhoto = updatedData.profilePhoto;
-              userFieldUpdated = true;
-            }
-
-            let loginNotificationSent = false;
             if (userFieldUpdated) {
               await userObj.save();
-              console.log(`[updateProfile] Synced data to User: ${targetUserId} (${userObj.firstName} ${userObj.lastName})`);
-
-              // If the email was updated, send credentials
               if (emailChanged) {
                 try {
                   const sendEmail = require("../../utils/sendEmail");
                   const { vendorUpdateEmail } = require("../../utils/sentEmail");
-                  await sendEmail(
-                    userObj.email,
-                    "Your BookMyEvent Portal Access Credentials (Updated)",
-                    vendorUpdateEmail(userObj, newPassword)
-                  );
-                  console.log(`[updateProfile] Sent updated credentials to ${userObj.email}`);
-                  loginNotificationSent = true;
-                } catch (emailErr) {
-                  console.error(`[updateProfile] Failed to send credentials email:`, emailErr.message);
-                }
+                  await sendEmail(userObj.email, "Updated Credentials", vendorUpdateEmail(userObj, newPassword));
+                } catch (e) {}
               }
             }
-
-            // Always send a notification if not already sent (only for vendors)
-            if (!loginNotificationSent) {
-              try {
-                const sendEmail = require("../../utils/sendEmail");
-                const { vendorProfileUpdateNotification } = require("../../utils/sentEmail");
-                await sendEmail(
-                  userObj.email,
-                  "Profile Updated Successfully",
-                  vendorProfileUpdateNotification(userObj)
-                );
-                console.log(`[updateProfile] Sent profile update notification to ${userObj.email}`);
-              } catch (emailErr) {
-                console.error(`[updateProfile] Failed to send profile update notification:`, emailErr.message);
-              }
-            }
-          } else {
-            console.warn(`[updateProfile] User not found for sync: ${targetUserId}`);
           }
-        } catch (userErr) {
-          console.error(`[updateProfile] User sync error:`, userErr.message);
-          return res.status(500).json({ success: false, message: "Failed to update user login details", error: userErr.message });
-        }
+        } catch (userErr) {}
 
         // Update VendorProfile Model
-         const vendorUpdateFields = {
+        const vendorUpdateFields = {
           storeName: rawName,
           ownerFirstName: firstNameSync,
           ownerLastName: lastNameSync,
@@ -975,51 +711,25 @@ exports.updateProfile = async (req, res) => {
           module: module || updatedData.module
         };
 
-        // Handle Zones sync
         if (zones || zone) {
-          let zonesArray = [];
-          if (zones) {
-            zonesArray = typeof zones === 'string' ? zones.split(',') : zones;
-          }
-          if (zone && !zonesArray.includes(zone)) {
-            zonesArray.push(zone);
-          }
-          // Filter out invalid IDs
+          let zonesArray = zones ? (typeof zones === 'string' ? zones.split(',') : zones) : [];
+          if (zone && !zonesArray.includes(zone)) zonesArray.push(zone);
           vendorUpdateFields.zones = zonesArray.filter(z => mongoose.Types.ObjectId.isValid(z));
         }
 
-        // Handle businessAddress sync
         if (businessAddress || profile.businessAddress) {
-          vendorUpdateFields.storeAddress = {
-            fullAddress: businessAddress || profile.businessAddress
-          };
+          vendorUpdateFields.storeAddress = { fullAddress: businessAddress || profile.businessAddress };
         }
 
         if (updatedData.storeAddress) vendorUpdateFields.storeAddress = updatedData.storeAddress;
         if (updatedData.profilePhoto) vendorUpdateFields.logo = updatedData.profilePhoto;
         if (updatedData.coverImage) vendorUpdateFields.coverImage = updatedData.coverImage;
 
-        try {
-          const updatedVendor = await VendorProfile.findOneAndUpdate(
-            { user: targetUserId },
-            { $set: vendorUpdateFields },
-            { new: true, upsert: false } // Only update if exists
-          );
-          if (updatedVendor) {
-            console.log(`[updateProfile] Synced data to VendorProfile for user: ${targetUserId} (Store: ${updatedVendor.storeName})`);
-          } else {
-            console.warn(`[updateProfile] VendorProfile not found for sync: ${targetUserId}. This is normal if they haven't registered a store yet.`);
-          }
-        } catch (vendorErr) {
-          console.error(`[updateProfile] VendorProfile sync error:`, vendorErr.message);
-        }
+        await VendorProfile.findOneAndUpdate({ user: targetUserId }, { $set: vendorUpdateFields });
       }
 
-      // Include zone in the response for vendor
       const finalResponse = profile.toObject();
-      const finalVendorProfile = await VendorProfile.findOne({ user: targetUserId })
-        .populate("zones", "name city");
-      
+      const finalVendorProfile = await VendorProfile.findOne({ user: targetUserId }).populate("zones", "name city");
       if (finalVendorProfile) {
         finalResponse.zones = finalVendorProfile.zones;
         finalResponse.zone = finalVendorProfile.zones?.[0] || null;
@@ -1027,20 +737,16 @@ exports.updateProfile = async (req, res) => {
 
       return res.status(200).json({
         success: true,
-        message: "Profile and linked records updated successfully",
+        message: "Profile updated successfully",
         data: finalResponse,
       });
     }
 
     // ✅ USER UPDATE
     if (role === "user") {
-      let targetUserId = id; // Default assumption
-
-      // Try to find profile and extract the actual User ID
+      let targetUserId = id;
       const profileDoc = await Profile.findById(id);
-      if (profileDoc && profileDoc.userId) {
-        targetUserId = profileDoc.userId;
-      }
+      if (profileDoc && profileDoc.userId) targetUserId = profileDoc.userId;
 
       const updateFields = {
         firstName: firstName || vendorName,
@@ -1052,36 +758,15 @@ exports.updateProfile = async (req, res) => {
       if (updatedData.profilePhoto) updateFields.profilePhoto = updatedData.profilePhoto;
 
       const user = await User.findByIdAndUpdate(targetUserId, updateFields, { new: true });
+      if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: "User not found",
-          debug: { attemptedUserId: targetUserId }
-        });
-      }
-
-      console.log(`[updateProfile] User profile updated successfully for user: ${targetUserId}`);
-      return res.status(200).json({
-        success: true,
-        message: "User profile updated successfully",
-        data: user,
-      });
+      return res.status(200).json({ success: true, message: "User updated successfully", data: user });
     }
 
-    return res.status(400).json({
-      success: false,
-      message: "Invalid request. Please provide a valid role (vendor or user)"
-    });
+    return res.status(400).json({ success: false, message: "Invalid role" });
 
   } catch (error) {
-    console.error("[updateProfile] Error:", error);
-    console.error("[updateProfile] Error stack:", error.stack);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -1091,7 +776,6 @@ exports.deleteProfile = async (req, res) => {
   try {
     const profile = await Profile.findByIdAndDelete(req.params.id);
     if (!profile) return res.status(404).json({ success: false, message: "Profile not found" });
-
     res.status(200).json({ success: true, message: "Profile deleted successfully" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -1105,8 +789,6 @@ exports.saveKyc = async (req, res) => {
   try {
     let { userId, personalInfo, documentInfo, bankDetails, data } = req.body;
 
-    // ✅ SUPPORT FOR SINGLE JSON PAYLOAD (Frontend/Postman Convenience)
-    // Allows sending { data: JSON_STRING, frontImage: FILE, backImage: FILE }
     if (data) {
       try {
         const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
@@ -1115,20 +797,16 @@ exports.saveKyc = async (req, res) => {
         documentInfo = parsedData.documentInfo || documentInfo;
         bankDetails = parsedData.bankDetails || bankDetails;
       } catch (err) {
-        return res.status(400).json({ success: false, message: "Invalid JSON format in 'data' field" });
+        return res.status(400).json({ success: false, message: "Invalid JSON" });
       }
     }
 
-    if (!userId) {
-      return res.status(400).json({ success: false, message: "User ID is required" });
-    }
+    if (!userId) return res.status(400).json({ success: false, message: "User ID required" });
 
-    // Parse JSON strings if they come as strings (from form-data)
     let parsedPersonalInfo = typeof personalInfo === 'string' ? JSON.parse(personalInfo) : personalInfo;
     let parsedDocumentInfo = typeof documentInfo === 'string' ? JSON.parse(documentInfo) : documentInfo;
     let parsedBankDetails = typeof bankDetails === 'string' ? JSON.parse(bankDetails) : bankDetails;
 
-    // Handle files
     const frontImage = req.files?.frontImage ? `/uploads/profiles/${req.files.frontImage[0].filename}` : null;
     const backImage = req.files?.backImage ? `/uploads/profiles/${req.files.backImage[0].filename}` : null;
 
@@ -1145,19 +823,10 @@ exports.saveKyc = async (req, res) => {
       }
     };
 
-    let profile = await Profile.findOneAndUpdate(
-      { userId },
-      updateData,
-      { new: true, upsert: true }
-    );
+    let profile = await Profile.findOneAndUpdate({ userId }, updateData, { new: true, upsert: true });
 
-    res.status(200).json({
-      success: true,
-      message: "KYC details submitted successfully",
-      data: profile.kycDetails
-    });
+    res.status(200).json({ success: true, message: "KYC submitted", data: profile.kycDetails });
   } catch (error) {
-    console.error("Save KYC Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -1166,27 +835,12 @@ exports.saveKyc = async (req, res) => {
 exports.getKyc = async (req, res) => {
   try {
     const { userId } = req.params;
-
-     if (!userId) {
-      return res.status(400).json({ success: false, message: "Provider ID is required" });
-    }
-
     const profile = await Profile.findOne({ userId });
-
     if (!profile || !profile.kycDetails) {
-      return res.status(404).json({
-        success: false,
-        message: "KYC details not found",
-        data: { status: 'not_submitted' }
-      });
+      return res.status(404).json({ success: false, message: "KYC not found", data: { status: 'not_submitted' } });
     }
-
-    res.status(200).json({
-      success: true,
-      data: profile.kycDetails
-    });
+    res.status(200).json({ success: true, data: profile.kycDetails });
   } catch (error) {
-    console.error("Get KYC Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -1197,10 +851,9 @@ exports.getProviderAdminDetails = async (req, res) => {
     const { providerId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(providerId)) {
-      return res.status(400).json({ success: false, message: "Invalid provider ID format" });
+      return res.status(400).json({ success: false, message: "Invalid provider ID" });
     }
 
-    // 1. Fetch Profile Data in Parallel
     const [user, profile, vendorProfile] = await Promise.all([
       User.findById(providerId).select("-password -refreshToken -otp"),
       Profile.findOne({ userId: providerId }),
@@ -1208,14 +861,11 @@ exports.getProviderAdminDetails = async (req, res) => {
         .populate("module", "title moduleId icon")
         .populate("services", "title")
         .populate("specialised", "title")
-        .populate("zones", "name description coordinates city country isActive isTopZone icon")
+        .populate("zones", "name description city country isActive isTopZone icon")
     ]);
 
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
-    // 2. Fetch Packages from all modules
     const [vehicles, cakes, catering, photography, venues, makeup, genericPackages, ornaments, boutiques, bouncers, emcees, eventpros, florists, invitations, lights, mehandis, panthals] = await Promise.all([
       Vehicle.find({ provider: providerId }).populate("category brand zone"),
       Cake.find({ provider: providerId }).populate("category module"),
@@ -1237,7 +887,6 @@ exports.getProviderAdminDetails = async (req, res) => {
       Panthal.find({ provider: providerId }).populate("services secondaryModule")
     ]);
 
-    // 3. Fetch Booking History
     const bookings = await Booking.find({ providerId: providerId })
       .populate("userId", "firstName lastName email phone")
       .populate("moduleId", "title icon")
@@ -1249,7 +898,6 @@ exports.getProviderAdminDetails = async (req, res) => {
       .populate("makeupId", "packageTitle thumbnail")
       .sort({ createdAt: -1 });
 
-    // 4. Construct Full Profile Response
     const fullProfile = {
       user,
       profile: profile || null,
@@ -1294,11 +942,7 @@ exports.getProviderAdminDetails = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Get Provider Admin Details Error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -1308,10 +952,9 @@ exports.getVendorCollectionDetails = async (req, res) => {
     const { providerId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(providerId)) {
-      return res.status(400).json({ success: false, message: "Invalid provider ID format" });
+      return res.status(400).json({ success: false, message: "Invalid provider ID" });
     }
 
-    // 1. Fetch data from all three models in parallel
     const [user, profile, vendorProfile] = await Promise.all([
       User.findById(providerId).select("firstName lastName email phone profilePhoto"),
       Profile.findOne({ userId: providerId }).select("-bankDetails -kycDetails"),
@@ -1321,11 +964,8 @@ exports.getVendorCollectionDetails = async (req, res) => {
         .populate("zones", "name description city country")
     ]);
 
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
-    // 2. Format the response data as requested
     const responseData = {
       user: {
         id: user._id,
@@ -1362,10 +1002,6 @@ exports.getVendorCollectionDetails = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Get Vendor Collection Details Error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
