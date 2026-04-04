@@ -6,6 +6,8 @@ const mongoose = require('mongoose');
 const User = require('../../models/User');
 const VendorProfile = require('../../models/vendor/vendorProfile');
 const Package = require('../../models/admin/Package');
+const Module = require('../../models/admin/module');
+const SecondaryModule = require('../../models/admin/secondarymodule');
 
 
 /**
@@ -26,6 +28,8 @@ exports.getAdminAllAroundReport = asyncHandler(async (req, res) => {
   const totalUsers = await User.countDocuments({ role: 'customer' });
   const totalVendors = await VendorProfile.countDocuments({ status: 'approved' });
   const pendingVendors = await VendorProfile.countDocuments({ status: 'pending' });
+  const totalModules = await Module.countDocuments();
+  const totalSecondaryModules = await SecondaryModule.countDocuments();
 
   // 2. Booking Lifecycle Stats
   const bookingLifecycle = await Booking.aggregate([
@@ -53,7 +57,9 @@ exports.getAdminAllAroundReport = asyncHandler(async (req, res) => {
       users: totalUsers,
       activeVendors: totalVendors,
       pendingApproval: pendingVendors,
-      platformPackages: corePackageCount
+      platformPackages: corePackageCount,
+      primaryModules: totalModules,
+      secondaryModules: totalSecondaryModules
     },
     bookings: bookingLifecycle,
     totalSubsRevenue: paymentStats[0]?.total || 0
