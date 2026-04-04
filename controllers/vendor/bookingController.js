@@ -2072,7 +2072,7 @@ exports.createBooking = async (req, res) => {
 
     // 📱 [WHATSAPP] CONFIRMATION TO USER
     if(booking.contactNumber) {
-      const userMsg = `🎉 Hello ${booking.fullName},\nYour booking for ${booking.moduleType} on ${new Date(booking.bookingDate).toDateString()} has been received! Our vendor will review it and confirm soon. \n\nBooking ID: ${booking._id}\nThank you for choosing BookMyEvent!`;
+      const userMsg = `✨ *Booking Received - BookMyEvent*\n\nHello ${booking.fullName},\n\nWe've received your booking request for *${booking.moduleType}* scheduled on *${new Date(booking.bookingDate).toDateString()}*.\n\n*Booking ID:* ${booking._id}\n\nOur vendor is currently reviewing your request. You'll receive another notification once it's confirmed.\n\nThank you for choosing *BookMyEvent*! 🎩🎉`;
       sendWhatsAppMessage(booking.contactNumber, userMsg);
     }
 
@@ -2674,7 +2674,7 @@ exports.acceptBooking = async (req, res) => {
 
     // 📱 [WHATSAPP] APPROVAL TO USER
     if(booking.contactNumber) {
-       const approveMsg = `✅ Hello ${booking.fullName},\nGreat news! Your booking for ${booking.moduleType} on ${new Date(booking.bookingDate).toDateString()} has been APPROVED by the vendor!\n\nBooking Details:\nID: ${booking._id}\nFinal Price: ₹${booking.finalPrice}\nAdvance Required: ₹${booking.advanceAmount}\n\nPlease proceed to complete your booking.\nThank you!`;
+       const approveMsg = `✅ *Booking Approved - BookMyEvent*\n\n🎉 Great news ${booking.fullName}!\n\nYour booking for *${booking.moduleType}* on *${new Date(booking.bookingDate).toDateString()}* has been *APPROVED* by the vendor!\n\n*Financial Details:*\n💰 Final Price: AED ${booking.finalPrice}\n💳 Advance Required: AED ${booking.advanceAmount}\n\n*Reference ID:* ${booking._id}\n\nPlease proceed to the portal to complete your payment and secure the date.\n\nThank you! ✨`;
        sendWhatsAppMessage(booking.contactNumber, approveMsg);
     }
 

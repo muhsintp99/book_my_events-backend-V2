@@ -10,9 +10,16 @@ const sendWhatsAppMessage = async (phoneNumber, message) => {
     const cleanNumber = phoneNumber.replace(/\D/g, "");
     
     // 🌍 Ensure number has country code (e.g., 91 for India, 971 for UAE)
-    // If it's 10 digits (India standard), we add 91 prefix.
     let finalNumber = cleanNumber;
-    if (cleanNumber.length === 10) {
+    
+    if (cleanNumber.length === 10 && cleanNumber.startsWith('0')) {
+      // UAE local format with leading zero: 05XXXXXXXX
+      finalNumber = "971" + cleanNumber.substring(1);
+    } else if (cleanNumber.length === 9 && cleanNumber.startsWith('5')) {
+      // UAE local format without zero: 5XXXXXXXX
+      finalNumber = "971" + cleanNumber;
+    } else if (cleanNumber.length === 10) {
+      // India standard: XXXXXXXXXX
       finalNumber = "91" + cleanNumber;
     }
 
