@@ -7,18 +7,41 @@ const upload = createUpload('coupons', { fileSizeMB: 2 });
 // ===== Get all coupons =====
 export const getAllCoupons = async (req, res) => {
   try {
-    const { page = 1, limit = 10, type, isActive, search, ownerType, vendorId } = req.query;
+    const { page = 1, limit = 10, type, isActive, search, ownerType, vendorId, packageId } = req.query;
 
     const filter = {};
     if (type) filter.type = type;
     if (isActive !== undefined) filter.isActive = isActive === 'true';
     if (ownerType) filter.ownerType = ownerType;
     if (vendorId) filter.vendorId = vendorId;
-    if (search) {
-      filter.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { code: { $regex: search, $options: 'i' } }
-      ];
+    
+    if (search || packageId) {
+      const andConditions = [];
+      
+      if (search) {
+        andConditions.push({
+          $or: [
+            { title: { $regex: search, $options: 'i' } },
+            { code: { $regex: search, $options: 'i' } }
+          ]
+        });
+      }
+      
+      if (packageId) {
+        const packageIdFilters = [
+          { linkedPackages: { $size: 0 } },
+          { linkedPackages: { $exists: false } },
+          { 'linkedPackages.packageId': packageId }
+        ];
+        if (mongoose.Types.ObjectId.isValid(packageId)) {
+          packageIdFilters.push({ 'linkedPackages.packageId': new mongoose.Types.ObjectId(packageId) });
+        }
+        andConditions.push({ $or: packageIdFilters });
+      }
+      
+      if (andConditions.length > 0) {
+        filter.$and = andConditions;
+      }
     }
 
     let query = Coupon.find(filter)
