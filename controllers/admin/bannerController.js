@@ -64,17 +64,18 @@ exports.getAllBanners = async (req, res) => {
       itemsPerPage: parseInt(limit),
     };
 
-    const response = paginatedResponse(
-      res,
-      { banners },
+    const responseData = {
+      success: true,
+      message: "Banners fetched successfully",
+      data: { banners },
       pagination,
-      "Banners fetched successfully"
-    );
+      timestamp: new Date().toISOString()
+    };
 
     // Cache for 5 minutes
-    setCache(cacheKey, response, 5);
+    setCache(cacheKey, responseData, 5);
 
-    return response;
+    return res.json(responseData);
   } catch (error) {
     console.error("Get banners error:", error);
     return errorResponse(res, "Error fetching banners", 500);

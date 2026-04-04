@@ -101,12 +101,13 @@ const verifyWhatsAppConnection = async () => {
         const url = `https://api.ultramsg.com/${INSTANCE_ID}/instance/status?token=${API_KEY}`;
         const res = await axios.get(url);
 
-        // ✅ UltraMsg can return 'authenticated' or 'active' when working
-        const status = res.data?.account_status;
+        // ✅ UltraMsg status check (authenticated / active / standby)
+        const status = res.data?.account_status || res.data?.status || 'Unknown';
+        
         if (status === "authenticated" || status === "active") {
             console.log(`✅ WhatsApp: UltraMsg Connected (${INSTANCE_ID})`);
         } else {
-            console.warn(`\n⚠️ WhatsApp: ${status || 'Disconnected'} - Please scan the QR code`);
+            console.warn(`\n⚠️ WhatsApp: Status is "${status}" (ID: ${res.data?.status_id || 'N/A'})`);
             console.warn(`🔗 DASHBOARD: https://ultramsg.com/dashboard/`);
             console.warn(`--------------------------------------------------\n`);
         }

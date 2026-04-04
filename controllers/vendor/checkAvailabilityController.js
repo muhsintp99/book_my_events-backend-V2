@@ -22,7 +22,7 @@ exports.checkAvailability = async (req, res) => {
       bookingDate,
       startDate,
       endDate,
-      timeSlot
+      timeSlot = "Morning"
     } = req.body;
 
     /* =========================
@@ -196,12 +196,8 @@ exports.checkAvailability = async (req, res) => {
       // Uses $or to check both possibilities without causing schema validation errors
 
       const timeQuery = {
-        $or: [
-          // Legacy format: timeSlot is a plain string
-          { timeSlot: { $regex: `^${timeSlot}$`, $options: "i" } },
-          // New format: timeSlot is an array of objects with label field
-          { "timeSlot.label": { $regex: `^${timeSlot}$`, $options: "i" } }
-        ]
+        // New format: timeSlot is an array of objects with label field
+        "timeSlot.label": { $regex: `^${timeSlot}$`, $options: "i" }
       };
 
       // Merge into conflictQuery
