@@ -43,3 +43,38 @@ exports.getWalletSummary = asyncHandler(async (req, res) => {
         recentTxCount: wallet?.transactions?.length || 0
     }, 'Wallet summary fetched');
 });
+
+/**
+ * REQUEST WITHDRAWAL
+ */
+exports.requestWithdrawal = asyncHandler(async (req, res) => {
+    const vendorId = req.user?._id;
+    const { amount, description } = req.body;
+
+    if (!amount || amount <= 0) return errorResponse(res, 'Invalid withdrawal amount', 400);
+
+    const wallet = await Wallet.findOne({ vendorId });
+    if (!wallet) return errorResponse(res, 'Wallet not found', 404);
+
+    if (wallet.balance < amount) {
+        return errorResponse(res, 'Insufficient balance for withdrawal', 400);
+    }
+
+    // Add debit transaction
+    const withdrawalTx = {
+        amount,
+        type: 'debit',
+        description: description || 'Payout request',
+        status: 'pending',
+        date: new Date()
+    };
+
+    wallet.transactions.push(withdrawalTx);
+    wallet.balance -= amount; // Deduct balance immediately upon request
+    await wallet.save();
+
+    return successResponse(res, {
+        balance: wallet.balance,
+        transaction: withdrawalTx
+    }, 'Withdrawal request submitted successfully');
+});

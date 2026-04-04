@@ -17,4 +17,11 @@ router.get('/', protect, walletController.getVendorWallet);
  */
 router.get('/summary', protect, walletController.getWalletSummary);
 
+/**
+ * @route   POST /api/vendor/wallet/withdrawal-request
+ * @desc    Submit withdrawal request (payout)
+ * @access  Private (Vendor)
+ */
+router.post('/withdrawal-request', protect, walletController.requestWithdrawal);
+
 module.exports = router;

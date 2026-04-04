@@ -25,7 +25,7 @@ exports.getAdminAllAroundReport = asyncHandler(async (req, res) => {
   }
 
   // 1. User/Vendor Totals
-  const totalUsers = await User.countDocuments({ role: 'customer' });
+  const totalUsers = await User.countDocuments({ role: 'user' });
   const totalVendors = await VendorProfile.countDocuments({ status: 'approved' });
   const pendingVendors = await VendorProfile.countDocuments({ status: 'pending' });
   const totalModules = await Module.countDocuments();
