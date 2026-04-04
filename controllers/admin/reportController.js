@@ -126,26 +126,36 @@ exports.getAdminPaymentReport = asyncHandler(async (req, res) => {
   }
 
   // 1. Subscription Revenue Summary
-  const subscriptionStats = await Payment.aggregate([
-    { $match: { ...filter, status: 'success' } },
-    { $group: { 
-        _id: null, 
-        total: { $sum: '$amount' },
-        count: { $sum: 1 }
+  let subscriptionStats = [];
+  try {
+    subscriptionStats = await Payment.aggregate([
+      { $match: { ...filter, status: 'success' } },
+      { $group: { 
+          _id: null, 
+          total: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
       }
-    }
-  ]);
+    ]);
+  } catch (err) {
+    console.error('Subscription aggregation failed:', err);
+  }
 
   // 2. Booking Revenue Summary
-  const bookingStats = await Booking.aggregate([
-    { $match: { ...filter, paymentStatus: 'completed' } },
-    { $group: { 
-        _id: null, 
-        total: { $sum: '$finalPrice' },
-        count: { $sum: 1 }
+  let bookingStats = [];
+  try {
+    bookingStats = await Booking.aggregate([
+      { $match: { ...filter, paymentStatus: 'completed' } },
+      { $group: { 
+          _id: null, 
+          total: { $sum: '$finalPrice' },
+          count: { $sum: 1 }
+        }
       }
-    }
-  ]);
+    ]);
+  } catch (err) {
+    console.error('Booking aggregation failed:', err);
+  }
 
   // 3. Monthly Breakdown (Last 12 Months)
   const twelveMonthsAgo = new Date();
