@@ -31,16 +31,49 @@ exports.createVendorProfile = async (req, res) => {
     }
 };
 
+const { getCache, setCache } = require("../../utils/cache");
+
 // ➤ Get All Vendors
 exports.getVendors = async (req, res) => {
     try {
-        const vendors = await VendorProfile.find().populate(populateFields);
-        res.status(200).json({ success: true, data: vendors });
+        const { page = 1, limit = 20, module, zone } = req.query;
+        
+        const cacheKey = `vendors_${JSON.stringify(req.query)}`;
+        const cachedData = getCache(cacheKey);
+        if (cachedData) return res.status(200).json(cachedData);
+
+        const filter = { status: "approved", isActive: true };
+        if (module) filter.module = module;
+        if (zone) filter.zones = zone;
+
+        const vendors = await VendorProfile.find(filter)
+            .populate(populateFields)
+            .limit(limit * 1)
+            .skip((page - 1) * limit)
+            .lean(); // Faster performance
+
+        const total = await VendorProfile.countDocuments(filter);
+        
+        const responseData = { 
+            success: true, 
+            data: vendors,
+            pagination: {
+                total,
+                page: parseInt(page),
+                pages: Math.ceil(total / limit)
+            }
+        };
+
+        // Cache for 2 minutes
+        setCache(cacheKey, responseData, 2);
+
+        res.status(200).json(responseData);
     } catch (error) {
         console.error("Error fetching vendors:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
 
 // ➤ Get Single Vendor (by vendor profile _id)
 exports.getVendor = async (req, res) => {

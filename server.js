@@ -587,6 +587,8 @@ app.use("/api/event-professional", require("./routes/vendor/eventProfessionalRou
 app.use("/api/premium-highlights", require("./routes/vendor/premiumVendorRoutes"));
 app.use("/api/admin/dashboard", require("./routes/admin/dashboardRoutes"));
 app.use("/api/event-requests", require("./routes/admin/eventRequestRouter"));
+app.use("/api/reports", require("./routes/admin/reportRoutes"));
+
 
 
 /**********************************************************
@@ -750,13 +752,9 @@ io.on("connection", (socket) => {
 /**********************************************************
  * GLOBAL ERROR HANDLER
  **********************************************************/
-app.use((err, req, res, next) => {
-  console.error("❌ Error:", err.message);
-  res.status(500).json({
-    success: false,
-    message: err.message || "Internal Server Error"
-  });
-});
+const errorHandler = require("./middlewares/errorHandler");
+app.use(errorHandler);
+
 
 /**********************************************************
  * START SERVER

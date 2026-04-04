@@ -20,6 +20,8 @@ const Florist = require("../../models/vendor/floristPackageModel");
 const Bouncer = require("../../models/vendor/bouncerPackageModel");
 const Emcee = require("../../models/vendor/emceePackageModel");
 const SecondaryModule = require("../../models/admin/secondarymodule");
+const { sendWhatsAppMessage } = require("../../utils/whatsapp");
+
 
 
 const AUTH_API_URL = "https://api.bookmyevent.ae/api/auth/login";
@@ -2068,6 +2070,12 @@ exports.createBooking = async (req, res) => {
     const booking = await Booking.create(bookingData);
     console.log("✅ Booking created:", booking._id);
 
+    // 📱 [WHATSAPP] CONFIRMATION TO USER
+    if(booking.contactNumber) {
+      const userMsg = `🎉 Hello ${booking.fullName},\nYour booking for ${booking.moduleType} on ${new Date(booking.bookingDate).toDateString()} has been received! Our vendor will review it and confirm soon. \n\nBooking ID: ${booking._id}\nThank you for choosing BookMyEvent!`;
+      sendWhatsAppMessage(booking.contactNumber, userMsg);
+    }
+
     // ✅ Increment coupon used count if coupon was used
     if (resolvedCoupon) {
       await Coupon.findByIdAndUpdate(resolvedCoupon._id, { $inc: { usedCount: 1 } });
@@ -2663,6 +2671,12 @@ exports.acceptBooking = async (req, res) => {
 
     booking.status = "Accepted";
     await booking.save();
+
+    // 📱 [WHATSAPP] APPROVAL TO USER
+    if(booking.contactNumber) {
+       const approveMsg = `✅ Hello ${booking.fullName},\nGreat news! Your booking for ${booking.moduleType} on ${new Date(booking.bookingDate).toDateString()} has been APPROVED by the vendor!\n\nBooking Details:\nID: ${booking._id}\nFinal Price: ₹${booking.finalPrice}\nAdvance Required: ₹${booking.advanceAmount}\n\nPlease proceed to complete your booking.\nThank you!`;
+       sendWhatsAppMessage(booking.contactNumber, approveMsg);
+    }
 
     const timeline = calculateTimeline(booking.bookingDate);
 
