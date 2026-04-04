@@ -347,6 +347,45 @@ const Subscription = require("../models/admin/Subscription");
 const Plan = require("../models/admin/Plan");
 const User = require("../models/User");
 const VendorProfile = require("../models/vendor/vendorProfile");
+const Wallet = require("../models/vendor/Wallet"); // Added Wallet model
+
+
+// Helper: Update Vendor Wallet on successful payment
+const updateVendorWallet = async (vendorId, amount, bookingId, description = "Booking payment") => {
+  try {
+    if (!vendorId) return;
+    
+    let wallet = await Wallet.findOne({ vendorId });
+    if (!wallet) {
+      wallet = new Wallet({ vendorId, balance: 0, transactions: [] });
+    }
+
+    // Check if this bookingId already has a 'credit' transaction to prevent duplicates
+    const isDuplicate = wallet.transactions.some(tx => 
+        tx.bookingId?.toString() === bookingId?.toString() && tx.type === 'credit'
+    );
+
+    if (isDuplicate) {
+        console.log("⚠️ Duplicate wallet credit attempt for booking:", bookingId);
+        return;
+    }
+
+    wallet.balance += Number(amount);
+    wallet.transactions.push({
+      bookingId,
+      amount: Number(amount),
+      type: 'credit',
+      description,
+      status: 'completed',
+      date: new Date()
+    });
+
+    await wallet.save();
+    console.log(`✅ Wallet updated for vendor ${vendorId}: +₹${amount}`);
+  } catch (err) {
+    console.error("❌ Error updating vendor wallet:", err.message);
+  }
+};
 
 
 
@@ -397,7 +436,6 @@ exports.testConnection = async (req, res) => {
     });
   }
 };
-
 /**
  * CREATE PAYMENT SESSION (SmartGateway Payment Page)
  */
@@ -725,11 +763,22 @@ exports.juspayWebhook = async (req, res) => {
 
     if (booking) {
       if (status === "CHARGED") {
+        const alreadyCompleted = (booking.paymentStatus === "completed");
         booking.paymentStatus = "completed";
 
         if (FULL_PAYMENT_MODULES.includes(booking.moduleType)) {
           booking.paidAmount = booking.finalPrice;
           booking.remainingAmount = 0;
+        }
+
+        // Add to wallet if this is the first success
+        if (!alreadyCompleted) {
+          await updateVendorWallet(
+            booking.providerId, 
+            booking.paidAmount || booking.finalPrice, 
+            booking._id,
+            `User payment for booking #${booking._id.toString().slice(-6).toUpperCase()}`
+          );
         }
       } else if (["AUTHENTICATION_FAILED", "AUTHORIZATION_FAILED", "JUSPAY_DECLINED", "AUTO_REFUNDED"].includes(status)) {
         booking.paymentStatus = "cancelled";
@@ -847,9 +896,19 @@ exports.verifyBookingPayment = async (req, res) => {
     // ✅ SUCCESS
     if (order.status === "CHARGED") {
       if (booking) {
+        const alreadyCompleted = (booking.paymentStatus === "completed");
         booking.paymentStatus = "completed";
         booking.paidAmount = order.amount;
         await booking.save();
+
+        if (!alreadyCompleted) {
+          await updateVendorWallet(
+            booking.providerId, 
+            order.amount, 
+            booking._id,
+            `User payment for booking #${booking._id.toString().slice(-6).toUpperCase()}`
+          );
+        }
       }
 
       return res.json({

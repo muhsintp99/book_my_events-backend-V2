@@ -588,6 +588,7 @@ app.use("/api/premium-highlights", require("./routes/vendor/premiumVendorRoutes"
 app.use("/api/admin/dashboard", require("./routes/admin/dashboardRoutes"));
 app.use("/api/event-requests", require("./routes/admin/eventRequestRouter"));
 app.use("/api/reports", require("./routes/admin/reportRoutes"));
+app.use("/api/vendor/wallet", require("./routes/vendor/walletRoutes"));
 
 
 
