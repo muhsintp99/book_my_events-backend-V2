@@ -697,7 +697,9 @@ exports.updateProfile = async (req, res) => {
               }
             }
           }
-        } catch (userErr) {}
+        } catch (userErr) {
+          console.error("[updateProfile] User sync error:", userErr.message);
+        }
 
         // Update VendorProfile Model
         const vendorUpdateFields = {
@@ -708,24 +710,55 @@ exports.updateProfile = async (req, res) => {
           latitude: latitude || updatedData.latitude,
           longitude: longitude || updatedData.longitude,
           bio: updatedData.bio || profile.bio,
-          module: module || updatedData.module
+          bankDetails: updatedData.bankDetails || profile.bankDetails,
+          module: module || updatedData.module,
+          vendorType: vendorType || updatedData.vendorType,
+          maxBookings: maxBookings || updatedData.maxBookings,
+          startingPrice: startingPrice || updatedData.startingPrice,
+          minBookingPrice: minBookingPrice || updatedData.minBookingPrice
         };
+
+        // Handle Specialized & Services (Must be valid ObjectIds)
+        if (specialised && mongoose.Types.ObjectId.isValid(specialised)) {
+          vendorUpdateFields.specialised = specialised;
+        }
+
+        if (services) {
+          let sArray = Array.isArray(services) ? services : (typeof services === 'string' ? services.split(',') : []);
+          vendorUpdateFields.services = sArray.filter(s => mongoose.Types.ObjectId.isValid(s.trim()));
+        }
+
+        // Determine Module Type automatically if not provided
+        if (module) {
+           const Module = require("../../models/admin/module");
+           const isPrimary = await Module.findById(module);
+           vendorUpdateFields.moduleType = isPrimary ? "Module" : "SecondaryModule";
+        }
 
         if (zones || zone) {
           let zonesArray = zones ? (typeof zones === 'string' ? zones.split(',') : zones) : [];
           if (zone && !zonesArray.includes(zone)) zonesArray.push(zone);
-          vendorUpdateFields.zones = zonesArray.filter(z => mongoose.Types.ObjectId.isValid(z));
+          vendorUpdateFields.zones = zonesArray.filter(z => mongoose.Types.ObjectId.isValid(z.trim()));
         }
 
         if (businessAddress || profile.businessAddress) {
-          vendorUpdateFields.storeAddress = { fullAddress: businessAddress || profile.businessAddress };
+          vendorUpdateFields.storeAddress = { fullAddress: (businessAddress || profile.businessAddress).trim() };
         }
 
         if (updatedData.storeAddress) vendorUpdateFields.storeAddress = updatedData.storeAddress;
         if (updatedData.profilePhoto) vendorUpdateFields.logo = updatedData.profilePhoto;
         if (updatedData.coverImage) vendorUpdateFields.coverImage = updatedData.coverImage;
 
-        await VendorProfile.findOneAndUpdate({ user: targetUserId }, { $set: vendorUpdateFields });
+        try {
+           await VendorProfile.findOneAndUpdate(
+             { user: targetUserId }, 
+             { $set: vendorUpdateFields },
+             { new: true }
+           );
+           console.log(`[updateProfile] Synced data to VendorProfile for user: ${targetUserId}`);
+        } catch (vErr) {
+           console.error("[updateProfile] VendorProfile sync error:", vErr.message);
+        }
       }
 
       const finalResponse = profile.toObject();
@@ -737,7 +770,7 @@ exports.updateProfile = async (req, res) => {
 
       return res.status(200).json({
         success: true,
-        message: "Profile updated successfully",
+        message: "Profile updated successfully across all systems",
         data: finalResponse,
       });
     }

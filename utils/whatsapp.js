@@ -4,50 +4,126 @@ const axios = require("axios");
  * WhatsApp Utility to send messages using UltraMsg API.
  * Update your .env with WHATSAPP_API_URL and WHATSAPP_API_KEY.
  */
-const sendWhatsAppMessage = async (phoneNumber, message) => {
+
+/**
+ * WhatsApp Utility using UltraMsg API (Config Pattern)
+ * @param {string} phoneNumber - Recipient's phone number
+ * @param {string} message - Message body
+ * @param {number} priority - Message priority (1-10, default 10)
+ */
+const sendWhatsAppMessage = async (phoneNumber, message, priority = 10) => {
   try {
-    // 🧹 Clean the phone number (keep only digits)
+    // 🧹 Clean and Format phone number
     const cleanNumber = phoneNumber.replace(/\D/g, "");
-    
-    // 🌍 Ensure number has country code (e.g., 91 for India, 971 for UAE)
     let finalNumber = cleanNumber;
     
     if (cleanNumber.length === 10 && cleanNumber.startsWith('0')) {
-      // UAE local format with leading zero: 05XXXXXXXX
       finalNumber = "971" + cleanNumber.substring(1);
     } else if (cleanNumber.length === 9 && cleanNumber.startsWith('5')) {
-      // UAE local format without zero: 5XXXXXXXX
       finalNumber = "971" + cleanNumber;
     } else if (cleanNumber.length === 10) {
-      // India standard: XXXXXXXXXX
       finalNumber = "91" + cleanNumber;
     }
 
-    const API_URL = process.env.WHATSAPP_API_URL;
+    const INSTANCE_ID = process.env.WHATSAPP_INSTANCE_ID;
     const API_KEY = process.env.WHATSAPP_API_KEY;
 
-    if (!API_URL || !API_KEY) {
-      console.warn("⚠️ WhatsApp API not configured in .env");
+    if (!INSTANCE_ID || !API_KEY) {
+      console.warn("⚠️ WhatsApp API credentials missing in .env");
       return { success: false, message: "API not configured" };
     }
 
-    // 🚀 UltraMsg requires: token, to, and body
-    const payload = {
-      token: API_KEY,
-      to: finalNumber,
-      body: message
+    // 🔗 Format data for x-www-form-urlencoded
+    const data = new URLSearchParams();
+    data.append('token', API_KEY);
+    data.append('to', finalNumber);
+    data.append('body', message);
+    data.append('priority', priority.toString()); // ✅ Added priority
+
+    const config = {
+      method: 'post',
+      url: `https://api.ultramsg.com/${INSTANCE_ID}/messages/chat`,
+      headers: { 
+        'Content-Type': 'application/x-www-form-urlencoded' 
+      },
+      data: data
     };
 
-    console.log(`📱 Sending UltraMsg to ${finalNumber}: ${message.substring(0, 50)}...`);
+    console.log(`📱 Sending WhatsApp to ${finalNumber}...`);
 
-    const response = await axios.post(API_URL, payload);
-
-    console.log("✅ Message Status:", response.data);
+    const response = await axios(config);
+    
+    console.log("✅ UltraMsg Status:", response.data);
     return { success: true, data: response.data };
+
   } catch (error) {
-    console.error("❌ Send Error:", error.response ? error.response.data : error.message);
-    return { success: false, error: error.message };
+    const errorMsg = error.response ? error.response.data : error.message;
+    console.error("❌ WhatsApp Error:", errorMsg);
+    return { success: false, error: errorMsg };
   }
 };
 
-module.exports = { sendWhatsAppMessage };
+/**
+ * Fetch Message Status/History from UltraMsg
+ * @param {string} statusFilter - 'all' | 'queue' | 'sent' | 'unsent' | 'invalid' | 'expired'
+ */
+const getWhatsAppMessageStatus = async (statusFilter = 'all', page = 1, limit = 100) => {
+    try {
+        const INSTANCE_ID = process.env.WHATSAPP_INSTANCE_ID;
+        const API_KEY = process.env.WHATSAPP_API_KEY;
+
+        let url = `https://api.ultramsg.com/${INSTANCE_ID}/messages?token=${API_KEY}&page=${page}&limit=${limit}`;
+        if (statusFilter !== 'all') {
+            url += `&status=${statusFilter}`;
+        }
+
+        const response = await axios.get(url);
+        return { success: true, data: response.data };
+    } catch (error) {
+        console.error("❌ WhatsApp Status Fetch Error:", error.message);
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * Verify WhatsApp Connection (UltraMsg Instance Status)
+ */
+const verifyWhatsAppConnection = async () => {
+    try {
+        const INSTANCE_ID = process.env.WHATSAPP_INSTANCE_ID;
+        const API_KEY = process.env.WHATSAPP_API_KEY;
+
+        if (!INSTANCE_ID || !API_KEY) {
+            console.warn("⚠️ WhatsApp: Instance or API Key missing in .env");
+            return;
+        }
+
+        const url = `https://api.ultramsg.com/${INSTANCE_ID}/instance/status?token=${API_KEY}`;
+        const res = await axios.get(url);
+
+        // ✅ UltraMsg can return 'authenticated' or 'active' when working
+        const status = res.data?.account_status;
+        if (status === "authenticated" || status === "active") {
+            console.log(`✅ WhatsApp: UltraMsg Connected (${INSTANCE_ID})`);
+        } else {
+            console.warn(`\n⚠️ WhatsApp: ${status || 'Disconnected'} - Please scan the QR code`);
+            console.warn(`🔗 DASHBOARD: https://ultramsg.com/dashboard/`);
+            console.warn(`--------------------------------------------------\n`);
+        }
+    } catch (err) {
+        if (err.response && err.response.status === 401) {
+            console.error("❌ WhatsApp: Invalid UltraMsg Token in .env");
+        } else {
+            console.error("❌ WhatsApp Connection Error:", err.message);
+        }
+    }
+};
+
+// Auto-verify on load
+verifyWhatsAppConnection();
+
+module.exports = { 
+  sendWhatsAppMessage, 
+  getWhatsAppMessageStatus, 
+  verifyWhatsAppConnection 
+};
