@@ -1689,6 +1689,20 @@ exports.createBooking = async (req, res) => {
         break;
 
       default:
+        // 🔄 [UNIVERSAL FALLBACK] FOR ANY NEW SECONDARY MODULES
+        console.log(`🔄 Attempting universal package lookup for module: ${moduleType}`);
+        const UniversalPackage = require("../../models/admin/Package");
+        
+        // Search by packageId or the provided id
+        serviceProvider = await UniversalPackage.findById(req.body.packageId || packageId).lean();
+        
+        if (serviceProvider) {
+          console.log(`✅ Found universal package: ${serviceProvider.title}`);
+          pricing.basePrice = Number(serviceProvider.price) || 0;
+          pricing.advanceAmount = Number(serviceProvider.advanceAmount) || 0;
+          break;
+        }
+
         return res.status(400).json({
           success: false,
           message: `Unsupported module ${moduleType}`,
@@ -2672,10 +2686,38 @@ exports.acceptBooking = async (req, res) => {
     booking.status = "Accepted";
     await booking.save();
 
+    // Prepare Detailed Message
+    const bookingDetails = `
+*Module:* ${booking.moduleType}
+*Date:* ${new Date(booking.bookingDate).toDateString()}
+*Slot:* ${Array.isArray(booking.timeSlot) ? booking.timeSlot.map(s => s.label).join(', ') : (booking.timeSlot?.label || booking.timeSlot || 'N/A')}
+*Price:* AED ${booking.finalPrice}
+*Reference:* ${booking._id}
+`.trim();
+
+    const approveMsg = `✅ *Your booking approved!*\n\n${bookingDetails}\n\nPlease proceed to complete the payment to secure your date. ✨`;
+
     // 📱 [WHATSAPP] APPROVAL TO USER
-    if(booking.contactNumber) {
-       const approveMsg = `✅ *Booking Approved - BookMyEvent*\n\n🎉 Great news ${booking.fullName}!\n\nYour booking for *${booking.moduleType}* on *${new Date(booking.bookingDate).toDateString()}* has been *APPROVED* by the vendor!\n\n*Financial Details:*\n💰 Final Price: AED ${booking.finalPrice}\n💳 Advance Required: AED ${booking.advanceAmount}\n\n*Reference ID:* ${booking._id}\n\nPlease proceed to the portal to complete your payment and secure the date.\n\nThank you! ✨`;
-       sendWhatsAppMessage(booking.contactNumber, approveMsg);
+    if (booking.contactNumber) {
+        sendWhatsAppMessage(booking.contactNumber, approveMsg);
+    }
+
+    // 💬 [INTERNAL CHAT] MESSAGE TO USER
+    if (booking.conversationId && mongoose.Types.ObjectId.isValid(booking.conversationId)) {
+        try {
+            const ChatMessage = require("../../models/chat/ChatMessage");
+            await ChatMessage.create({
+                enquiryId: booking.conversationId,
+                senderId: booking.providerId,
+                receiverId: booking.userId,
+                message: `✅ Your booking has been approved!\n\n${bookingDetails}`,
+                senderRole: "vendor",
+                timestamp: new Date().toISOString()
+            });
+            console.log(`💬 Internal approval message sent for booking ${booking._id}`);
+        } catch (chatError) {
+            console.error("Error sending internal chat message:", chatError);
+        }
     }
 
     const timeline = calculateTimeline(booking.bookingDate);
