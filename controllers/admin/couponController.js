@@ -230,8 +230,7 @@ export const createCoupon = async (req, res) => {
         moduleId,
         ownerType = 'admin',
         vendorId,
-        linkedPackages,
-        applyTo = 'total'
+        linkedPackages
       } = req.body;
 
       // Validate required fields
@@ -266,7 +265,7 @@ export const createCoupon = async (req, res) => {
         ownerType,
         vendorId: vendorId || undefined,
         linkedPackages: Array.isArray(linkedPackages) ? linkedPackages : [],
-        applyTo
+        applyTo: 'total'
       };
 
       if (req.file) {
