@@ -148,7 +148,7 @@ exports.getAdminPaymentReport = asyncHandler(async (req, res) => {
   const monthlyBreakdown = await Booking.aggregate([
     { $match: { createdAt: { $gte: twelveMonthsAgo }, paymentStatus: 'completed' } },
     { $group: { 
-        _id: { $month: '$createdAt', $year: '$createdAt' },
+        _id: { month: { $month: '$createdAt' }, year: { $year: '$createdAt' } },
         revenue: { $sum: '$finalPrice' },
         orders: { $sum: 1 }
       }
@@ -215,12 +215,12 @@ exports.getVendorPaymentReport = asyncHandler(async (req, res) => {
   const monthlyEarnings = await Booking.aggregate([
     { $match: { providerId: vId, paymentStatus: 'completed' } },
     { $group: { 
-        _id: { $month: '$createdAt' },
+        _id: { month: { $month: '$createdAt' }, year: { $year: '$createdAt' } },
         earnings: { $sum: '$finalPrice' },
         bookings: { $sum: 1 }
       }
     },
-    { $sort: { '_id': 1 } }
+    { $sort: { '_id.year': 1, '_id.month': 1 } }
   ]);
 
   // 4. Recent Transactions for this Vendor
