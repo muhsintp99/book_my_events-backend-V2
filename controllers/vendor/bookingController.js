@@ -1852,7 +1852,12 @@ exports.createBooking = async (req, res) => {
       let applyTarget = (resolvedCoupon.applyTo || "total");
 
       // For specific modules, ALWAYS apply to total as per user requirement
-      const restrictedModules = ["cake", "ornament", "ornaments", "boutique", "boutiques", "mehandi", "mehandi artist"];
+      const restrictedModules = [
+        "cake", "ornament", "ornaments", "boutique", "boutiques", 
+        "mehandi", "mehandi artist", "makeup", "makeup artist", 
+        "photography", "catering", "invitation", "invitation & printing", 
+        "printing", "florist", "florist & stage"
+      ];
       if (restrictedModules.includes((moduleType || "").toLowerCase())) {
         applyTarget = "total";
       }
@@ -1874,7 +1879,12 @@ exports.createBooking = async (req, res) => {
     let finalPrice = Math.max(totalPriceBeforeCoupon - couponDiscountValue, 0);
 
     // If applyTo is 'advance', specifically subtract from the advance field
-    if (resolvedCoupon && resolvedCoupon.applyTo === "advance" && !["mehandi", "mehandi artist"].includes((moduleType || "").toLowerCase())) {
+    const applyToAdvanceBlockedModules = [
+      "mehandi", "mehandi artist", "makeup", "makeup artist", 
+      "photography", "catering", "invitation", "invitation & printing", 
+      "printing", "florist", "florist & stage"
+    ];
+    if (resolvedCoupon && resolvedCoupon.applyTo === "advance" && !applyToAdvanceBlockedModules.includes((moduleType || "").toLowerCase())) {
         advanceAmount = Math.max(advanceAmount - couponDiscountValue, 0);
     } else if (resolvedCoupon) {
         // For percentage-based systems, we recalculate the percentage of the newly discounted final price.
