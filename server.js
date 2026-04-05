@@ -582,8 +582,8 @@ app.use("/api/florist", require("./routes/vendor/floristRoutes"));
 app.use("/api/light-and-sound", require("./routes/vendor/lightAndSoundPackageRoutes"));
 app.use("/api/bouncers-security", require("./routes/vendor/bouncerRoutes"));
 app.use("/api/emcee", require("./routes/vendor/emceeRoutes"));
-app.use("/api/panthal-decoration", require("./routes/vendor/panthalDecorationRoutes"));
 app.use("/api/secondary-package", require("./routes/vendor/secondaryModulePackageRoutes"));
+app.use("/api/admin/secondary-package", require("./routes/admin/secondaryModulePackageAdminRoutes")); // ✅ NEW: Admin management
 app.use("/api/event-professional", require("./routes/vendor/eventProfessionalRoutes"));
 app.use("/api/premium-highlights", require("./routes/vendor/premiumVendorRoutes"));
 app.use("/api/admin/dashboard", require("./routes/admin/dashboardRoutes"));

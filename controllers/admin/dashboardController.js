@@ -51,6 +51,9 @@ const getPackageCount = async (moduleTitle, moduleId) => {
   else if (title.includes('catering')) model = Catering;
   else if (title.includes('vehicle') || title.includes('transport')) model = Vehicle;
 
+  // ✅ FALLBACK: If no specialized model, use the Universal Package system
+  if (!model) model = Package;
+
   if (!model) return 0;
 
   try {
@@ -505,7 +508,7 @@ exports.getNotifications = async (req, res) => {
 
 // 4. Multiple Package Models Detection
     const packageModels = [
-      { model: Package, name: 'Venue' },
+      { model: Package, name: 'Modular/Venue' },
       { model: require('../../models/admin/makeupPackageModel'), name: 'Makeup' },
       { model: require('../../models/vendor/PhotographyPackage'), name: 'Photography' },
       { model: require('../../models/vendor/floristPackageModel'), name: 'Florist' },
