@@ -1827,7 +1827,8 @@ exports.createBooking = async (req, res) => {
     // [PHASE 2] Calculate BASE Advance Amount (before coupon)
     let advanceAmount = 0;
     if (moduleType === "Catering") {
-      advanceAmount = Math.round(totalPriceBeforeCoupon * 0.10);
+      const advPct = Number(serviceProvider.advancePercentage || 10);
+      advanceAmount = Math.round(totalPriceBeforeCoupon * (advPct / 100));
     } else {
       advanceAmount = Number(
         moduleType === "Venues"
@@ -1884,7 +1885,8 @@ exports.createBooking = async (req, res) => {
         );
         
         if (moduleType === "Catering" || !hasFixedAdvance) {
-            advanceAmount = Math.round(finalPrice * 0.10);
+            const advPct = Number(serviceProvider.advancePercentage || 10);
+            advanceAmount = Math.round(finalPrice * (advPct / 100));
         }
     }
 

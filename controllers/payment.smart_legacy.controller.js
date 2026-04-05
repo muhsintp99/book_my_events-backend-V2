@@ -484,8 +484,8 @@ exports.createSmartGatewayPayment = async (req, res) => {
         }
 
         if (booking.moduleType === "Catering") {
-          amountToPay =
-            Number(booking.cateringId?.advanceBookingAmount) || 0;
+          const advPct = Number(booking.cateringId?.advancePercentage || 10);
+          amountToPay = Math.round(Number(booking.finalPrice || 0) * (advPct / 100));
         }
 
         if (
