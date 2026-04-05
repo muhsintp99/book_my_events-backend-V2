@@ -116,6 +116,7 @@ exports.createMakeupPackage = async (req, res) => {
       cancellationPolicy,
       providerId,
       basicAddOns,
+      advancePercentage,
       createdBy
     } = req.body;
 
@@ -158,6 +159,7 @@ exports.createMakeupPackage = async (req, res) => {
       trialMakeupIncluded,
       travelToVenue,
       advanceBookingAmount,
+      advancePercentage: Number(advancePercentage || 10),
       cancellationPolicy,
       gallery,
       provider: providerId,
@@ -298,6 +300,7 @@ exports.updateMakeupPackage = async (req, res) => {
       advanceBookingAmount,
       cancellationPolicy,
       basicAddOns,
+      advancePercentage,
       updatedBy
     } = req.body;
 
@@ -331,6 +334,7 @@ exports.updateMakeupPackage = async (req, res) => {
     if (travelToVenue !== undefined) makeup.travelToVenue = travelToVenue;
 
     if (advanceBookingAmount) makeup.advanceBookingAmount = advanceBookingAmount;
+    if (advancePercentage !== undefined) makeup.advancePercentage = Number(advancePercentage);
     if (cancellationPolicy) makeup.cancellationPolicy = cancellationPolicy;
 
     makeup.updatedBy = updatedBy || makeup.updatedBy;

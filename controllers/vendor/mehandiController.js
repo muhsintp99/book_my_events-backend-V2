@@ -30,6 +30,7 @@ exports.createMehandiPackage = async (req, res) => {
             description,
             packagePrice,
             advanceBookingAmount,
+            advancePercentage,
             services,
         } = req.body;
 
@@ -82,6 +83,7 @@ exports.createMehandiPackage = async (req, res) => {
             description,
             packagePrice,
             advanceBookingAmount,
+            advancePercentage: Number(advancePercentage || 10),
             services: parsedServices,
             image,
         });
@@ -914,6 +916,7 @@ exports.updateMehandiPackage = async (req, res) => {
             description,
             packagePrice,
             advanceBookingAmount,
+            advancePercentage,
             services,
             updatedBy,
         } = req.body;
@@ -921,7 +924,8 @@ exports.updateMehandiPackage = async (req, res) => {
         if (packageName) pkg.packageName = packageName;
         if (description) pkg.description = description;
         if (packagePrice) pkg.packagePrice = packagePrice;
-        if (advanceBookingAmount) pkg.advanceBookingAmount = advanceBookingAmount;
+        if (advanceBookingAmount !== undefined) pkg.advanceBookingAmount = advanceBookingAmount;
+        if (advancePercentage !== undefined) pkg.advancePercentage = Number(advancePercentage);
 
         if (services) {
             let parsedServices = [];

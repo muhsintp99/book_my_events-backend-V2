@@ -75,6 +75,7 @@ exports.createPhotographyPackage = async (req, res) => {
       price,
       travelToVenue,
       advanceBookingAmount,
+      advancePercentage,
       cancellationPolicy,
       providerId,
       createdBy
@@ -113,6 +114,7 @@ exports.createPhotographyPackage = async (req, res) => {
       price,
       travelToVenue: travelToVenue === "true" || travelToVenue === true,
       advanceBookingAmount,
+      advancePercentage: Number(advancePercentage || 10),
       cancellationPolicy,
       gallery,
       provider: providerId,
@@ -270,6 +272,7 @@ exports.updatePhotographyPackage = async (req, res) => {
       price,
       travelToVenue,
       advanceBookingAmount,
+      advancePercentage,
       cancellationPolicy,
       updatedBy
     } = req.body;
@@ -295,6 +298,7 @@ exports.updatePhotographyPackage = async (req, res) => {
 
     if (travelToVenue !== undefined) pkg.travelToVenue = travelToVenue === "true" || travelToVenue === true;
     if (advanceBookingAmount !== undefined) pkg.advanceBookingAmount = advanceBookingAmount;
+    if (advancePercentage !== undefined) pkg.advancePercentage = Number(advancePercentage);
     if (cancellationPolicy !== undefined) pkg.cancellationPolicy = cancellationPolicy;
 
     pkg.updatedBy = updatedBy || pkg.updatedBy;

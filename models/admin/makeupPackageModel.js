@@ -60,6 +60,7 @@ const MakeupSchema = new mongoose.Schema(
     trialMakeupIncluded: { type: Boolean, default: false },
     travelToVenue: { type: Boolean, default: false },
     advanceBookingAmount: { type: String },
+    advancePercentage: { type: Number, default: 10, min: 0, max: 100 },
     cancellationPolicy: { type: String },
 
     provider: {

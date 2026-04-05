@@ -40,6 +40,7 @@ exports.createInvitationPackage = async (req, res) => {
             description,
             packagePrice,
             advanceBookingAmount,
+            advancePercentage,
             services,
         } = req.body;
 
@@ -98,6 +99,7 @@ exports.createInvitationPackage = async (req, res) => {
             description,
             packagePrice,
             advanceBookingAmount,
+            advancePercentage: Number(advancePercentage || 10),
             services: parsedServices,
             thumbnail,
             images,
@@ -693,6 +695,7 @@ exports.updateInvitationPackage = async (req, res) => {
             description,
             packagePrice,
             advanceBookingAmount,
+            advancePercentage,
             services,
             updatedBy,
         } = req.body;
@@ -700,7 +703,8 @@ exports.updateInvitationPackage = async (req, res) => {
         if (packageName) pkg.packageName = packageName;
         if (description) pkg.description = description;
         if (packagePrice) pkg.packagePrice = packagePrice;
-        if (advanceBookingAmount) pkg.advanceBookingAmount = advanceBookingAmount;
+        if (advanceBookingAmount !== undefined) pkg.advanceBookingAmount = advanceBookingAmount;
+        if (advancePercentage !== undefined) pkg.advancePercentage = Number(advancePercentage);
 
         if (services) {
             let parsedServices = [];

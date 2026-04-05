@@ -51,6 +51,7 @@ const PhotographySchema = new mongoose.Schema(
 
     travelToVenue: { type: Boolean, default: false },
     advanceBookingAmount: { type: String, default: "" },
+    advancePercentage: { type: Number, default: 10, min: 0, max: 100 },
     cancellationPolicy: { type: String, default: "" },
 
     gallery: [{ type: String }],

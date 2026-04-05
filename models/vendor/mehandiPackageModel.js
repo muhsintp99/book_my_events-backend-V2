@@ -42,6 +42,12 @@ const mehandiPackageSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    advancePercentage: {
+       type: Number,
+       default: 10,
+       min: 0,
+       max: 100
+    },
 
     image: {
       type: String,
