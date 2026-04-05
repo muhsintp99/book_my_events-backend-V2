@@ -1877,16 +1877,15 @@ exports.createBooking = async (req, res) => {
     if (resolvedCoupon && resolvedCoupon.applyTo === "advance") {
         advanceAmount = Math.max(advanceAmount - couponDiscountValue, 0);
     } else if (resolvedCoupon && resolvedCoupon.applyTo === "total") {
-        // For percentage-based systems (Catering or any module with NO fixed advance), re-calculate 10%
-        const hasFixedAdvance = !!(
-            moduleType === "Venues" ? serviceProvider.advanceDeposit : 
-            moduleType === "Cake" ? serviceProvider.priceInfo?.advanceBookingAmount :
-            serviceProvider.advanceBookingAmount
-        );
-        
-        if (moduleType === "Catering" || !hasFixedAdvance) {
-            const advPct = Number(serviceProvider.advancePercentage || 10);
+        // For percentage-based systems, we recalculate the percentage of the newly discounted final price.
+        // If there's a strict fixed amount without a valid percentage, retain the fixed advance or clamp to finalPrice.
+        const pctString = serviceProvider.advancePercentage;
+        if (pctString !== undefined && pctString !== null && pctString !== "") {
+            const advPct = Number(pctString);
             advanceAmount = Math.round(finalPrice * (advPct / 100));
+        } else {
+             // Clamping absolute advance so it cannot exceed the new discounted final price
+             advanceAmount = Math.min(advanceAmount, finalPrice);
         }
     }
 
