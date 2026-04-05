@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Venue = require("../../models/vendor/Venue");
+const Booking = require("../../models/vendor/Booking");
 const Category = require("../../models/admin/category");
 const { enhanceProviderDetails } = require("../../utils/providerHelper");
 
@@ -1201,10 +1202,29 @@ exports.searchVenues = async (req, res) => {
       venues.sort((a, b) => a.distance - b.distance);
     }
 
-    // Date-based availability filter
+    // Date-based validation & availability filter
     if (date) {
+      // 1. Enforce 2-day lead time rule
+      const requestedDate = new Date(date);
+      const minDate = new Date();
+      minDate.setHours(0, 0, 0, 0);
+      minDate.setDate(minDate.getDate() + 2); // 2 days from today
+
+      if (requestedDate < minDate) {
+        return res.status(200).json({
+          success: true,
+          count: 0,
+          totalResults: 0,
+          page: parseInt(page),
+          totalPages: 0,
+          data: [],
+          message: "Selected date is within the 2-day restricted booking window",
+        });
+      }
+
       const dayOfWeek = getDayOfWeek(date);
 
+      // Filter venues based on their pricing schedule (opening days)
       venues = venues.filter((venue) => {
         if (!venue.pricingSchedule || !venue.pricingSchedule[dayOfWeek]) {
           return false;
@@ -1216,6 +1236,54 @@ exports.searchVenues = async (req, res) => {
             Object.keys(daySchedule.morning).length > 0) ||
           (daySchedule.evening && Object.keys(daySchedule.evening).length > 0)
         );
+      });
+
+      // 2. Check for booking conflicts (filter out fully booked venues)
+      const startOfDay = new Date(date);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+
+      // Find all relevant bookings for these venues on this date
+      const venueIds = venues.map(v => v._id);
+      const activeBookings = await Booking.find({
+        venueId: { $in: venueIds },
+        bookingDate: { $gte: startOfDay, $lte: endOfDay },
+        status: { $in: ["Pending", "Accepted", "Confirmed"] },
+        paymentStatus: { $nin: ["failed", "cancelled", "initiated"] }
+      }).select("venueId timeSlot").lean();
+
+      // For each venue, count occupied slots
+      venues = venues.filter(venue => {
+        const venueBookings = activeBookings.filter(b => b.venueId.toString() === venue._id.toString());
+
+        // Identify which slots are open in pricing schedule
+        const daySchedule = venue.pricingSchedule[dayOfWeek];
+        const hasMorningSlot = daySchedule?.morning && Object.keys(daySchedule.morning).length > 0;
+        const hasEveningSlot = daySchedule?.evening && Object.keys(daySchedule.evening).length > 0;
+
+        // Count how many and which slots are already booked
+        let morningBooked = false;
+        let eveningBooked = false;
+
+        venueBookings.forEach(booking => {
+          const slots = Array.isArray(booking.timeSlot) ? booking.timeSlot : [{ label: booking.timeSlot }];
+          slots.forEach(s => {
+            const label = (s.label || s || "").toString().toLowerCase();
+            if (label.includes("morning")) morningBooked = true;
+            if (label.includes("evening")) eveningBooked = true;
+            if (label.includes("full day")) {
+              morningBooked = true;
+              eveningBooked = true;
+            }
+          });
+        });
+
+        // A venue is "fully booked" if it has ONLY a morning slot and that's booked,
+        // OR it has ONLY an evening slot and that's booked,
+        // OR it has BOTH and both are booked.
+        // It's "available" if (hasMorning and NOT morningBooked) OR (hasEvening and NOT eveningBooked)
+        return (hasMorningSlot && !morningBooked) || (hasEveningSlot && !eveningBooked);
       });
 
       venues = venues.map((venue) => ({

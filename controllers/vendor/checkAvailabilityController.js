@@ -96,6 +96,22 @@ exports.checkAvailability = async (req, res) => {
     endOfDay.setUTCHours(23, 59, 59, 999);
 
     /* =========================
+       2-DAY LEAD TIME VALIDATION
+    ========================= */
+    const minDate = new Date();
+    minDate.setDate(minDate.getDate() + 1);
+    minDate.setHours(0, 0, 0, 0);
+
+    if (startOfDay < minDate) {
+      return res.status(200).json({
+        success: true,
+        available: false,
+        availabilityStatus: "Restricted",
+        message: "Bookings must be made at least 1 days in advance. Please select a later date.",
+      });
+    }
+
+    /* =========================
        BUILD CONFLICT QUERY
     ========================= */
     const { vehicleId, boutiqueId, ornamentId, cakeId, venueId, makeupId, photographyId, cateringId, invitationId, lightAndSoundId } = req.body;
