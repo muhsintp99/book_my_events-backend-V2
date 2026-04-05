@@ -1852,7 +1852,7 @@ exports.createBooking = async (req, res) => {
       let applyTarget = (resolvedCoupon.applyTo || "total");
 
       // For specific modules, ALWAYS apply to total as per user requirement
-      const restrictedModules = ["cake", "ornament", "ornaments", "boutique", "boutiques"];
+      const restrictedModules = ["cake", "ornament", "ornaments", "boutique", "boutiques", "mehandi", "mehandi artist"];
       if (restrictedModules.includes((moduleType || "").toLowerCase())) {
         applyTarget = "total";
       }
@@ -1874,9 +1874,9 @@ exports.createBooking = async (req, res) => {
     let finalPrice = Math.max(totalPriceBeforeCoupon - couponDiscountValue, 0);
 
     // If applyTo is 'advance', specifically subtract from the advance field
-    if (resolvedCoupon && resolvedCoupon.applyTo === "advance") {
+    if (resolvedCoupon && resolvedCoupon.applyTo === "advance" && !["mehandi", "mehandi artist"].includes((moduleType || "").toLowerCase())) {
         advanceAmount = Math.max(advanceAmount - couponDiscountValue, 0);
-    } else if (resolvedCoupon && resolvedCoupon.applyTo === "total") {
+    } else if (resolvedCoupon) {
         // For percentage-based systems, we recalculate the percentage of the newly discounted final price.
         // If there's a strict fixed amount without a valid percentage, retain the fixed advance or clamp to finalPrice.
         const pctString = serviceProvider.advancePercentage;
@@ -1884,8 +1884,13 @@ exports.createBooking = async (req, res) => {
             const advPct = Number(pctString);
             advanceAmount = Math.round(finalPrice * (advPct / 100));
         } else {
-             // Clamping absolute advance so it cannot exceed the new discounted final price
-             advanceAmount = Math.min(advanceAmount, finalPrice);
+             // Dynamically recalculate advance by determining its original implicit percentage
+             if (totalPriceBeforeCoupon > 0 && advanceAmount > 0) {
+                 const implicitPct = advanceAmount / totalPriceBeforeCoupon;
+                 advanceAmount = Math.round(finalPrice * implicitPct);
+             } else {
+                 advanceAmount = Math.min(advanceAmount, finalPrice);
+             }
         }
     }
 
