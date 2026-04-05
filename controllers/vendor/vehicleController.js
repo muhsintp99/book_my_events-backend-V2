@@ -2656,9 +2656,12 @@ const sanitizeVehicleData = (body) => {
   }
 
   /* ================= ADVANCE BOOKING AMOUNT ================= */
-
   if (body.advanceBookingAmount !== undefined) {
     sanitized.advanceBookingAmount = Number(body.advanceBookingAmount) || 0;
+  }
+
+  if (body.advancePercentage !== undefined) {
+    sanitized.advancePercentage = Number(body.advancePercentage) || 0;
   }
 
 

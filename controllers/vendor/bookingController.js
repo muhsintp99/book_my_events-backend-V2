@@ -1826,7 +1826,12 @@ exports.createBooking = async (req, res) => {
 
     // [PHASE 2] Calculate BASE Advance Amount (before coupon)
     let advanceAmount = 0;
-    if (moduleType === "Catering") {
+    
+    // Check for explicit advancePercentage first (MODERN STANDARDIZED LOGIC)
+    if (serviceProvider.advancePercentage && Number(serviceProvider.advancePercentage) > 0) {
+      const advPct = Number(serviceProvider.advancePercentage);
+      advanceAmount = Math.round(totalPriceBeforeCoupon * (advPct / 100));
+    } else if (moduleType === "Catering") {
       const advPct = Number(serviceProvider.advancePercentage || 10);
       advanceAmount = Math.round(totalPriceBeforeCoupon * (advPct / 100));
     } else {
@@ -1856,7 +1861,8 @@ exports.createBooking = async (req, res) => {
         "cake", "ornament", "ornaments", "boutique", "boutiques", 
         "mehandi", "mehandi artist", "makeup", "makeup artist", 
         "photography", "catering", "invitation", "invitation & printing", 
-        "printing", "florist", "florist & stage"
+        "printing", "florist", "florist & stage", "transport", "vehicle", 
+        "vehicles", "venues", "venue"
       ];
       if (restrictedModules.includes((moduleType || "").toLowerCase())) {
         applyTarget = "total";
@@ -1882,7 +1888,8 @@ exports.createBooking = async (req, res) => {
     const applyToAdvanceBlockedModules = [
       "mehandi", "mehandi artist", "makeup", "makeup artist", 
       "photography", "catering", "invitation", "invitation & printing", 
-      "printing", "florist", "florist & stage"
+      "printing", "florist", "florist & stage", "transport", "vehicle", 
+      "vehicles", "venues", "venue"
     ];
     if (resolvedCoupon && resolvedCoupon.applyTo === "advance" && !applyToAdvanceBlockedModules.includes((moduleType || "").toLowerCase())) {
         advanceAmount = Math.max(advanceAmount - couponDiscountValue, 0);
