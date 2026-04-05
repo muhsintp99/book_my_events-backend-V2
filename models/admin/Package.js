@@ -9,7 +9,7 @@ const PackageSchema = new mongoose.Schema({
 
   module: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Module', 
+    ref: 'SecondaryModule', 
     index: true, 
     required: false
   },
@@ -31,6 +31,8 @@ const PackageSchema = new mongoose.Schema({
   }],
 
   price: { type: Number, required: true, min: 0 },
+  advanceAmount: { type: Number, default: 0 },
+  isTopPick: { type: Boolean, default: false },
   images: [{ type: String }],
   thumbnail: { type: String, default: null },
 
