@@ -214,6 +214,11 @@ const VehicleSchema = new mongoose.Schema(
       default: 0,
       min: [0, "Advance booking amount cannot be negative"],
     },
+    advancePercentage: {
+       type: Number,
+       min: 0,
+       max: 100
+    },
 
 
 
