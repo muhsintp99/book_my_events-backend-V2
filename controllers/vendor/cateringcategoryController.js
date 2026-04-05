@@ -355,6 +355,7 @@ exports.createCatering = async (req, res) => {
       includes,
       price,
       advanceBookingAmount,
+      advancePercentage,
       createdBy,
       providerId
     } = req.body;
@@ -393,6 +394,7 @@ exports.createCatering = async (req, res) => {
       includes: parsedIncludes,
       price,
       advanceBookingAmount: Number(advanceBookingAmount) || 0,
+      advancePercentage: Number(advancePercentage) || 10,
 
       images,
       thumbnail,
@@ -431,6 +433,7 @@ exports.updateCatering = async (req, res) => {
       includes,
       price,
       advanceBookingAmount, // ✅ ADD THIS
+      advancePercentage,
 
       updatedBy
     } = req.body;
@@ -466,6 +469,9 @@ exports.updateCatering = async (req, res) => {
     catering.updatedBy = updatedBy;
     if (advanceBookingAmount !== undefined) {
       catering.advanceBookingAmount = Number(advanceBookingAmount);
+    }
+    if (advancePercentage !== undefined) {
+      catering.advancePercentage = Number(advancePercentage);
     }
 
     await catering.save();

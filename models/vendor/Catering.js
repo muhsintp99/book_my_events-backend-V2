@@ -119,6 +119,13 @@ const CateringSchema = new mongoose.Schema(
       },
     },
 
+    advancePercentage: {
+       type: Number,
+       default: 10,
+       min: 0,
+       max: 100
+    },
+
     // ===============================
     // MEDIA
     // ===============================
