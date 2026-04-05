@@ -63,6 +63,7 @@ const normalizeFormData = (data) => {
     "latitude",
     "longitude",
     "advanceDeposit",
+    "advancePercentage",
     "maxGuestsSeated",
     "maxGuestsStanding",
     "rating",
